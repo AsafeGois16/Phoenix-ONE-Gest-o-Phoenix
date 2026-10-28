@@ -58,3 +58,14 @@ Na aba **Integrações** do Phoenix ONE, o administrador informa a URL completa 
 O botão de teste usa `phoenix-one-admin:probe`, com `conversation_id` de protocolo aberto, e chama somente `GET /contacts/resolve`, sem mostrar dados pessoais. A consulta contextual do agente usa `phoenix-one-bridge:junior_context`, que lê a mesma credencial do Vault e devolve somente apólices/parcelas permitidas da conversa. A URL deve ser HTTPS da função Supabase esperada; não são aceitos endereços arbitrários.
 
 **Importante:** `PHOENIX_ONE_TOKEN` é OUTRA chave — serve para autenticar o sistema Junior ao chamar `/api/v1/conversations/respond`. `PHOENIX_ONE_WEBHOOK_SECRET` assina avisos. Essas duas continuam como segredos no Vercel e devem ser sincronizadas por canal seguro com a instalação do Junior. Nenhuma chave deve ser enviada por chat.
+
+
+## Contrato v1, atualização de 28/10/2026 — usuário específico
+
+A gestão do Junior pode enviar `ticket.assigned.v1` com `ticket.assigned_to: { type: 'user', id, name }`. O Phoenix ONE encaminha apenas `type` e `id` para a ponte interna, que grava o identificador do responsável em `phoenix_one.external_ticket_refs.assigned_to_user_id` e altera o estado para `assigned`. O nome da pessoa não é copiado para a base da IA. O agente deixa de ser responsável pela conversa conforme regras da gestão do Junior. O contrato de `/respond` ainda oferece `handoff.department`; esta implementação **não atribui um ticket diretamente a usuários**: falta pactuar a proposta de atribuição pessoa a pessoa, que só a gestão do Junior executará. A gestão também passa a oferecer `GET /users` e aceita `POST /tickets/{protocolo}/transfer` com `user_id`, mas nenhuma dessas chamadas é executada automaticamente nesta revisão.
+
+Mensagens de entrada são exclusivamente do tipo `text` (até 20 itens de 4000 caracteres), com arquivos/áudios descritos como texto. O endpoint existente aceita `text` e preserva o formato de resposta e o prazo máximo de 20 segundos. A lista de parcelas pode omitir `parcela`; o leitor da API trata esse campo como opcional.
+
+## Correção de persistência do Vault — 28/10/2026
+
+Uma falha real de 500 em `phoenix-one-admin` foi causada por `SELECT ... FOR UPDATE` sobre `vault.secrets`: o usuário de conexão tem SELECT, mas não UPDATE sobre essa tabela protegida, e o PostgreSQL rejeita esse bloqueio. Solução: serialização por `pg_advisory_xact_lock(hashtext(credentialName))` e leitura de `vault.secrets` sem `FOR UPDATE`. A gravação e rotação utilizam apenas as funções `vault.create_secret` e `vault.update_secret`; nenhuma permissão adicional foi concedida à tabela do Vault. Um teste de criação e rotação usando chave fictícia foi validado em transação revertida com `ROLLBACK`. O fluxo administrativo com a credencial real do usuário precisa ser testado após a atualização.

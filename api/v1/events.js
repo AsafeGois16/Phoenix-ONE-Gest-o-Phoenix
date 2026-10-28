@@ -26,7 +26,7 @@ export default async function handler(req,res){
    const result=await bridge('event',{event:{
       event_id:event.event_id,event_type:event.event_type,occurred_at:event.occurred_at,
       ticket:{id:ticket.id,conversation_id:ticket.conversation_id,department:ticket.department,category:ticket.category,
-              agent:ticket.agent,status:ticket.status,resolution_summary:ticket.resolution_summary}
+              agent:ticket.agent,status:ticket.status,resolution_summary:ticket.resolution_summary,assigned_to:ticket.assigned_to?.type==='user'&&typeof ticket.assigned_to.id==='string'?{type:'user',id:ticket.assigned_to.id}:null}
     }},controller.signal)
    return jsonResponse(res,200,result)
   }finally{clearTimeout(timer)}
