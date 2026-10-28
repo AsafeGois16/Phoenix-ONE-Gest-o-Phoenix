@@ -69,3 +69,8 @@ Mensagens de entrada são exclusivamente do tipo `text` (até 20 itens de 4000 c
 ## Correção de persistência do Vault — 28/10/2026
 
 Uma falha real de 500 em `phoenix-one-admin` foi causada por `SELECT ... FOR UPDATE` sobre `vault.secrets`: o usuário de conexão tem SELECT, mas não UPDATE sobre essa tabela protegida, e o PostgreSQL rejeita esse bloqueio. Solução: serialização por `pg_advisory_xact_lock(hashtext(credentialName))` e leitura de `vault.secrets` sem `FOR UPDATE`. A gravação e rotação utilizam apenas as funções `vault.create_secret` e `vault.update_secret`; nenhuma permissão adicional foi concedida à tabela do Vault. Um teste de criação e rotação usando chave fictícia foi validado em transação revertida com `ROLLBACK`. O fluxo administrativo com a credencial real do usuário precisa ser testado após a atualização.
+
+
+## Correção adicional do salvamento de permissões — 28/10/2026
+
+Após corrigir o bloqueio do Vault, os logs de produção registraram novos HTTP 500 (Edge Function v3) com erro PostgreSQL 22023: `cannot extract elements from a scalar`. Origem: `granted_scopes=ARRAY(SELECT jsonb_array_elements_text($2::jsonb))` ao receber o parâmetro `JSON.stringify(selected)` via `postgres.js` (`tx.unsafe`) e serialização de parâmetros. A função v4 converte as permissões já validadas contra a allowlist com `selected.join(',')` e persiste usando `CASE WHEN $2='' THEN '{}'::text[] ELSE string_to_array($2,',') END`; valores permitidos nunca contêm vírgulas. Foram validados SQL de lista preenchida e vazia com ROLLBACK, sem alterar configuração existente. Não expõe a credencial da API nos logs ou respostas. Ainda é necessário validar um salvamento de chave real por sessão administrativa (não dispomos da senha do usuário).
