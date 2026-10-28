@@ -35,15 +35,20 @@ export function redact(s){
  .replace(/\b(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}\b/g,'[CONTATO]')
  .replace(/\b\d{8,}\b/g,'[IDENTIFICADOR]')
 }
-export async function juniorIdentityContext(conversationId,protocolo,document,signal){
+export async function juniorIdentityContext(conversationId,protocolo,document,proof,signal){
  if(!uuidValid(conversationId)||!/^\d{8}-\d{4}$/.test(protocolo))return {status:'unavailable'}
  try{
-  const payload={conversationId,protocolo}
-  if(document?.status==='valid'){payload.documentType=document.type;payload.document=document.number}
+  if(!document||document.status!=='valid')return {status:'unavailable'}
+  const payload={conversationId,protocolo,documentType:document.type,document:document.number}
+  if(proof&&Object.keys(proof).length===1){
+   if(document.type==='cpf'&&typeof proof.birth_date==='string')payload.proof={birth_date:proof.birth_date}
+   if(document.type==='cnpj'&&typeof proof.cep==='string')payload.proof={cep:proof.cep}
+  }
   const data=await bridge('identity_context',payload,signal)
-  return data?.status==='verified'?
-    {status:'verified',policies:data.policies||[],installments:data.installments||[]}:
-    {status:['verification_required','not_found','multiple_matches','unavailable'].includes(data?.status)?data.status:'unavailable'}
+  if(data?.status==='verified')return {status:'verified',policies:data.policies||[],installments:data.installments||[]}
+  const allowed=['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
+  return {status:allowed.includes(data?.status)?data.status:'unavailable',
+   method:data?.verification?.method||null,attemptsLeft:Number.isInteger(data?.verification?.attempts_left)?data.verification.attempts_left:null}
  }catch{return {status:'unavailable'}}
 }
 export function hmacSignature(ts,raw,secret){return 'sha256='+createHmac('sha256',secret).update(ts+'.'+raw).digest('hex')}

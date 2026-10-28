@@ -35,3 +35,42 @@ export function handoffDepartment(history){
  if(/auto|autom[oó]vel|residencial|frota|patrimonial|sinistro|inc[eê]ndio/.test(text))return 'patrimonio'
  return 'comercial'
 }
+
+
+/** Interpretar prova apenas quando a última resposta da Clara explicitamente a pediu.
+ * Nunca armazenar ou remeter nascimento/CEP ao modelo de linguagem.
+ */
+export function extractVerificationProof(messages,documentType) {
+ const list=Array.isArray(messages)?messages:[]
+ const latest=list.at(-1)
+ if(!latest||latest.direction!=='inbound'||latest.author!=='contact'||typeof latest.text!=='string')return null
+ const question=[...list.slice(0,-1)].reverse().find(m=>m?.direction==='outbound'&&m?.author==='agent'&&typeof m.text==='string')
+ if(!question)return null
+ const previous=question.text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+ const last=latest.text.trim()
+ if(documentType==='cpf'&&previous.includes('data de nascimento')){
+   const iso=last.match(/(?:^|\D)((?:19|20)\d{2})[-/.](\d{1,2})[-/.](\d{1,2})(?:\D|$)/)
+   const br=last.match(/(?:^|\D)(\d{1,2})[-/.](\d{1,2})[-/.]((?:19|20)\d{2})(?:\D|$)/)
+   const compact=last.match(/^\D*(\d{2})(\d{2})((?:19|20)\d{2})\D*$/)
+   let year,month,day
+   if(iso){[,year,month,day]=iso}
+   else if(br||compact){const x=br||compact;day=x[1];month=x[2];year=x[3]}
+   if(year){
+     const y=+year,m=+month,d=+day,dt=new Date(Date.UTC(y,m-1,d))
+     if(y>=1900&&dt.getUTCFullYear()===y&&dt.getUTCMonth()+1===m&&dt.getUTCDate()===d&&dt<=new Date())
+       return {birth_date:[year,String(m).padStart(2,'0'),String(d).padStart(2,'0')].join('-')}
+   }
+ }
+ if(documentType==='cnpj'&&/\bcep\b/.test(previous)){
+   const match=last.match(/(?:^|\D)(\d{5})-?(\d{3})(?:\D|$)/)
+   if(match)return {cep:match[1]+match[2]}
+ }
+ return null
+}
+export function scrubVerificationProof(text){
+ return String(text||'')
+ .replace(/(?<!\d)(?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2}(?!\d)/g,'[DATA DE VERIFICACAO]')
+ .replace(/(?<!\d)\d{1,2}[-/.]\d{1,2}[-/.](?:19|20)\d{2}(?!\d)/g,'[DATA DE VERIFICACAO]')
+ .replace(/(?<!\d)(?:0[1-9]|[12]\d|3[01])(?:0[1-9]|1[0-2])(?:19|20)\d{2}(?!\d)/g,'[DATA DE VERIFICACAO]')
+ .replace(/(?<!\d)\d{5}-?\d{3}(?!\d)/g,'[CEP DE VERIFICACAO]')
+}

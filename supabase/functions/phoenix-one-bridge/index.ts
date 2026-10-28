@@ -45,9 +45,20 @@ Deno.serve(async request=>{
   if(data.action==='identity_context'){
    const conversationId=data.conversationId,protocolo=data.protocolo
    if(!uuid(conversationId)||typeof protocolo!=='string'||!/^\d{8}-\d{4}$/.test(protocolo))return reply(400,{error:'invalid_identity_request'})
-   const doc=typeof data.document==='string'?data.document:''
-   const typ=data.documentType
-   if(doc&&(!/^\d{11}$|^\d{14}$/.test(doc)||!(typ==='cpf'||typ==='cnpj')||(typ==='cpf'&&doc.length!==11)||(typ==='cnpj'&&doc.length!==14)))return reply(400,{error:'invalid_document_format'})
+   const doc=typeof data.document==='string'?data.document:'',typ=data.documentType
+   if(!((typ==='cpf'&&/^\d{11}$/.test(doc))||(typ==='cnpj'&&/^\d{14}$/.test(doc))))return reply(400,{error:'invalid_document_format'})
+   const proof=data.proof
+   let verifiedProof=null
+   if(proof!==undefined&&proof!==null){
+    if(typeof proof!=='object'||Array.isArray(proof)||Object.keys(proof).length!==1)return reply(400,{error:'invalid_proof'})
+    if(typ==='cpf'&&typeof proof.birth_date==='string'&&/^(19|20)\d{2}-\d{2}-\d{2}$/.test(proof.birth_date)){
+      const s=proof.birth_date,y=Number(s.slice(0,4)),m=Number(s.slice(5,7)),d=Number(s.slice(8,10)),dt=new Date(Date.UTC(y,m-1,d))
+      if(dt.getUTCFullYear()!==y||dt.getUTCMonth()+1!==m||dt.getUTCDate()!==d||dt>new Date())return reply(400,{error:'invalid_proof'})
+      verifiedProof={birth_date:s}
+    }else if(typ==='cnpj'&&typeof proof.cep==='string'&&/^\d{8}$/.test(proof.cep)){
+      verifiedProof={cep:proof.cep}
+    }else return reply(400,{error:'invalid_proof'})
+   }
    const conn=await pg.unsafe("select api_base_url,granted_scopes from phoenix_one.integration_connections where provider='junior_management'")
    const endpoint=conn[0]?.api_base_url||''
    if(!Array.isArray(conn[0]?.granted_scopes)||!conn[0].granted_scopes.includes('identity:resolve'))return reply(200,{status:'unavailable'})
@@ -61,31 +72,45 @@ Deno.serve(async request=>{
    const token=stored[0]?.decrypted_secret||''
    if(!token)return reply(200,{status:'unavailable'})
    const target=endpoint.replace(/\/+$/,'')+'/identity/resolve'
-   let result
+   let response
    try{
-    result=await fetch(target,{method:'POST',redirect:'error',signal:AbortSignal.timeout(4500),
+    response=await fetch(target,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5500),
       headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},
-      body:JSON.stringify({conversation_id:conversationId,protocolo,document_type:doc?typ:null,document:doc||null,purpose:'policies_and_installments'})
+      body:JSON.stringify({conversation_id:conversationId,protocolo,document_type:typ,document:doc,purpose:'policies_and_installments',...(verifiedProof?{proof:verifiedProof}:{})})
     })
    }catch{return reply(200,{status:'unavailable'})}
-   if(result.status===404||result.status===405||result.status===501)return reply(200,{status:'unavailable'})
-   if(!result.ok)return reply(200,{status:'unavailable'})
-   let dataFromJunior
-   try{const raw=await result.text();if(raw.length>32000)return reply(200,{status:'unavailable'});dataFromJunior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
-   const safeStatus=new Set(['verification_required','multiple_matches','not_found'])
-   if(dataFromJunior?.status!=='verified')return reply(200,{status:safeStatus.has(dataFromJunior?.status)?dataFromJunior.status:'unavailable'})
-   const verification=dataFromJunior.verification||{}
-   const strong=new Set(['otp','staff_verified','existing_verified_session'])
-   if(dataFromJunior.conversation_id!==conversationId||dataFromJunior.protocolo!==protocolo
-     ||verification.status!=='verified'||!strong.has(verification.method)
-     ||(doc&&(dataFromJunior.document_type!==typ||dataFromJunior.document_last4!==doc.slice(-4))))
-      return reply(200,{status:'verification_required'})
-   const policies=Array.isArray(dataFromJunior.policies)?dataFromJunior.policies.slice(0,12).map(p=>({
+   let junior
+   try{const raw=await response.text();if(raw.length>32000)return reply(200,{status:'unavailable'});junior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
+   // Não revelar diferenças internas de documento: status apenas para fluxo do agente.
+   const allowed=new Set(['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches'])
+   let status=junior?.status
+   if(response.status===429)status='too_many_attempts'
+   if(response.status===404)status='protocol_not_open'
+   if(response.status===400&&!allowed.has(status))status='invalid_document'
+   if(!response.ok&&![400,404,429].includes(response.status))return reply(200,{status:'unavailable'})
+   if(status!=='verified'){
+    if(!allowed.has(status))return reply(200,{status:'unavailable'})
+    const proofMethod=junior?.verification?.method
+    const method=['birth_date','cep','human'].includes(proofMethod)?proofMethod:null
+    const remaining=junior?.verification?.attempts_left
+    return reply(200,{status,verification:{
+      method,attempts_left:Number.isInteger(remaining)&&remaining>=0&&remaining<=3?remaining:null
+    }})
+   }
+   // Status verificado deve vir da API autenticada do Junior e estar ligado ao documento solicitado.
+   // O backend da gestão assume a confirmação, aplica os limites e liga a verificação ao protocolo.
+   if(junior.document_last4!==doc.slice(-4)||
+     (junior.conversation_id&&junior.conversation_id!==conversationId)||
+     (junior.protocolo&&junior.protocolo!==protocolo)||
+     (junior.document_type&&junior.document_type!==typ)||
+     (junior.verification&&junior.verification.status!=='verified'))
+     return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
+   const policies=Array.isArray(junior.policies)?junior.policies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60)
    })):[]
-   const installments=Array.isArray(dataFromJunior.installments)?dataFromJunior.installments.slice(0,12).map(i=>({
-    apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),
-    vencimento:cleanString(i?.vencimento,30),valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
+   const installments=Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
+    apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),vencimento:cleanString(i?.vencimento,30),
+    valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
    })):[]
    return reply(200,{status:'verified',policies,installments})
   }

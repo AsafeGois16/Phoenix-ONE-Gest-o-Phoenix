@@ -24,3 +24,20 @@ test('setor de suporte independente de identidade por telefone',()=>{
  assert.equal(handoffDepartment([inbound('Parcelas seguro auto')]),'patrimonio')
  assert.equal(handoffDepartment([inbound('Quais seguros tenho?')]),'comercial')
 })
+
+
+test('CPF: prova de nascimento apenas após pergunta explicita da Clara',async()=>{
+ const {extractVerificationProof,scrubVerificationProof}=await import('../server/document-identity.js')
+ const q={direction:'outbound',author:'agent',text:'Pode informar sua data de nascimento no formato DD/MM/AAAA?'}
+ assert.deepEqual(extractVerificationProof([inbound('111.444.777-35'),q,inbound('25/11/1990')],'cpf'),{birth_date:'1990-11-25'})
+ assert.equal(extractVerificationProof([inbound('25/11/1990')],'cpf'),null)
+ assert.equal(extractVerificationProof([inbound('111.444.777-35'),q,inbound('31/02/1990')],'cpf'),null)
+ assert.equal(scrubVerificationProof('Nasci em 25/11/1990'),'Nasci em [DATA DE VERIFICACAO]')
+})
+test('CNPJ: CEP somente após pergunta explicita e nao chega ao modelo',async()=>{
+ const {extractVerificationProof,scrubVerificationProof}=await import('../server/document-identity.js')
+ const q={direction:'outbound',author:'agent',text:'Pode informar o CEP cadastrado (8 números)?'}
+ assert.deepEqual(extractVerificationProof([inbound('11.222.333/0001-81'),q,inbound('01234-567')],'cnpj'),{cep:'01234567'})
+ assert.equal(extractVerificationProof([inbound('01234-567')],'cnpj'),null)
+ assert.equal(scrubVerificationProof('CEP 01234-567'),'CEP [CEP DE VERIFICACAO]')
+})

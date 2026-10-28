@@ -85,3 +85,83 @@ test('somente após verificação confirmada o modelo recebe dados filtrados sem
  assert.ok(!JSON.stringify(openAiPayload).includes('11144477735'))
  assert.ok(!JSON.stringify(openAiPayload).includes(testCPF))
 }))
+
+
+test('CPF: verification_required solicita nascimento, sem handoff imediato',()=>withMock(async()=>{
+ let calls=0
+ globalThis.fetch=async(url,options)=>{
+  const data=JSON.parse(options.body)
+  if(data.action==='context')return json({prompt:'Prompt de teste',sources:[]})
+  if(data.action==='identity_context'){
+   calls++
+   assert.equal(data.document,'11144477735')
+   assert.equal(data.proof,undefined)
+   return json({status:'verification_required',verification:{method:'birth_date',attempts_left:2}})
+  }
+  throw Error('Nao deveria chamar OpenAI enquanto pede prova')
+ }
+ const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'clara');assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/data de nascimento/i);assert.equal(calls,1)
+}))
+test('CPF: data de nascimento vai apenas ao Junior e é removida da OpenAI',()=>withMock(async()=>{
+ let called=false,model=null
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(url.includes('phoenix-one-bridge')&&d.action==='context'){assert.ok(!JSON.stringify(d).includes('25/11/1990'));return json({prompt:'Prompt de teste',sources:[]})}
+  if(url.includes('phoenix-one-bridge')&&d.action==='identity_context'){
+   called=true;assert.deepEqual(d.proof,{birth_date:'1990-11-25'})
+   return json({status:'verified',policies:[{numero:'APOLICE-FICTICIA',ramo:'Auto'}],installments:[]})
+  }
+  if(url.includes('api.openai.com')){
+   model=d;return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Seu seguro foi localizado.',humanHandoff:false,handoff:null})}]}]})
+  }
+  throw Error('Fetch nao previsto')
+ }
+ const res=response(),input=request(['Quais seguros eu tenho?',testCPF])
+ input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Pode informar sua data de nascimento no formato DD/MM/AAAA?'},{direction:'inbound',author:'contact',type:'text',text:'25/11/1990'})
+ await handler(input,res)
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false);assert.ok(called&&model)
+ assert.ok(!JSON.stringify(model).includes('25/11/1990'))
+ assert.ok(!JSON.stringify(model).includes('1990-11-25'))
+ assert.ok(!JSON.stringify(model).includes('11144477735'))
+}))
+test('CNPJ: CEP enviado apenas ao bridge e nova tentativa permitida',()=>withMock(async()=>{
+ let called=false
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='context')return json({prompt:'Prompt de teste',sources:[]})
+  if(d.action==='identity_context'){
+   called=true;assert.equal(d.documentType,'cnpj');assert.equal(d.document,'11222333000181')
+   assert.deepEqual(d.proof,{cep:'01234567'})
+   return json({status:'verification_required',verification:{method:'cep',attempts_left:1}})
+  }
+  throw Error('OpenAI nao deveria ser chamada')
+ }
+ const res=response(),input=request(['Quais seguros eu tenho?','11.222.333/0001-81'])
+ input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Pode informar o CEP cadastrado (8 números)?'},{direction:'inbound',author:'contact',type:'text',text:'01234-567'})
+ await handler(input,res)
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false);assert.match(res.body.reply,/CEP/)
+ assert.ok(called)
+}))
+test('Limite de tentativas gera encaminhamento humano sem dados privados',()=>withMock(async()=>{
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='context')return json({prompt:'Prompt de teste',sources:[]})
+  if(d.action==='identity_context')return json({status:'too_many_attempts'})
+  throw Error('Nao pode consultar OpenAI')
+ }
+ const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,true)
+ assert.ok(!JSON.stringify(res.body).includes('11144477735'))
+}))
+test('Junior pede validação humana, não nascimento/CEP',()=>withMock(async()=>{
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='context')return json({prompt:'Prompt de teste',sources:[]})
+  if(d.action==='identity_context')return json({status:'verification_required',verification:{method:'human',attempts_left:2}})
+  throw Error('Nao pode consultar OpenAI')
+ }
+ const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,true)
+}))
