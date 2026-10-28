@@ -98,3 +98,22 @@ Para sucesso, o Junior retorna `{"status":"verified","conversation_id":"UUID","p
 **Fluxo:** pedido de detalhes -> Clara pede CPF/CNPJ do titular -> cliente fornece número -> Phoenix ONE valida sintaxe e o Junior valida identidade e vínculo ao cadastro -> só a confirmação verificada autoriza consulta -> apólices e parcelas são entregues à Clara. Caso haja mais de um titular/apólice, o Junior aplica controle de acesso à seleção.
 
 **IMPORTANTE:** Este endpoint é uma extensão proposta e ainda **não foi confirmado como implementado** no sistema do Junior. O comportamento atual preserva sigilo e transfere ao humano até a homologação. A execução do 4Zapy e tickets permanece integralmente no Junior.
+
+
+## Contrato atualizado em 28/10/2026 — prova de identidade conforme API do Junior
+
+O Junior informou que a rota POST /identity/resolve foi implementada com CPF/CNPJ e uma segunda solicitação opcional de proof. Esta seção prevalece sobre trechos anteriores que citavam somente OTP ou repasse humano imediato.
+
+1. Clara solicita CPF ou CNPJ somente para pesquisa de informações privadas; não presume titularidade pelo telefone.
+2. A gestão responde status=verification_required, verification.method=birth_date (pessoa física), cep (pessoa jurídica) ou human, além de attempts_left.
+3. Nos dois primeiros casos, Clara pede a informação correspondente; o backend do Phoenix ONE só extrai nascimento/CEP após uma pergunta explícita e envia a prova para POST /identity/resolve usando o token criptografado no Vault. Nenhuma informação de prova ou documento entra na OpenAI.
+4. O Junior confirma o vínculo e a identidade no protocolo aberto; apenas status=verified com document_last4 correspondente é aceito como autorização para acessar policies e installments. A resposta ao modelo inclui apenas os dados contratuais autorizados.
+5. status=verification_failed, too_many_attempts, invalid_document, not_found, protocol_not_open ou confirmação humana obrigatória resulta em encaminhamento, sem revelar dados privados.
+
+Parâmetros de prova enviados apenas entre servidores: proof: {birth_date: '1990-11-25'} para PF ou proof: {cep: '01234567'} para PJ. Dados acima são apenas exemplos.
+
+A API do Junior é responsável pelos limites de 3 documentos por protocolo, 3 tentativas de prova e 20 consultas por hora. O Phoenix ONE não contorna bloqueios e não armazena documentos nem provas.
+
+Risco residual: data de nascimento e CEP podem ser conhecidos por terceiros, portanto são fatores relativamente fracos. Recomenda-se confirmação por segundo canal confiável, ou revisão humana, antes de liberar detalhes financeiros em modo automático.
+
+Validação de homologação: executar o fluxo completo de prova com CPF e CNPJ fictícios/autorizados, bem como bloqueio, 404 e tentativas incorretas; os testes automatizados validam o comportamento do Phoenix ONE, mas não substituem a prova fim a fim com a API real do Junior.
