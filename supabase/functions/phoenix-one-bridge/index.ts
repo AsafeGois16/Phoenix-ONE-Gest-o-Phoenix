@@ -42,36 +42,52 @@ Deno.serve(async request=>{
    const matches=await pg.unsafe("select d.title as source,c.chunk_index,c.content,ts_rank_cd(to_tsvector('portuguese',c.content),websearch_to_tsquery('portuguese',$1)) as rank from phoenix_one.knowledge_chunks c join phoenix_one.knowledge_documents d on d.id=c.document_id join phoenix_one.document_agents da on da.document_id=d.id and da.agent_id=$2 where d.status='published' and d.sensitivity in ('internal','public') and (d.valid_until is null or d.valid_until >= current_date) and to_tsvector('portuguese',c.content) @@ websearch_to_tsquery('portuguese',$1) order by rank desc limit 6",[query,agent])
    return reply(200,{agent,version:agents[0].version,prompt:agents[0].system_prompt,sources:matches.map(x=>({title:x.source,chunk_index:x.chunk_index,content:x.content.slice(0,1300)}))})
   }
-  if(data.action==='junior_context'){
-   const conversationId=data.conversationId
-   if(!uuid(conversationId))return reply(400,{error:'invalid_conversation_id'})
-   const conn=await pg.unsafe("select api_base_url from phoenix_one.integration_connections where provider='junior_management'")
+  if(data.action==='identity_context'){
+   const conversationId=data.conversationId,protocolo=data.protocolo
+   if(!uuid(conversationId)||typeof protocolo!=='string'||!/^\d{8}-\d{4}$/.test(protocolo))return reply(400,{error:'invalid_identity_request'})
+   const doc=typeof data.document==='string'?data.document:''
+   const typ=data.documentType
+   if(doc&&(!/^\d{11}$|^\d{14}$/.test(doc)||!(typ==='cpf'||typ==='cnpj')||(typ==='cpf'&&doc.length!==11)||(typ==='cnpj'&&doc.length!==14)))return reply(400,{error:'invalid_document_format'})
+   const conn=await pg.unsafe("select api_base_url,granted_scopes from phoenix_one.integration_connections where provider='junior_management'")
    const endpoint=conn[0]?.api_base_url||''
-   if(!endpoint)return reply(200,{available:false})
+   if(!Array.isArray(conn[0]?.granted_scopes)||!conn[0].granted_scopes.includes('identity:resolve'))return reply(200,{status:'unavailable'})
+   if(!endpoint)return reply(200,{status:'unavailable'})
    let url
    try{
     url=new URL(endpoint)
-    if(url.protocol!=='https:'||!(/^[a-z0-9-]+\.supabase\.co$/i.test(url.hostname))||url.username||url.password||url.search||url.hash||!/^\/functions\/v1\/phoenix-one-api\/v1\/?$/.test(url.pathname))return reply(200,{available:false})
-   }catch{return reply(200,{available:false})}
-   const sec=await pg.unsafe("select decrypted_secret from vault.decrypted_secrets where name='phoenix_one_junior_api_token' limit 1")
-   const bearer=sec[0]?.decrypted_secret||''
-   if(!bearer)return reply(200,{available:false})
-   let response
+    if(url.protocol!=='https:'||!(/^[a-z0-9-]+\.supabase\.co$/i.test(url.hostname))||url.username||url.password||url.search||url.hash||!/^\/functions\/v1\/phoenix-one-api\/v1\/?$/.test(url.pathname))return reply(200,{status:'unavailable'})
+   }catch{return reply(200,{status:'unavailable'})}
+   const stored=await pg.unsafe("select decrypted_secret from vault.decrypted_secrets where name='phoenix_one_junior_api_token' limit 1")
+   const token=stored[0]?.decrypted_secret||''
+   if(!token)return reply(200,{status:'unavailable'})
+   const target=endpoint.replace(/\/+$/,'')+'/identity/resolve'
+   let result
    try{
-    response=await fetch(endpoint.replace(/\/+$/,'')+'/conversations/'+encodeURIComponent(conversationId)+'/context',{
-     method:'GET',redirect:'error',signal:AbortSignal.timeout(4500),headers:{Authorization:'Bearer '+bearer,Accept:'application/json'}
+    result=await fetch(target,{method:'POST',redirect:'error',signal:AbortSignal.timeout(4500),
+      headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},
+      body:JSON.stringify({conversation_id:conversationId,protocolo,document_type:doc?typ:null,document:doc||null,purpose:'policies_and_installments'})
     })
-   }catch{return reply(200,{available:false})}
-   if(!response.ok)return reply(200,{available:false})
-   let body
-   try{const raw=await response.text();if(raw.length>32000)return reply(200,{available:false});body=JSON.parse(raw)}catch{return reply(200,{available:false})}
-   const policies=Array.isArray(body.policies)?body.policies.slice(0,8).map(p=>({
-     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60)
+   }catch{return reply(200,{status:'unavailable'})}
+   if(result.status===404||result.status===405||result.status===501)return reply(200,{status:'unavailable'})
+   if(!result.ok)return reply(200,{status:'unavailable'})
+   let dataFromJunior
+   try{const raw=await result.text();if(raw.length>32000)return reply(200,{status:'unavailable'});dataFromJunior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
+   const safeStatus=new Set(['verification_required','multiple_matches','not_found'])
+   if(dataFromJunior?.status!=='verified')return reply(200,{status:safeStatus.has(dataFromJunior?.status)?dataFromJunior.status:'unavailable'})
+   const verification=dataFromJunior.verification||{}
+   const strong=new Set(['otp','staff_verified','existing_verified_session'])
+   if(dataFromJunior.conversation_id!==conversationId||dataFromJunior.protocolo!==protocolo
+     ||verification.status!=='verified'||!strong.has(verification.method)
+     ||(doc&&(dataFromJunior.document_type!==typ||dataFromJunior.document_last4!==doc.slice(-4))))
+      return reply(200,{status:'verification_required'})
+   const policies=Array.isArray(dataFromJunior.policies)?dataFromJunior.policies.slice(0,12).map(p=>({
+    numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60)
    })):[]
-   const installments=Array.isArray(body.installments)?body.installments.slice(0,12).map(i=>({
-     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),parcela:i?.parcela,vencimento:cleanString(i?.vencimento,30),valor:i?.valor,vencida:!!i?.vencida
+   const installments=Array.isArray(dataFromJunior.installments)?dataFromJunior.installments.slice(0,12).map(i=>({
+    apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),
+    vencimento:cleanString(i?.vencimento,30),valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
    })):[]
-   return reply(200,{available:true,policies,installments})
+   return reply(200,{status:'verified',policies,installments})
   }
   if(data.action==='event'){
    const v=data.event

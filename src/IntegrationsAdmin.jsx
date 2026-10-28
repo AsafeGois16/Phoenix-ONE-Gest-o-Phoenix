@@ -6,7 +6,7 @@ const supaUrl=import.meta.env.VITE_SUPABASE_URL
 const pubKey=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const client=(supaUrl&&pubKey)?createClient(supaUrl,pubKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}}):null
 const allowedScopes=[
- ['contacts:resolve','Identificar contatos'],['clients:read','Consultar clientes'],['policies:read','Consultar apólices'],
+ ['contacts:resolve','Identificar contatos'],['identity:resolve','Identificar titular por CPF/CNPJ com verificação'],['clients:read','Consultar clientes'],['policies:read','Consultar apólices'],['installments:read','Consultar parcelas autorizadas'],
  ['tickets:read','Consultar tickets'],['tickets:create','Solicitar abertura de tickets'],['tickets:transfer','Solicitar transferência'],
  ['tickets:comment','Registrar notas de ticket'],['users:capabilities','Consultar setores/usuários'],['tickets:resolved','Receber resoluções para aprendizado']
 ]

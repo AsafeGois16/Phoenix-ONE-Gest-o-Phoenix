@@ -81,3 +81,20 @@ Após corrigir o bloqueio do Vault, os logs de produção registraram novos HTTP
 A Clara Concierge é a **porta de entrada padrão do atendimento** independentemente de número novo, `contact.kind='lead'` ou `agent_hint='murilo'`. O Phoenix ONE escolhe agente pela intenção da mensagem: dúvidas gerais, saudações, segunda via de boleto, apólice, parcelas, sinistros, movimentações e suporte ficam com **Clara**; somente pedidos **comercialmente explícitos** (cotação, orçamento, contratação, simulação, preço de seguro) são tratados por **Murilo**. Pedidos de serviço têm prioridade sobre expressões comerciais ambíguas. A continuidade de um interesse comercial já identificado pode manter o Murilo quando a pessoa responder brevemente ("Sim", "Claro"). Toda seleção é feita apenas com o histórico das mensagens do protocolo recebido; sem acesso a contatos externos ou CRM LEADS.
 
 **Ajuste necessário do lado Junior:** não classificar número novo automaticamente como Murilo nem exibir saudação de Murilo por regra local. Envie preferencialmente `agent_hint='clara'` ao abrir conversa, e permita Murilo somente após identificar necessidade comercial. O Phoenix ONE faz uma correção adicional por intenção caso receba `agent_hint` inconsistente. A resposta inclui `agent` e é o nome que o sistema deve exibir/registrar. Nenhuma troca altera o dono do WhatsApp nem executa transferência de tickets. A implementação atual não possui uma ferramenta autônoma de repasse entre Clara e Murilo; a seleção é por mensagem e contexto.
+
+
+## Proposta de contrato v1.1 — consulta documental por CPF/CNPJ
+
+Necessário porque telefones WhatsApp podem estar desatualizados ou vinculados a mais de uma pessoa. CPF/CNPJ é apenas chave de busca. Conhecer o número **não autentica** o solicitante.
+
+**Junior implementa:** `POST {SUPABASE_URL}/functions/v1/phoenix-one-api/v1/identity/resolve` com mesmo Bearer de serviço, acesso exclusivo a protocolos abertos, proteção anti-enumeração e verificação adicional (OTP em canal previamente verificado ou validação humana). Não reutilizar a consulta por telefone para dados privados.
+
+Corpo enviado somente entre serviços, nunca à OpenAI: `{"conversation_id":"UUID","protocolo":"AAAAMMDD-NNNN","document_type":"cpf","document":"11_DIGITOS","purpose":"policies_and_installments"}`. Para CNPJ, tipo `cnpj` e 14 dígitos. O Junior valida legitimidade do representante de pessoa jurídica.
+
+Para sucesso, o Junior retorna `{"status":"verified","conversation_id":"UUID","protocolo":"AAAAMMDD-NNNN","document_type":"cpf","document_last4":"XXXX","verification":{"status":"verified","method":"otp"},"policies":[],"installments":[]}`. Métodos permitidos: `otp`, `staff_verified`, `existing_verified_session` (com verificação anterior ligada ao mesmo protocolo, não telefone). Campo `document_last4` deve corresponder ao documento enviado. Sem validação, devolver `status` de `verification_required`, `multiple_matches` ou `not_found` SEM dados privados; preferir mensagens genéricas para não revelar se o CPF existe.
+
+**Phoenix ONE agora faz:** valida CPF/CNPJ no servidor, remove documento de qualquer texto enviado à OpenAI, deixa de consultar apólices/parcelas por `conversation_id` isoladamente, chama `identity/resolve` exclusivamente via Edge Function privada que lê token do Vault. Se API v1.1 não existe ou identidade não verificada, realiza encaminhamento humano sem expor dados. Não grava o CPF/CNPJ em RAG, logs, memórias ou banco do Phoenix ONE.
+
+**Fluxo:** pedido de detalhes -> Clara pede CPF/CNPJ do titular -> cliente fornece número -> Phoenix ONE valida sintaxe e o Junior valida identidade e vínculo ao cadastro -> só a confirmação verificada autoriza consulta -> apólices e parcelas são entregues à Clara. Caso haja mais de um titular/apólice, o Junior aplica controle de acesso à seleção.
+
+**IMPORTANTE:** Este endpoint é uma extensão proposta e ainda **não foi confirmado como implementado** no sistema do Junior. O comportamento atual preserva sigilo e transfere ao humano até a homologação. A execução do 4Zapy e tickets permanece integralmente no Junior.

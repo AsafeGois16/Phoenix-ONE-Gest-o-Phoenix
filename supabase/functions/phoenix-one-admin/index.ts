@@ -15,7 +15,7 @@ const CORS={
  'Content-Type':'application/json; charset=utf-8'
 }
 const respond=(status,data)=>new Response(JSON.stringify(data),{status,headers:CORS})
-const scopesAllowed=new Set(['contacts:resolve','clients:read','policies:read','tickets:read','tickets:create','tickets:transfer','tickets:comment','users:capabilities','tickets:resolved'])
+const scopesAllowed=new Set(['contacts:resolve','identity:resolve','clients:read','policies:read','installments:read','tickets:read','tickets:create','tickets:transfer','tickets:comment','users:capabilities','tickets:resolved'])
 const goodURL=input=>{
  if(typeof input!=='string'||input.length>255)return false
  try{
