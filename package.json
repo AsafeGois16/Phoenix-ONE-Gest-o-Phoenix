@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "build": "node --test tests/agent-routing.test.js && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test:route": "node --test tests/agent-routing.test.js"
   },
   "dependencies": {
     "lucide-react": "0.468.0",
