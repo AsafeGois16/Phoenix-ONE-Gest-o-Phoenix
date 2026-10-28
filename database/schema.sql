@@ -1,0 +1,13 @@
+-- Phoenix ONE V0.2 — REFERÊNCIA do schema já provisionado no Supabase.
+-- Uma migração autoritativa foi aplicada em 2026-10-28 no projeto LEADS, SOMENTE criando objetos em phoenix_one
+-- e instalando a extensão pgvector. Não rodar cegamente sem consultar o histórico de migrações.
+-- Nenhuma tabela do CRM em public deve ser consultada ou modificada.
+-- Tabelas existentes em phoenix_one (11):
+-- agents, agent_versions, knowledge_documents, document_agents, knowledge_chunks,
+-- external_ticket_refs, learning_candidates, learning_agents,
+-- integration_connections, integration_events, audit_events.
+-- Extensão: vector em extensions; embeddings 1536 dimensões.
+-- Função privada: phoenix_one.search_authorized_knowledge(agent, vector, limit).
+-- RLS ligado em todas as tabelas; anon/authenticated sem USAGE do schema.
+-- Acesso service_role e demais credenciais somente no backend confiável.
+-- Scripts de migração completos estão no histórico do projeto Supabase.
