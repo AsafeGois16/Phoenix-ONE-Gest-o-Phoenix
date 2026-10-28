@@ -36,31 +36,10 @@ export function redact(s){
  .replace(/\b\d{8,}\b/g,'[IDENTIFICADOR]')
 }
 export async function juniorContext(conversationId,signal){
- const base=process.env.JUNIOR_MANAGEMENT_API_URL
- const token=process.env.PHOENIX_ONE_API_TOKEN
- if(!base||!token||!uuidValid(conversationId))return null
- let target
+ if(!uuidValid(conversationId))return null
  try{
-  const url=new URL(base)
-  if(url.protocol!=='https:'||url.username||url.password||url.hash||url.search||/^(localhost|127\.|169\.254\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(url.hostname))return null
-  target=new URL(url.pathname.replace(/\/+$/,'')+'/conversations/'+encodeURIComponent(conversationId)+'/context',url.origin)
- }catch{return null}
- try{
-  const response=await fetch(target,{
-   method:'GET',signal,redirect:'error',
-   headers:{Authorization:'Bearer '+token,Accept:'application/json'}
-  })
-  if(!response.ok)return null
-  const raw=await response.text()
-  if(raw.length>35000)return null
-  const data=JSON.parse(raw)
-  const policies=Array.isArray(data?.policies)?data.policies.slice(0,8).map(p=>({
-   numero:safeText(p?.numero,64),ramo:safeText(p?.ramo,60),seguradora:safeText(p?.seguradora,90),fim_vigencia:safeText(p?.fim_vigencia,30),linha:safeText(p?.linha,60)
-  })):[]
-  const installments=Array.isArray(data?.installments)?data.installments.slice(0,12).map(i=>({
-   apolice:safeText(i?.apolice,64),ramo:safeText(i?.ramo,50),parcela:i?.parcela,vencimento:safeText(i?.vencimento,30),valor:i?.valor,vencida:!!i?.vencida
-  })):[]
-  return {policies,installments}
+  const data=await bridge('junior_context',{conversationId},signal)
+  return data?.available===true?{policies:data.policies||[],installments:data.installments||[]}:null
  }catch{return null}
 }
 export function hmacSignature(ts,raw,secret){return 'sha256='+createHmac('sha256',secret).update(ts+'.'+raw).digest('hex')}

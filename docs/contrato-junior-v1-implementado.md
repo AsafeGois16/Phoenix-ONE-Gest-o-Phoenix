@@ -49,3 +49,12 @@ No projeto Vercel adicionar, quando disponibilizados pelo Junior:
 8. Caso de handoff em `beneficios` e depois em `patrimonio`, validado no sistema do Junior (não fazer em produção com clientes reais).
 
 **Limitações:** sem URL e `PHOENIX_ONE_API_TOKEN` do Junior, o contexto de apólices e parcelas não estará disponível. Nenhuma rota operacional é chamada diretamente para transferência ou comentários no v1, pois a própria resposta com `humanHandoff` instrui o sistema do Junior a realizar a transferência. A autenticação do sistema Junior e o teste de ida e volta dependem do provisionamento seguro dos dois lados.
+
+
+## Configuração do token pelo painel (atualização 28/10/2026)
+
+Na aba **Integrações** do Phoenix ONE, o administrador informa a URL completa da Edge Function do Junior `https://<ref>.supabase.co/functions/v1/phoenix-one-api/v1` e o segredo **PHOENIX_ONE_API_TOKEN**. A configuração vai ao serviço de autenticação `phoenix-one-admin` e o token é armazenado criptografado no **Supabase Vault** sob nome único (o valor não volta para o navegador). Quando já existe uma chave, deixar o campo vazio mantém a configuração anterior. Para trocar a chave, inserir a nova e salvar.
+
+O botão de teste usa `phoenix-one-admin:probe`, com `conversation_id` de protocolo aberto, e chama somente `GET /contacts/resolve`, sem mostrar dados pessoais. A consulta contextual do agente usa `phoenix-one-bridge:junior_context`, que lê a mesma credencial do Vault e devolve somente apólices/parcelas permitidas da conversa. A URL deve ser HTTPS da função Supabase esperada; não são aceitos endereços arbitrários.
+
+**Importante:** `PHOENIX_ONE_TOKEN` é OUTRA chave — serve para autenticar o sistema Junior ao chamar `/api/v1/conversations/respond`. `PHOENIX_ONE_WEBHOOK_SECRET` assina avisos. Essas duas continuam como segredos no Vercel e devem ser sincronizadas por canal seguro com a instalação do Junior. Nenhuma chave deve ser enviada por chat.
