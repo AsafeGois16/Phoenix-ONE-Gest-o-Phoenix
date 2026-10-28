@@ -48,3 +48,10 @@ npm run dev
 4. Tickets concluídos originam **sugestões pendentes**; revisão humana obrigatória antes de publicar na base.
 5. Sem segredo no frontend; ambiente provisório não pode incluir dados reais sem autenticação, RLS adequada e política de LGPD.
 6. Ao migrar de projeto Supabase, exportar e restaurar apenas objetos do schema `phoenix_one`, documentos privados e embeddings associados.
+
+
+## Laboratório IA real (V0.3 — ambiente protegido)
+
+A chave `OPENAI_API_KEY` é usada somente no backend `api/lab-chat.js`. A variável `PHOENIX_ONE_LAB_ACCESS_CODE` protege as sessões de teste (cookie assinado HttpOnly). O endpoint jamais acessa o CRM de leads, o sistema de gestão do Junior, WhatsApp, tickets ou tabelas pessoais. As identidades da Clara e do Murilo nesta versão são **prompts de sandbox** no backend; as edições locais da interface ainda não alteram a API. Não inserir dados pessoais reais. O RAG vetorial e a persistência dos documentos ainda não estão conectados à UI.
+
+A rota `/api/lab-session` faz login e verifica a sessão; `/api/lab-chat` conversa com o modelo pela Responses API. Para produção com acesso externo, acrescentar autenticação de usuários, controles persistentes de limites por conta/IP, observabilidade, políticas de retenção e revisão de segurança.
