@@ -35,12 +35,16 @@ export function redact(s){
  .replace(/\b(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}\b/g,'[CONTATO]')
  .replace(/\b\d{8,}\b/g,'[IDENTIFICADOR]')
 }
-export async function juniorContext(conversationId,signal){
- if(!uuidValid(conversationId))return null
+export async function juniorIdentityContext(conversationId,protocolo,document,signal){
+ if(!uuidValid(conversationId)||!/^\d{8}-\d{4}$/.test(protocolo))return {status:'unavailable'}
  try{
-  const data=await bridge('junior_context',{conversationId},signal)
-  return data?.available===true?{policies:data.policies||[],installments:data.installments||[]}:null
- }catch{return null}
+  const payload={conversationId,protocolo}
+  if(document?.status==='valid'){payload.documentType=document.type;payload.document=document.number}
+  const data=await bridge('identity_context',payload,signal)
+  return data?.status==='verified'?
+    {status:'verified',policies:data.policies||[],installments:data.installments||[]}:
+    {status:['verification_required','not_found','multiple_matches','unavailable'].includes(data?.status)?data.status:'unavailable'}
+ }catch{return {status:'unavailable'}}
 }
 export function hmacSignature(ts,raw,secret){return 'sha256='+createHmac('sha256',secret).update(ts+'.'+raw).digest('hex')}
 export async function readRaw(req,maxBytes=65536){
