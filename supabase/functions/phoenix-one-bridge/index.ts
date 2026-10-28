@@ -48,8 +48,9 @@ Deno.serve(async request=>{
    const doc=typeof data.document==='string'?data.document:''
    const typ=data.documentType
    if(doc&&(!/^\d{11}$|^\d{14}$/.test(doc)||!(typ==='cpf'||typ==='cnpj')||(typ==='cpf'&&doc.length!==11)||(typ==='cnpj'&&doc.length!==14)))return reply(400,{error:'invalid_document_format'})
-   const conn=await pg.unsafe("select api_base_url from phoenix_one.integration_connections where provider='junior_management'")
+   const conn=await pg.unsafe("select api_base_url,granted_scopes from phoenix_one.integration_connections where provider='junior_management'")
    const endpoint=conn[0]?.api_base_url||''
+   if(!Array.isArray(conn[0]?.granted_scopes)||!conn[0].granted_scopes.includes('identity:resolve'))return reply(200,{status:'unavailable'})
    if(!endpoint)return reply(200,{status:'unavailable'})
    let url
    try{
