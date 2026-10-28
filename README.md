@@ -55,3 +55,12 @@ npm run dev
 A chave `OPENAI_API_KEY` é usada somente no backend `api/lab-chat.js`. A variável `PHOENIX_ONE_LAB_ACCESS_CODE` protege as sessões de teste (cookie assinado HttpOnly). O endpoint jamais acessa o CRM de leads, o sistema de gestão do Junior, WhatsApp, tickets ou tabelas pessoais. As identidades da Clara e do Murilo nesta versão são **prompts de sandbox** no backend; as edições locais da interface ainda não alteram a API. Não inserir dados pessoais reais. O RAG vetorial e a persistência dos documentos ainda não estão conectados à UI.
 
 A rota `/api/lab-session` faz login e verifica a sessão; `/api/lab-chat` conversa com o modelo pela Responses API. Para produção com acesso externo, acrescentar autenticação de usuários, controles persistentes de limites por conta/IP, observabilidade, políticas de retenção e revisão de segurança.
+
+
+## Prompts históricos preservados — laboratório v0.3.1
+
+Arquivos imutáveis preservados na pasta `prompts/originais/`: Clara 4.6, complemento operacional Clara 4.5 e Murilo SDR 1.0. O laboratório da OpenAI utiliza as versões **integrais** do mestre Clara 4.6 e Murilo 1.0 via módulo `server/agent-prompts.js` (somente backend), e carrega o complemento Clara 4.5 quando a pergunta envolve transferência/encaminhamento. Um guardrail de sandbox impede uso das referências históricas ao BLACK CRM: somente o **sistema do Junior**, após integração formal, pode fornecer dados operacionais e executar tickets. O CRM LEADS não participa.
+
+Os textos foram também registrados como versões 2 de `phoenix_one.agent_versions` no Supabase, preservando as versões 1 anteriores. **Limitação:** esta versão do laboratório lê a cópia versionada no GitHub (bundled), ainda não consulta o banco ao vivo e a aba de edição de agentes continua demonstrativa. Uma próxima etapa fará edição autenticada/versionamento transacional no banco.
+
+Não afirmar sucesso de operações ou acesso a fontes reais. O RAG vetorial e as bases PDF ainda não foram conectadas a este laboratório. O uso de prompts extensos aumenta o consumo da API OpenAI.
