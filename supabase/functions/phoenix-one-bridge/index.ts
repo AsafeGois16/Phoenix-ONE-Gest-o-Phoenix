@@ -88,37 +88,6 @@ Deno.serve(async request=>{
    })):[]
    return reply(200,{status:'verified',policies,installments})
   }
-  if(data.action==='junior_context'){
-   const conversationId=data.conversationId
-   if(!uuid(conversationId))return reply(400,{error:'invalid_conversation_id'})
-   const conn=await pg.unsafe("select api_base_url from phoenix_one.integration_connections where provider='junior_management'")
-   const endpoint=conn[0]?.api_base_url||''
-   if(!endpoint)return reply(200,{available:false})
-   let url
-   try{
-    url=new URL(endpoint)
-    if(url.protocol!=='https:'||!(/^[a-z0-9-]+\.supabase\.co$/i.test(url.hostname))||url.username||url.password||url.search||url.hash||!/^\/functions\/v1\/phoenix-one-api\/v1\/?$/.test(url.pathname))return reply(200,{available:false})
-   }catch{return reply(200,{available:false})}
-   const sec=await pg.unsafe("select decrypted_secret from vault.decrypted_secrets where name='phoenix_one_junior_api_token' limit 1")
-   const bearer=sec[0]?.decrypted_secret||''
-   if(!bearer)return reply(200,{available:false})
-   let response
-   try{
-    response=await fetch(endpoint.replace(/\/+$/,'')+'/conversations/'+encodeURIComponent(conversationId)+'/context',{
-     method:'GET',redirect:'error',signal:AbortSignal.timeout(4500),headers:{Authorization:'Bearer '+bearer,Accept:'application/json'}
-    })
-   }catch{return reply(200,{available:false})}
-   if(!response.ok)return reply(200,{available:false})
-   let body
-   try{const raw=await response.text();if(raw.length>32000)return reply(200,{available:false});body=JSON.parse(raw)}catch{return reply(200,{available:false})}
-   const policies=Array.isArray(body.policies)?body.policies.slice(0,8).map(p=>({
-     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60)
-   })):[]
-   const installments=Array.isArray(body.installments)?body.installments.slice(0,12).map(i=>({
-     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),parcela:i?.parcela,vencimento:cleanString(i?.vencimento,30),valor:i?.valor,vencida:!!i?.vencida
-   })):[]
-   return reply(200,{available:true,policies,installments})
-  }
   if(data.action==='event'){
    const v=data.event
    if(!v||!uuid(v.event_id)||!eventsAllowed.has(v.event_type)||!v.ticket||!uuid(v.ticket.conversation_id)||typeof v.ticket.id!=='string'||!/^\d{8}-\d{4}$/.test(v.ticket.id))return reply(400,{error:'invalid_event'})
