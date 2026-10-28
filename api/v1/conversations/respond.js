@@ -1,4 +1,5 @@
 import {authenticateJunior,bridge,juniorContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
+import {selectConversationAgent} from '../../../server/agent-routing.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial']
@@ -17,6 +18,7 @@ const formatSchema={
 }
 const criticalInstructions=[
  'Você está atendendo pelo Phoenix ONE como assistente de IA da Phoenix Insurance. Suas instruções históricas de CRM, BLACK CRM, ações ou integrações são legadas e NÃO representam ferramentas ativas.',
+ 'Sua identidade é EXATAMENTE o agente selecionado neste atendimento: Clara é a concierge de primeiro contato, suporte, orientação, segunda via e triagem; Murilo é SDR para interesse comercial ou cotação identificados. Não se apresente com outro nome. Um número novo não significa automaticamente interesse comercial.',
  'Sistema de Gestão Phoenix (Junior) é o único sistema operacional autorizado, e recebe de você apenas a PROPOSTA de resposta e de encaminhamento. 4Zapy, WhatsApp, protocolo, envio de mensagens e transferências pertencem ao Junior.',
  'Nunca declare que abriu ou transferiu ticket, enviou boleto, fez alteração ou consultou apólice sem contexto real autorizado fornecido abaixo. O sistema adicionará o número do protocolo automaticamente. Você não deve repeti-lo.',
  'Use o nome de exibição se disponível e adequado. Não peça telefone que já é conhecido pelo sistema. Não exponha CPF, CNPJ, telefone ou identificadores internos na resposta.',
@@ -47,7 +49,7 @@ function needsAccountContext(text){
  return /ap[oó]lice|cobertura|seguradora|parcela|boleto|segunda via|2[ªa]?\s*via|vencimento|vig[eê]ncia|contrato|pagamento|fatura|plano|carteirinha|inadimpl[eê]ncia|quit[ae]ç[aã]o/i.test(text)
 }
 function selectAgent(body){
- return validAgent(body.agent_hint)?body.agent_hint:body.contact.kind==='cliente'?'clara':'murilo'
+ return selectConversationAgent(body)
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store')
@@ -77,6 +79,7 @@ export default async function handler(req,res){
     'CONTEXTO AUTORIZADO PELO SISTEMA JUNIOR:',
     'Nome de exibição: '+(name||'não informado'),
     'Tipo de contato: '+body.contact.kind,
+    'Agente escolhido após triagem de intenção: '+agent,
     'Fila atual: '+(DEPARTMENTS.includes(body.contact.department)?body.contact.department:'não informada'),
     'Modo atual: '+body.mode,
     'Dados de apólices e parcelas: '+(management?JSON.stringify(management):'Não disponibilizados ou não necessários nesta interação. Não alegar consulta.'),
