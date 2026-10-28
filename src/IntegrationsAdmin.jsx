@@ -22,14 +22,21 @@ const messages={
  connection_unavailable:'Não foi possível acessar o serviço de saúde da API.',
  access_denied:'A API do Junior recusou a autenticação. Confira a chave de serviço.',
  health_endpoint_unavailable:'O endpoint de saúde não respondeu com sucesso. Confirme a rota /health com o Junior.',
- integration_service_unavailable:'O serviço de configuração está indisponível. Consulte os logs da função phoenix-one-admin.'
+ integration_service_unavailable:'O serviço de configuração está indisponível. Consulte os logs da função phoenix-one-admin.',
+ invalid_conversation_id:'Informe um conversation_id UUID válido de um protocolo de teste aberto.',
+ junior_api_credentials_pending:'Faltam JUNIOR_MANAGEMENT_API_URL e PHOENIX_ONE_API_TOKEN nos Secrets Vercel.',
+ junior_auth_rejected:'O sistema do Junior rejeitou a credencial de serviço (401/403).',
+ conversation_not_open:'O conversation_id não possui protocolo aberto no sistema do Junior (404).',
+ junior_api_unavailable:'A API do Junior respondeu com erro ao resolver o contato.',
+ junior_timeout:'A API do Junior não respondeu no prazo de teste.',
+ junior_api_connection_failed:'Não foi possível acessar a API do Junior pelo servidor Vercel.'
 }
 const translate=reason=>messages[reason]||'Não foi possível completar a operação. Confira o status da integração.'
 export default function IntegrationsAdmin(){
  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[session,setSession]=useState(null),
        [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[checking,setChecking]=useState(false),
        [profile,setProfile]=useState(null),[url,setUrl]=useState(''),[scopes,setScopes]=useState([]),
-       [notice,setNotice]=useState(''),[noticeError,setNoticeError]=useState(false)
+       [notice,setNotice]=useState(''),[noticeError,setNoticeError]=useState(false),[testConversation,setTestConversation]=useState('')
  const ready=Boolean(client)
  const adminEndpoint=useMemo(()=>supaUrl?supaUrl+'/functions/v1/phoenix-one-admin':'',[])
  const setFeedback=(message,error=false)=>{setNotice(message);setNoticeError(error)}
@@ -76,8 +83,12 @@ export default function IntegrationsAdmin(){
  }
  const test=async()=>{
    setChecking(true);setFeedback('')
-   try{const r=await call('test');setFeedback(r.ok?'Conexão inicial validada. '+r.note:translate(r.reason),!r.ok);await reload()}
-   catch(e){setFeedback(translate(e.message),true)}finally{setChecking(false)}
+   try{
+     const res=await fetch('/api/v1/integration/probe',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({conversation_id:testConversation.trim()})})
+     const data=await res.json().catch(()=>({error:'junior_api_connection_failed'}))
+     if(!res.ok)throw Error(data.error||'junior_api_connection_failed')
+     setFeedback(data.ok?'Teste concluído: '+data.note:translate(data.error),!data.ok)
+   }catch(e){setFeedback(translate(e.message),true)}finally{setChecking(false)}
  }
  const state=profile?.connection?.state||'disabled'
  return <div className="stack one-integration">
@@ -102,12 +113,13 @@ export default function IntegrationsAdmin(){
        <label>URL base da API HTTPS<input value={url} type="url" maxLength={255} onChange={e=>setUrl(e.target.value)} placeholder="https://api.sistema-do-junior.com.br"/></label>
        <div className="one-int-heading"><div><h3>Permissões solicitadas</h3><p>O sistema do Junior deverá homologar cada escopo antes de executar qualquer ação.</p></div></div>
        <div className="one-int-scopes">{allowedScopes.map(([key,label])=><label key={key}><input type="checkbox" checked={scopes.includes(key)} onChange={e=>changeScope(key,e.target.checked)}/><span>{label}<small>{key}</small></span></label>)}</div>
-       <div className="one-int-actions"><button type="submit" className="one-int-primary" disabled={saving||checking}><Save size={16}/> {saving?'Salvando…':'Salvar configuração'}</button><button type="button" className="one-int-secondary" disabled={saving||checking||!profile.connection.apiBaseUrl} onClick={test}><TestTube2 size={16}/> Testar conexão</button></div>
-       <p className="one-int-hint">Ao salvar, a conexão permanece desativada até a validação do servidor. O teste realiza somente uma verificação de saúde, sem criar nem transferir tickets.</p>
+       <label>conversation_id de teste (protocolo aberto)<input type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={testConversation} onChange={e=>setTestConversation(e.target.value)} maxLength={36}/></label>
+       <div className="one-int-actions"><button type="submit" className="one-int-primary" disabled={saving||checking}><Save size={16}/> {saving?'Salvando…':'Salvar configuração'}</button><button type="button" className="one-int-secondary" disabled={saving||checking||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(testConversation.trim())} onClick={test}><TestTube2 size={16}/> Testar conexão</button></div>
+       <p className="one-int-hint">Ao salvar, registramos o endpoint de referência no Supabase. Para testar a API v1 real, configure os segredos na Vercel e informe um conversation_id UUID com protocolo aberto no sistema do Junior. O teste é somente leitura, sem enviar mensagem, criar ou transferir ticket.</p>
     </form>
-    <div className="one-int-panel"><h3><KeyRound size={18}/> Credenciais seguras do conector</h3><p>As credenciais do Junior não são digitadas nesta página. Elas devem ser configuradas como segredos no Supabase Edge Functions: <code>JUNIOR_MANAGEMENT_API_CLIENT_SECRET</code> e <code>JUNIOR_ALLOWED_API_HOST</code>.</p><div className="one-int-substates"><span>Segredo do Junior: <b>{profile.connectionSecretConfigured?'Configurado':'Pendente'}</b></span><span>Host autorizado: <b>{profile.testHostConfigured?'Configurado':'Pendente'}</b></span><span>Último teste: <b>{profile.connection.lastTestAt?new Date(profile.connection.lastTestAt).toLocaleString('pt-BR'):'Não realizado'}</b></span></div><a href="https://supabase.com/dashboard/project/cxyxrhmpjehrqhwihxul/settings/functions" target="_blank" rel="noopener noreferrer">Abrir configurações seguras <ExternalLink size={13}/></a></div>
+    <div className="one-int-panel"><h3><KeyRound size={18}/> Segredos do contrato v1</h3><p>O teste operacional utiliza exclusivamente os segredos <code>JUNIOR_MANAGEMENT_API_URL</code> e <code>PHOENIX_ONE_API_TOKEN</code> cadastrados no projeto Phoenix ONE da Vercel. Não informe tokens nesta página. A URL acima é referência documental; o valor de execução deve coincidir com a variável segura na Vercel.</p><a href="https://vercel.com/phoenix-insurance-mkt/phoenix-one-ai/settings/environment-variables" target="_blank" rel="noopener noreferrer">Abrir variáveis seguras na Vercel <ExternalLink size={13}/></a></div>
    </>}
    {notice&&<div role="status" className={'one-int-message '+(noticeError?'error':'success')}>{notice}</div>}
-   <div className="one-int-panel one-int-disclaimer"><h3><Unplug size={18}/> O que ainda não está ativado</h3><p>Esta etapa permite configurar e validar a conexão da API do Junior. A execução real de tickets, a consulta de apólices e o recebimento de eventos dependerão da homologação das rotas e permissões. O Phoenix ONE não acessa o CRM LEADS e não controla o 4Zapy.</p></div>
+   <div className="one-int-panel one-int-disclaimer"><h3><Unplug size={18}/> O que ainda não está ativado</h3><p>Esta etapa permite configurar e validar a conexão da API do Junior. Os eventos e a resposta proposta seguem o contrato V1 do Junior. A consulta de apólices depende das credenciais da API do Junior. A execução de tickets continuará sob controle do sistema do Junior. O Phoenix ONE não acessa o CRM LEADS e não controla o 4Zapy.</p></div>
  </div>
 }
