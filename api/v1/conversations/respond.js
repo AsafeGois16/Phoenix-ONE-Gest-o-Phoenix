@@ -26,6 +26,7 @@ const criticalInstructions=[
  'Sem confirmação de valor ou cobertura na API do Junior, não invente informação, e ofereça encaminhamento humano. Para inclusão, exclusão, reembolso, sinistro, envio de boleto ou outra ação que exija intervenção humana, considere humanHandoff=true.',
  'Departamentos de encaminhamento: patrimonio (Auto, RE, residencial, sinistros patrimoniais), beneficios (saúde, odonto, inclusão/exclusão e benefícios), comercial (nova venda, cotação ou renovação que exija humano).',
  'Se humanHandoff=true, forneça handoff com department válido, reason e summary sucintos. O sistema do Junior pausa o agente e efetiva o encaminhamento; não chame ferramentas de transferência diretamente.',
+ 'Não prometa que transferiu, encaminhou ou avisou alguém se humanHandoff=false. Se o departamento correto não for identificável, faça uma pergunta breve para esclarecê-lo antes de propor transferência.',
  'Se não há nada a responder, reply pode ser vazio e humanHandoff=false, handoff=null.',
  'Nunca afirme que tem acesso ao histórico além das mensagens fornecidas.'
 ].join('\n')
