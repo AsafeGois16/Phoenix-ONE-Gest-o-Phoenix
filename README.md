@@ -71,3 +71,8 @@ Não afirmar sucesso de operações ou acesso a fontes reais. O RAG vetorial e a
 Nova aba de Integrações com login pelo Supabase Auth e autorização privativa por `phoenix_one.admin_users`, usando Edge Function `phoenix-one-admin` para salvar URL e escopos autorizáveis. Não usa tabelas CRM LEADS. Para o frontend, variáveis públicas `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`; **NUNCA** usar credenciais administrativas no navegador.
 
 A API do Junior permanece desconectada até cadastrar a URL HTTPS na aba Integrações e registrar os segredos `JUNIOR_MANAGEMENT_API_CLIENT_SECRET` e `JUNIOR_ALLOWED_API_HOST` no ambiente seguro das Edge Functions Supabase. A ação **Testar conexão** apenas consulta `/health`, e só para um host expressamente aprovado. Criar/transferir tickets e consultar apólices requer homologar as rotas; nenhum desses efeitos é acionado nesta etapa. RAG e editor de prompts persistentes permanecem em desenvolvimento.
+
+
+## Operação real v0.5
+
+Agentes, biblioteca, memória supervisionada e laboratório agora consultam o schema privado `phoenix_one` pelo Edge Function `phoenix-one-core` autenticado, não mais o localStorage. Arquivos PDF/DOCX são extraídos pela API servidor e submetidos à revisão antes da publicação; textos publicados alimentam busca PostgreSQL FTS para resposta RAG. Modelos com embeddings vetoriais ficam em fase posterior. Tickets do Junior não são replicados ou simulados. O CRM LEADS não é fonte de dados.
