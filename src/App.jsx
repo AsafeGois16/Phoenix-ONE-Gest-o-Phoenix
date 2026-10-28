@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Operations from './Operations.jsx'
 import IntegrationsAdmin from './IntegrationsAdmin.jsx'
-import IntegrationsAdmin from './IntegrationsAdmin.jsx'
 import LiveLab from './LiveLab.jsx'
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BookMarked, BookOpen, Bot, BrainCircuit,
