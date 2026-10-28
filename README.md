@@ -64,3 +64,10 @@ Arquivos imutáveis preservados na pasta `prompts/originais/`: Clara 4.6, comple
 Os textos foram também registrados como versões 2 de `phoenix_one.agent_versions` no Supabase, preservando as versões 1 anteriores. **Limitação:** esta versão do laboratório lê a cópia versionada no GitHub (bundled), ainda não consulta o banco ao vivo e a aba de edição de agentes continua demonstrativa. Uma próxima etapa fará edição autenticada/versionamento transacional no banco.
 
 Não afirmar sucesso de operações ou acesso a fontes reais. O RAG vetorial e as bases PDF ainda não foram conectadas a este laboratório. O uso de prompts extensos aumenta o consumo da API OpenAI.
+
+
+## Administração de integração (V0.4)
+
+Nova aba de Integrações com login pelo Supabase Auth e autorização privativa por `phoenix_one.admin_users`, usando Edge Function `phoenix-one-admin` para salvar URL e escopos autorizáveis. Não usa tabelas CRM LEADS. Para o frontend, variáveis públicas `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`; **NUNCA** usar credenciais administrativas no navegador.
+
+A API do Junior permanece desconectada até cadastrar a URL HTTPS na aba Integrações e registrar os segredos `JUNIOR_MANAGEMENT_API_CLIENT_SECRET` e `JUNIOR_ALLOWED_API_HOST` no ambiente seguro das Edge Functions Supabase. A ação **Testar conexão** apenas consulta `/health`, e só para um host expressamente aprovado. Criar/transferir tickets e consultar apólices requer homologar as rotas; nenhum desses efeitos é acionado nesta etapa. RAG e editor de prompts persistentes permanecem em desenvolvimento.
