@@ -1,9 +1,7 @@
 import {labAvailable,originMatches,sessionIsValid} from '../server/lab-auth.js'
 
-const PROMPTS={
- clara: 'Você é Clara Concierge da Phoenix Insurance. Este é um LABORATÓRIO de testes, desconectado do banco de gestão, de apólices, do WhatsApp e dos tickets. Tenha linguagem acolhedora, clara e profissional. Não afirme que consultou dados, criou tickets, fez transferências ou executou operações. Se for necessário um humano, proponha encaminhamento futuro e informe que não houve operação real. Nunca invente carências, coberturas, autorizações, rede credenciada ou prazos de operadoras; explique que dependem de validação contratual. Não peça dados pessoais, dados de saúde ou identificadores neste laboratório. Responda em português brasileiro, de modo conciso.',
- murilo: 'Você é Murilo, SDR da Phoenix Insurance, neste LABORATÓRIO de testes desconectado do CRM e dos tickets. Seja jovial, carismático, consultivo, natural e ágil. Qualifique interesses comerciais com uma ou duas perguntas relevantes por vez. Não invente valores, preços, coberturas, serviços ou aprovações. Não afirme registrar lead, criar ticket, enviar WhatsApp ou transferir contato; apenas proponha o próximo passo. Não solicite CPF, dados médicos ou outras informações pessoais sensíveis neste laboratório. Responda em português brasileiro, de modo conciso.'
-}
+import {PROMPTS,laboratoryInstructions} from '../server/agent-prompts.js'
+
 function outputText(payload){
   const arr=[]
   for(const block of payload?.output||[]){
@@ -32,15 +30,16 @@ export default async function handler(req,res){
   const controller=new AbortController()
   const timeout=setTimeout(()=>controller.abort(),44000)
   let response
+  const selected=laboratoryInstructions(agent,messages)
   try{
    response=await fetch('https://api.openai.com/v1/responses',{
     method:'POST',signal:controller.signal,
     headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
     body:JSON.stringify({
       model:process.env.PHOENIX_ONE_TEST_MODEL||'gpt-4.1-mini',
-      instructions:PROMPTS[agent],
+      instructions:selected.instructions,
       input:messages.map(m=>({role:m.role,content:m.content})),
-      max_output_tokens:450,
+      max_output_tokens:550,
       store:false
     })
    })
@@ -52,7 +51,7 @@ export default async function handler(req,res){
   const payload=await response.json()
   const answer=outputText(payload)
   if(!answer)return res.status(502).json({error:'empty_provider_response'})
-  return res.status(200).json({agent,answer,model:payload.model||'unknown',mode:'sandbox',ragConnected:false,ticketsConnected:false})
+  return res.status(200).json({agent,answer,model:payload.model||'unknown',mode:'sandbox',ragConnected:false,ticketsConnected:false,promptVersion:selected.version,flowSupplement:selected.flowSupplement})
  }catch(err){
    return res.status(502).json({error:err?.name==='AbortError'?'provider_timeout':'provider_unavailable'})
  }
