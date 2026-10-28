@@ -75,7 +75,7 @@ Deno.serve(async req=>{
          if(existing.length)await tx.unsafe('select vault.update_secret($1::uuid,$2)',[existing[0].id,token])
          else await tx.unsafe('select vault.create_secret($1,$2,$3)',[token,credentialName,'Token da API de gestão do Junior para o Phoenix ONE'])
        }
-       await tx.unsafe("update phoenix_one.integration_connections set api_base_url=$1,granted_scopes=ARRAY(SELECT jsonb_array_elements_text($2::jsonb)),state='disabled',last_sync_at=null,updated_at=now() where provider='junior_management'",[endpoint||null,JSON.stringify(selected)])
+       await tx.unsafe("update phoenix_one.integration_connections set api_base_url=$1,granted_scopes=CASE WHEN $2='' THEN '{}'::text[] ELSE string_to_array($2,',') END,state='disabled',last_sync_at=null,updated_at=now() where provider='junior_management'",[endpoint||null,selected.join(',')])
        await tx.unsafe("insert into phoenix_one.audit_events(actor_id,action,entity_kind,entity_id,metadata) values ($1::uuid,'management_connection_updated','integration','junior_management',$2::jsonb)",[user.id,JSON.stringify({api_host:endpoint?new URL(endpoint).hostname:null,scopes:selected,credential_updated:!!token})])
      })
      return respond(200,{saved:true,state:'disabled',note:'Configuração salva no Phoenix ONE. A chave foi armazenada no Supabase Vault, sem exibir o valor.'})
