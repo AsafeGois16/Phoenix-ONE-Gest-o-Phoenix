@@ -31,3 +31,27 @@
 .one-live-samples{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
 .one-live-samples button{background:#f1f6fd;border:1px solid #dfebf8;border-radius:30px;font-size:11px;padding:7px 10px;color:#3d6289}
 @media(max-width:600px){.one-live-header{padding:19px;flex-wrap:wrap}.one-live-body{padding:16px}.one-live-message{max-width:96%}.one-live-chat-form{flex-wrap:wrap}.one-live-chat-form textarea{width:100%;flex:auto}}
+
+
+/* Phoenix ONE - área administrativa e configurações de integração */
+.one-integration{max-width:1130px}.one-int-status{border:1px solid #cce1f9;background:#eaf4ff;border-radius:100px;color:#1a568f;display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:750;padding:9px 13px}
+.one-int-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.one-int-summary>div{background:#fff;border:1px solid #e4eaf3;border-radius:13px;padding:17px;display:flex;align-items:flex-start;flex-direction:column;gap:9px}
+.one-int-summary svg{color:#276dc4}.one-int-summary strong{font:750 12px Manrope,sans-serif}.one-int-summary span{font-size:11px;color:#72829a;line-height:1.6}
+.one-int-panel{background:white;border:1px solid #e3eaf3;border-radius:14px;padding:25px;display:flex;flex-direction:column;gap:14px}
+.one-int-panel h3{font:750 15px Manrope,sans-serif;color:#17325a;display:flex;gap:9px;align-items:center;margin:0}
+.one-int-panel p{margin:0;color:#6e8099;font-size:12px;line-height:1.7}
+.one-int-form label{display:flex;flex-direction:column;gap:8px;font-size:12px;font-weight:700;color:#2a4364}
+.one-int-form input[type=email],.one-int-form input[type=password],.one-int-form input[type=url]{height:45px;padding:12px 14px;border-radius:9px;border:1px solid #d5e1ee;color:#25405c;outline:0;background:#fff;width:100%;font-size:13px}
+.one-int-form input:focus{border-color:#2a75c7;box-shadow:0 0 0 3px #dcecff}
+.one-int-login{max-width:440px}.one-int-primary,.one-int-secondary{border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border-radius:9px;font-weight:750;font-size:12px;min-height:41px}
+.one-int-primary{background:#195dba;color:white}.one-int-secondary{background:#fff;border-color:#d6e2ee;color:#275681}.one-int-primary:disabled,.one-int-secondary:disabled{opacity:.5;cursor:not-allowed}
+.one-int-adminbar{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #d7e5f4;background:#eef6ff;padding:12px 17px;border-radius:12px;color:#225d95;font-size:12px;font-weight:750}
+.one-int-adminbar span,.one-int-adminbar>div{display:flex;align-items:center;gap:9px}
+.one-int-heading{display:flex;justify-content:space-between;align-items:center;gap:15px}.one-int-heading>div{display:flex;flex-direction:column;gap:6px}.one-int-state{font-size:11px;font-weight:750;color:#87651c;background:#fff7db;border-radius:99px;padding:8px 12px;white-space:nowrap}
+.one-int-scopes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.one-int-scopes label{background:#f7f9fc;border:1px solid #e4eaf3;border-radius:10px;padding:12px;display:flex;flex-direction:row;align-items:flex-start;gap:9px;font-size:11px;line-height:1.4}
+.one-int-scopes label input{margin:2px 0 0;accent-color:#206bc8}.one-int-scopes label span{display:flex;flex-direction:column;gap:4px}.one-int-scopes small{font-size:9px;color:#8394a8;font-weight:500}
+.one-int-actions{display:flex;gap:10px;flex-wrap:wrap}.one-int-hint{font-size:11px}.one-int-substates{display:flex;gap:8px;flex-wrap:wrap}.one-int-substates span{padding:8px 12px;border:1px solid #e5edf4;background:#f8fafd;border-radius:9px;font-size:11px}.one-int-panel a{font-weight:700;font-size:12px;color:#1c64b8;display:inline-flex;align-items:center;gap:6px;align-self:flex-start}
+.one-int-message{border-radius:10px;padding:12px 16px;font-size:12px;font-weight:700}.one-int-message.error{background:#fff1f2;color:#aa3547;border:1px solid #ffd5db}.one-int-message.success{background:#effbf4;color:#18754d;border:1px solid #cff0de}
+.one-int-disclaimer{background:#f8fafd}@media(max-width:900px){.one-int-scopes{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.one-int-summary,.one-int-scopes{grid-template-columns:1fr}.one-int-adminbar,.one-int-heading{flex-direction:column;align-items:flex-start}.one-int-panel{padding:17px}}
