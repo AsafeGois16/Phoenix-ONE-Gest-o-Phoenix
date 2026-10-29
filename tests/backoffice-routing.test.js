@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {detectBackofficeRequest,assessBackofficeIntake} from '../server/backoffice-routing.js'
+import {detectBackofficeRequest,assessBackofficeIntake,activeMovementHistory,isStandaloneNewRequest} from '../server/backoffice-routing.js'
 import {checkCapability} from '../server/action-capabilities.js'
 test('triagem coleta produto e vínculo antes de transferir ao Backoffice',()=>{
  const generic=detectBackofficeRequest('Gostaria de incluir um beneficiário')
@@ -108,4 +108,59 @@ test('plano com empresa explícita não repete pergunta sobre origem',()=>{
  const requested=detectBackofficeRequest('Preciso incluir meu filho no plano de saúde da empresa Higas')
  assert.equal(requested.stage,'handoff')
  assert.equal(requested.department,'backoffice')
+})
+
+test('regressão WhatsApp 16:52: retorno humano não reabre movimentação de Saúde',()=>{
+ const m=text=>({direction:'inbound',author:'contact',text})
+ const a=text=>({direction:'outbound',author:'agent',text})
+ const old=m('Preciso incluir meu filho no meu plano de saúde')
+ const sent=a('Concluí a etapa de verificação, mas não consegui identificar um plano de Saúde para seleção nesta consulta. Vou direcionar sua solicitação ao Backoffice para conferência, sem realizar nenhuma movimentação.')
+ const after=m('Certo pode me ajudar em mais uma coisa?')
+ const messages=[old,sent,{direction:'outbound',author:'staff',text:'Atendimento devolvido para a Clara'},after]
+ assert.equal(isStandaloneNewRequest(after.text),true)
+ assert.deepEqual(activeMovementHistory(messages),[after])
+ assert.equal(assessBackofficeIntake(messages),null)
+})
+test('novo assunto ignora CPF e plano anteriores, mantendo a nova solicitação',async()=>{
+ const {findInboundDocument}=await import('../server/document-identity.js')
+ const m=text=>({direction:'inbound',author:'contact',text})
+ const a=text=>({direction:'outbound',author:'agent',text})
+ const messages=[
+  m('Preciso incluir meu filho no plano de saúde'),
+  m('111.444.777-35'),
+  a('Vou direcionar sua solicitação ao Backoffice para conferência manual.'),
+  m('Certo, pode me ajudar em mais uma coisa?'),
+  a('Claro! Como posso ajudar?'),
+  m('Agora preciso excluir minha esposa do plano odontológico')
+ ]
+ const active=activeMovementHistory(messages)
+ assert.equal(findInboundDocument(active).status,'missing')
+ const decision=assessBackofficeIntake(active)
+ assert.equal(decision.type,'exclusao')
+ assert.equal(decision.product,'Odonto')
+ assert.equal(decision.relation,'dependente')
+ assert.doesNotMatch(JSON.stringify(decision),/Saúde|11144477735/)
+})
+test('continuidade de triagem não é apagada por simples resposta',()=>{
+ const m=text=>({direction:'inbound',author:'contact',text})
+ const a=text=>({direction:'outbound',author:'agent',text})
+ const msgs=[m('Quero incluir um dependente'),a('Qual seguro? Saúde, Odonto ou Vida?'),m('Saúde')]
+ assert.equal(activeMovementHistory(msgs).length,3)
+ assert.equal(assessBackofficeIntake(msgs).product,'Saúde')
+})
+test('pergunta sobre encaminhar não é transferência efetuada',()=>{
+ const m=text=>({direction:'inbound',author:'contact',text})
+ const a=text=>({direction:'outbound',author:'agent',text})
+ const msgs=[m('Preciso incluir meu filho no plano de saúde'),a('Deseja que eu encaminhe seu pedido ao Backoffice?'),m('Sim')]
+ assert.equal(activeMovementHistory(msgs).length,3)
+ assert.equal(assessBackofficeIntake(msgs).type,'inclusao')
+})
+test('mensagem genérica de nova solicitação interrompe retomada do pedido anterior',()=>{
+ const m=text=>({direction:'inbound',author:'contact',text})
+ const previous=[m('Quero incluir meu filho em Saúde')]
+ for(const phrase of ['Certo pode me ajudar em mais uma coisa?','Tenho outra dúvida','Posso te pedir outra coisa?','Podemos falar de outro assunto?']){
+  assert.equal(isStandaloneNewRequest(phrase),true,phrase)
+  assert.equal(assessBackofficeIntake([...previous,m(phrase)]),null,phrase)
+ }
+ assert.equal(isStandaloneNewRequest('Certo, quero incluir minha esposa no Odonto'),false)
 })

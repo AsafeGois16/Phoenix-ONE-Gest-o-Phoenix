@@ -43,3 +43,10 @@ O funcionamento real da seleção depende da integração/autorização estarem 
 
 ## Histórico da mudança
 A versão anterior perguntava primeiro produto, vínculo e operadora/empresa e depois transferia. Essa abordagem foi substituída pela triagem validada acima, que exige identificação e consulta à apólice específica antes do encaminhamento de movimentações.
+
+## Retorno do Backoffice ao agente — correção de continuidade em 29/10/2026
+- Quando o atendimento é encaminhado ao Backoffice, a triagem daquela movimentação fica encerrada para novas respostas automáticas. A devolução do atendimento ao agente **não** reabre automaticamente a movimentação anterior.
+- Ao receber “Certo, pode me ajudar em mais uma coisa?”, “Tenho outra dúvida” ou frase similar, Clara deve responder oferecendo ajuda para a **nova solicitação** com `humanHandoff=false` e `handoff=null`.
+- Novo pedido específico inicia uma nova triagem; dados/documentos usados na triagem anterior não são reaproveitados para autenticar a nova movimentação.
+- A delimitação de contexto ocorre no Phoenix ONE, usando mensagens já recebidas via contrato existente do Junior. Não altera a gestão do WhatsApp, o protocolo nem os eventos operacionais.
+- A memória de apresentação única (`clara_apresentada`, `murilo_apresentado`) permanece independente: não repetir apresentação apenas por causa de devolução ao agente.
