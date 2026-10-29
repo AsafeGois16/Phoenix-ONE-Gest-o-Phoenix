@@ -1,6 +1,7 @@
 import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent} from '../../../server/agent-routing.js'
+import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial']
@@ -32,6 +33,7 @@ const criticalInstructions=[
  'Departamentos de encaminhamento: patrimonio (Auto, RE, residencial, sinistros patrimoniais), beneficios (saúde, odonto, inclusão/exclusão e benefícios), comercial (nova venda, cotação ou renovação que exija humano).',
  'Se humanHandoff=true, forneça handoff com department válido, reason e summary sucintos. O sistema do Junior pausa o agente e efetiva o encaminhamento; não chame ferramentas de transferência diretamente.',
  'Não prometa que transferiu, encaminhou ou avisou alguém se humanHandoff=false. Se o departamento correto não for identificável, faça uma pergunta breve para esclarecê-lo antes de propor transferência.',
+ 'REGRA DE CONTINUIDADE: Quando oferecer a opção de encaminhar (por exemplo: "Deseja que eu encaminhe?"), envie humanHandoff=false e handoff=null, permitindo que o cliente responda. Marque humanHandoff=true somente quando o encaminhamento for efetivamente necessário ou solicitado, com resposta afirmativa declarando o encaminhamento. Não pergunte se pode encaminhar e ao mesmo tempo transfira.',
  'Se não há nada a responder, reply pode ser vazio e humanHandoff=false, handoff=null.',
  'Nunca afirme que tem acesso ao histórico além das mensagens fornecidas.'
 ].join('\n')
@@ -179,13 +181,15 @@ export default async function handler(req,res){
   timing.modelMs=Math.round(performance.now()-modelStarted)
   let decision
   try{decision=JSON.parse(outputText(raw))}catch{return jsonResponse(res,502,{error:'invalid_model_output'})}
-  const handoff=decision?.humanHandoff===true&&decision?.handoff
-  const item=handoff&&DEPARTMENTS.includes(decision.handoff.department)?{
-   department:decision.handoff.department,
-   reason:redact(safeText(decision.handoff.reason,140)),
-   summary:redact(safeText(decision.handoff.summary,350))
+  const normalizedDecision=normalizeHandoffDecision(decision,DEPARTMENTS)
+  const handoff=normalizedDecision.handoff
+  const item=handoff&&DEPARTMENTS.includes(handoff.department)?{
+   department:handoff.department,
+   reason:redact(safeText(handoff.reason,140)),
+   summary:redact(safeText(handoff.summary,350))
   }:null
-  if(decision?.humanHandoff===true&&!item)return jsonResponse(res,502,{error:'invalid_handoff_output'})
+  if(decision?.humanHandoff===true&&!item&&!normalizedDecision.suppressed)return jsonResponse(res,502,{error:'invalid_handoff_output'})
+  if(normalizedDecision.suppressed)console.info('phoenix_handoff_policy',JSON.stringify({agent,action:'suppressed_unconfirmed_handoff'}))
   return jsonResponse(res,200,{agent,reply:redact(safeText(decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
  }catch(e){
   const code=e?.name==='AbortError'?'response_timeout':e?.message||'response_unavailable'
