@@ -60,3 +60,15 @@ test('quando falta produto ou relação, pede confirmação depois da verificaç
  assert.match(verifiedMovementDecision({...movement,product:null},policies,[received('oi')]).reply,/Saúde, Odonto ou Vida/)
  assert.match(verifiedMovementDecision({...movement,relation:null},policies,[received('oi')]).reply,/titular ou dependente/)
 })
+
+test('duas apólices sem referência distinguível não permitem escolha ambígua',()=>{
+ const duplicate=[{ramo:'Saúde',seguradora:'Amil'},{ramo:'Saúde',seguradora:'Amil'}]
+ const x=verifiedMovementDecision(movement,duplicate,[received('Quero incluir dependente')])
+ assert.equal(x.humanHandoff,true)
+ assert.equal(x.handoff.department,'backoffice')
+ assert.match(x.reply,/sem identificação suficiente/)
+})
+test('metadados mistos de Saúde e Odonto não aparecem em escolha exclusivamente Saúde',()=>{
+ const mixed=[{ramo:'Saúde e Odontológico',linha:'Benefícios',seguradora:'Mista'}]
+ assert.equal(categoryPolicies(mixed,'Saúde').length,0)
+})
