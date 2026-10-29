@@ -84,3 +84,23 @@ test('resposta longa não deve cortar nomes de coberturas no meio de uma linha',
  assert.ok(!reply.includes('[object Object]'))
  assert.match(reply,/Há outros detalhes cadastrados|Mais \d+ cobertura/)
 })
+
+
+test('Clara se apresenta na primeira resposta direta, antes de pedir CPF/CNPJ',async()=>{
+ const {ensureClaraIntro}=await import('../server/conversation-policy.js')
+ const result=ensureClaraIntro('Para localizar seus seguros, pode informar o CPF ou CNPJ do titular?',[c('Olá, preciso consultar meus seguros')])
+ assert.match(result,/Sou a Clara, concierge de atendimento da Phoenix Insurance/)
+ assert.match(result,/CPF ou CNPJ/)
+ assert.ok(result.indexOf('Sou a Clara')<result.indexOf('CPF ou CNPJ'))
+})
+test('Clara não se reapresenta em mensagens seguintes do protocolo',async()=>{
+ const {ensureClaraIntro}=await import('../server/conversation-policy.js')
+ const history=[c('Quais seguros tenho?'),a('Olá! Sou a Clara, concierge da Phoenix Insurance.'),c('111.444.777-35')]
+ assert.equal(ensureClaraIntro('Para verificar sua identidade, qual sua data de nascimento?',history),'Para verificar sua identidade, qual sua data de nascimento?')
+ assert.equal(ensureClaraIntro('',[]),'')
+})
+test('Clara não duplica apresentação produzida pelo próprio modelo',async()=>{
+ const {ensureClaraIntro}=await import('../server/conversation-policy.js')
+ const reply='Olá! Sou a Clara, da Phoenix Insurance. Como posso ajudar?'
+ assert.equal(ensureClaraIntro(reply,[c('Oi')]),reply)
+})

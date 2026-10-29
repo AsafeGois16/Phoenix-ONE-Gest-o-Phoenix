@@ -2,7 +2,7 @@ import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAg
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest,ensureClaraIntro} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial']
@@ -81,19 +81,20 @@ export default async function handler(req,res){
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
  let agent=selectAgent(body)
+ const replyToJunior=payload=>jsonResponse(res,200,{...payload,reply:payload.agent==='clara'?ensureClaraIntro(payload.reply,body.messages):payload.reply})
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
-  return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+  return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const last=body.messages.at(-1)
  if(last.direction!=='inbound'||last.author!=='contact'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'last_message_not_inbound',agent}))
-  return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+  return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const normalized=normalizeMessages(body.messages)
  if(!normalized.length||normalized.at(-1)?.role!=='user'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'no_inbound_text',agent}))
-  return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+  return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)
  const start=performance.now()
@@ -110,12 +111,12 @@ export default async function handler(req,res){
   let management=null
   if(contextNeeded){
    path='personal_lookup'
-   if(document.status==='missing')return jsonResponse(res,200,{
+   if(document.status==='missing')return replyToJunior({
      agent,
      reply:'Para localizar seus seguros, apólices ou parcelas com segurança, pode informar o CPF ou CNPJ do titular? Usarei o número somente para consultar o sistema de gestão. A liberação das informações pode exigir uma verificação adicional de identidade.',
      humanHandoff:false,handoff:null
    })
-   if(document.status==='invalid'||document.status==='multiple')return jsonResponse(res,200,{
+   if(document.status==='invalid'||document.status==='multiple')return replyToJunior({
      agent,
      reply:document.status==='multiple'?'Recebi mais de um documento. Pode me informar apenas o CPF ou CNPJ do titular do seguro?':'Pode conferir o CPF ou CNPJ do titular e me enviar novamente? O número não passou na validação de formato.',
      humanHandoff:false,handoff:null
@@ -138,7 +139,7 @@ export default async function handler(req,res){
      const question=identity.method==='birth_date'&&document.type==='cpf'?
        'Para verificar sua identidade, pode informar sua data de nascimento no formato DD/MM/AAAA? Usarei essa informação somente no sistema de gestão da Phoenix.':
        'Para verificar sua representação da empresa, pode informar o CEP cadastrado (8 números)? Usarei essa informação somente no sistema de gestão da Phoenix.'
-     return jsonResponse(res,200,{agent,reply:retry+question+remaining,humanHandoff:false,handoff:null})
+     return replyToJunior({agent,reply:retry+question+remaining,humanHandoff:false,handoff:null})
    }
    if(identity.status!=='verified'){
      const department=handoffDepartment(body.messages)
@@ -155,7 +156,7 @@ export default async function handler(req,res){
      const response=['verification_failed','too_many_attempts'].includes(identity.status)?
        'Não foi possível confirmar seus dados com segurança. Para proteger suas informações, vou encaminhar o atendimento à equipe responsável.':
        'Recebi as informações, mas ainda não foi possível concluir a validação com segurança. Vou encaminhar seu atendimento à equipe para conferir, sem expor dados pessoais.'
-     return jsonResponse(res,200,{agent,reply:response,humanHandoff:true,handoff:{
+     return replyToJunior({agent,reply:response,humanHandoff:true,handoff:{
        department,reason,summary:'Consulta de seguros/parcelas sem validação documental concluída. A equipe deve validar identidade e vínculo; não divulgar dados contratuais.'
      }})
    }
@@ -165,7 +166,7 @@ export default async function handler(req,res){
    if(agent==='clara'&&isVerifiedReadonlyContext(body.messages)){
      path='verified_overview'
      const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(body.messages),maxChars:1770})
-     return jsonResponse(res,200,{agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
+     return replyToJunior({agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
    }
   }
   if(!process.env.OPENAI_API_KEY)return jsonResponse(res,503,{error:'openai_not_configured'})
@@ -230,7 +231,7 @@ export default async function handler(req,res){
   if(decision?.humanHandoff===true&&!item&&!normalizedDecision.suppressed)return jsonResponse(res,502,{error:'invalid_handoff_output'})
   handoffRequested=Boolean(item)
   if(normalizedDecision.suppressed)console.info('phoenix_handoff_policy',JSON.stringify({agent,action:'suppressed_unconfirmed_handoff'}))
-  return jsonResponse(res,200,{agent,reply:redact(safeText(agent==='murilo'?ensureMuriloIntro(decision.reply,body.messages):decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
+  return replyToJunior({agent,reply:redact(safeText(agent==='murilo'?ensureMuriloIntro(decision.reply,body.messages):decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
  }catch(e){
   const code=e?.name==='AbortError'?'response_timeout':e?.message||'response_unavailable'
   resultStatus=code==='response_timeout'?'timeout':'error'
