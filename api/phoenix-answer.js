@@ -1,4 +1,5 @@
 import {createClient} from '@supabase/supabase-js'
+import {ensureMuriloIntro} from '../server/conversation-policy.js'
 const URL=process.env.VITE_SUPABASE_URL, KEY=process.env.VITE_SUPABASE_PUBLISHABLE_KEY, ORIGIN='https://phoenix-one-ai.vercel.app'
 function outputText(payload){
  return (payload.output||[]).filter(x=>x.type==='message').flatMap(x=>x.content||[]).filter(x=>x.type==='output_text'&&typeof x.text==='string').map(x=>x.text).join('\n').trim()
@@ -19,7 +20,8 @@ const safety=[
  'Não solicite CPF, dados clínicos ou números de contrato neste laboratório.',
  'Para inclusões, exclusões e alterações de beneficiários, a equipe responsável é o Backoffice. A Clara explica o procedimento geral e orienta o encaminhamento sem afirmar ter criado ou executado movimentações.',
  'Não mencione sistemas ou nomes de colaboradores internos como "sistema do Junior" ao cliente: diga "sistema de gestão da Phoenix" ou "nossa equipe de Backoffice".',
- 'Ao explicar requisitos, não peça nomes completos ou documentos de terceiros antes de ser necessário e autorizado. Não invente documentos específicos, carências, prazos nem andamento de solicitações.'
+ 'Ao explicar requisitos, não peça nomes completos ou documentos de terceiros antes de ser necessário e autorizado. Não invente documentos específicos, carências, prazos nem andamento de solicitações.',
+ 'Murilo: em sua primeira resposta, apresente-se pelo nome e pela função comercial. Na primeira conversa de cotação residencial, comece pelo tipo de imóvel e pela cidade; não solicite endereço completo, CEP, número ou documentos na abertura. Faça perguntas progressivas e não alegue que registrou uma cotação sem API confirmada.'
 ].join('\n')
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store')
@@ -46,6 +48,11 @@ export default async function handler(req,res){
   if(!resp.ok)return res.status(resp.status===429?429:502).json({error:resp.status===429?'openai_rate_limited':'openai_error'})
   const resultModel=await resp.json(),text=outputText(resultModel)
   if(!text)return res.status(502).json({error:'empty_model_response'})
-  return res.status(200).json({agent,answer:text,promptVersion:active.version,sources:matches,mode:'authenticated_rag_text',vectorIndexed:false,management:'not_connected'})
+  // O laboratório deve reproduzir a apresentação do WhatsApp para o SDR.
+  // Ao selecionar outro agente, o histórico do laboratório é reiniciado.
+  const priorAgentAnswer=messages.some(m=>m.role==='assistant'&&String(m.content||'').trim())
+  const labHistory=messages.map(m=>({direction:m.role==='assistant'?'outbound':'inbound',author:m.role==='assistant'?'agent':'contact',text:m.content}))
+  const answer=agent==='murilo'&&!priorAgentAnswer?ensureMuriloIntro(text,labHistory,messages.at(-1).content):text
+  return res.status(200).json({agent,answer,promptVersion:active.version,sources:matches,mode:'authenticated_rag_text',vectorIndexed:false,management:'not_connected'})
  }catch(e){console.error('one-answer',e.status||e.name);return res.status(e.status===401?401:502).json({error:e.status===401?'unauthorized':e.name==='AbortError'?'model_timeout':'answer_unavailable'})}
 }
