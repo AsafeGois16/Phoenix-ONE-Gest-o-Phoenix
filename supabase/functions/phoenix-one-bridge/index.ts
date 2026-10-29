@@ -34,6 +34,25 @@ Deno.serve(async request=>{
   if(!await authenticate(token))return reply(401,{error:'bridge_unauthorized'})
   const data=await request.json().catch(()=>null)
   if(!data||typeof data!=='object')return reply(400,{error:'invalid_json'})
+  if(data.action==='agent_state_open'){
+   const ticket=data.protocolo,conversation=data.conversationId,intent=data.intent,suggested=data.suggestedAgent
+   if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}$/.test(ticket)||!['neutral','service','sales'].includes(intent)||!agentOk(suggested))
+     return reply(400,{error:'invalid_agent_state'})
+   const result=await pg.begin(async tx=>{
+     // Serialize independent requests for one protocol. The table stores no personal data or text.
+     await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
+     const prev=await tx.unsafe("select conversation_id::text as conversation_id,last_agent,last_intent,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at>now()",[ticket])
+     const current=prev[0]
+     if(current&&current.conversation_id!==conversation)return {blocked:true,reason:'protocol_conversation_mismatch'}
+     if(current?.stage==='assigned'||current?.stage==='resolved')return {blocked:true,reason:current.stage==='assigned'?'assigned_to_human':'protocol_resolved'}
+     const agent=intent==='neutral'&&agentOk(current?.last_agent)&&current?.last_intent!=='neutral'?current.last_agent:suggested
+     const savedIntent=intent==='neutral'&&['sales','service'].includes(current?.last_intent)?current.last_intent:intent
+     const updated=await tx.unsafe("insert into phoenix_one.protocol_agent_state(source_system,external_ticket_id,conversation_id,last_agent,last_intent,stage,expires_at) values('junior_management',$1,$2::uuid,$3,$4,'with_agent',now()+interval '7 days') on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,last_agent=excluded.last_agent,last_intent=excluded.last_intent,updated_at=now(),expires_at=excluded.expires_at where phoenix_one.protocol_agent_state.stage not in ('assigned','resolved') returning last_agent,last_intent,stage",[ticket,conversation,agent,savedIntent])
+     if(!updated.length)return {blocked:true,reason:'assigned_to_human'}
+     return {blocked:false,agent:updated[0].last_agent,intent:updated[0].last_intent,stage:updated[0].stage,changed:agentOk(current?.last_agent)&&current.last_agent!==agent}
+   })
+   return reply(200,result)
+  }
   if(data.action==='prompt_only'){
    const agent=data.agent
    if(!agentOk(agent))return reply(400,{error:'invalid_agent'})
@@ -112,20 +131,20 @@ Deno.serve(async request=>{
      (junior.document_type&&junior.document_type!==typ)||
      (junior.verification&&junior.verification.status!=='verified'))
      return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
-   const policies=Array.isArray(junior.policies)?junior.policies.slice(0,12).map(p=>({
+   const policies=conn[0].granted_scopes.includes('policies:read')&&Array.isArray(junior.policies)?junior.policies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
     premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
     capital_segurado:typeof p?.capital_segurado==='number'&&Number.isFinite(p.capital_segurado)&&p.capital_segurado>=0?p.capital_segurado:null,
     status:cleanString(p?.status,45),coberturas:Array.isArray(p?.coberturas)?p.coberturas.slice(0,8).map(c=>cleanString(c,140)).filter(Boolean):[]
    })):[]
-   const installments=Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
+   const installments=conn[0].granted_scopes.includes('installments:read')&&Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),vencimento:cleanString(i?.vencimento,30),
     valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
    })):[]
    // Pendências são fornecidas exclusivamente pela API do Junior após verificação.
    // Nunca pesquisar documentos ou valores a partir do número do WhatsApp.
-   const pending=Array.isArray(junior.pending)?junior.pending.slice(0,8).map(p=>({
+   const pending=conn[0].granted_scopes.includes('clients:read')&&Array.isArray(junior.pending)?junior.pending.slice(0,8).map(p=>({
     description:cleanString(p?.description,200),status:cleanString(p?.status,45),due_date:cleanString(p?.due_date,30)
    })).filter(p=>p.description):[]
    return reply(200,{status:'verified',policies,installments,pending})
@@ -142,6 +161,12 @@ Deno.serve(async request=>{
      const inserted=await tx.unsafe("insert into phoenix_one.integration_events(provider,external_event_id,event_type,processing_status) values('junior_management',$1,$2,'processing') on conflict(provider,external_event_id) do nothing returning id",[v.event_id,v.event_type])
      if(!inserted.length){duplicate=true;return}
      const ref=await tx.unsafe("insert into phoenix_one.external_ticket_refs(source_system,external_ticket_id,category,department,status,resolved_at,assigned_to_user_id) values('junior_management',$1,$2,$3,$4,$5::timestamptz,$6) on conflict(source_system,external_ticket_id) do update set category=excluded.category,department=excluded.department,status=excluded.status,resolved_at=excluded.resolved_at,assigned_to_user_id=excluded.assigned_to_user_id,seen_at=now() returning id",[v.ticket.id,category,department,status,status==='resolved'?new Date().toISOString():null,staffId])
+
+     // Keep only non-sensitive, per-protocol orchestration metadata. Later events
+     // must not be overwritten by delayed earlier signed webhook deliveries.
+     const occurred=typeof v.occurred_at==='string'&&!Number.isNaN(Date.parse(v.occurred_at))?v.occurred_at:new Date().toISOString()
+     const eventAgent=agentOk(v.ticket.agent)?v.ticket.agent:null
+     await tx.unsafe("insert into phoenix_one.protocol_agent_state(source_system,external_ticket_id,conversation_id,last_agent,last_intent,stage,last_event_at,expires_at) values('junior_management',$1,$2::uuid,$3,'neutral',$4,$5::timestamptz,case when $4='resolved' then now()+interval '1 day' else now()+interval '7 days' end) on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,last_agent=coalesce(excluded.last_agent,phoenix_one.protocol_agent_state.last_agent),stage=excluded.stage,last_event_at=excluded.last_event_at,updated_at=now(),expires_at=excluded.expires_at where phoenix_one.protocol_agent_state.last_event_at is null or excluded.last_event_at >= phoenix_one.protocol_agent_state.last_event_at",[v.ticket.id,v.ticket.conversation_id,eventAgent,['assigned','resolved','queued','reopened','with_agent'].includes(status)?status:'queued',occurred])
      if(status==='resolved'){
       const raw=cleanString(v.ticket.resolution_summary,4000)
       const summary=redact(raw).trim()
