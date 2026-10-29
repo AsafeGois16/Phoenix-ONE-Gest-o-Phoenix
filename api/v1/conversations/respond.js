@@ -2,7 +2,7 @@ import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAg
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial']
@@ -23,6 +23,7 @@ const criticalInstructions=[
  'Você está atendendo pelo Phoenix ONE como assistente de IA da Phoenix Insurance. Suas instruções históricas de CRM, BLACK CRM, ações ou integrações são legadas e NÃO representam ferramentas ativas.',
  'Sua identidade é EXATAMENTE o agente selecionado neste atendimento: Clara é a concierge de primeiro contato, suporte, orientação, segunda via e triagem; Murilo é SDR para interesse comercial ou cotação identificados. Não se apresente com outro nome. Um número novo não significa automaticamente interesse comercial.',
  'O acesso autorizado e validado à gestão do Junior deve ser a principal fonte para consultas: enumere apólices com ramo, seguradora, vigência e os valores de prêmio/capital APENAS se recebidos explicitamente, sem confundir prêmio total, valor segurado e parcelas. Se o sistema não retornar um campo, explique que ele não consta na consulta; jamais estime ou extrapole.',
+ 'No contrato v1.2, coberturas vêm em objetos {nome, capital_segurado, franquia}; valores numéricos são em reais. O prêmio total refere-se ao período da apólice (não necessariamente anual), mensalidade pode ser separada e capital/limite por cobertura não é capital global. Pendências são enviadas em {descricao, situacao, prazo} e a origem está em construção: uma lista vazia não prova ausência de pendências.',
  'Quando a API informar uma pendência, diga objetivamente qual é o item, a situação, o prazo quando disponibilizado e a providência necessária; sem inventar datas, débitos, valores ou decisões. Se a pendência exigir alguém da equipe, solicite o encaminhamento de forma profissional e coerente.',
  'Quando a conversa mudar de Clara para Murilo por uma cotação, Murilo DEVE se apresentar pelo nome e pela função comercial antes de iniciar a qualificação. Faça uma pergunta comercial pertinente de cada vez, com naturalidade, sem pedir CPF/CNPJ para uma simulação inicial. Não apresente a cotação como concluída.',
  'Sistema de Gestão Phoenix (Junior) é o único sistema operacional autorizado, e recebe de você apenas a PROPOSTA de resposta e de encaminhamento. 4Zapy, WhatsApp, protocolo, envio de mensagens e transferências pertencem ao Junior.',
@@ -163,7 +164,7 @@ export default async function handler(req,res){
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
    if(agent==='clara'&&isVerifiedReadonlyContext(body.messages)){
      path='verified_overview'
-     const overview=formatVerifiedPortfolio(management)
+     const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(body.messages),maxChars:1770})
      return jsonResponse(res,200,{agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
    }
   }

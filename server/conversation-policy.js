@@ -8,7 +8,7 @@ export function shouldLookupPersonalData(messages,agent,accountHistory){
  if(agent==='murilo')return false
  const history=customerTexts(messages),latest=plain(history.at(-1))
  if(!latest||isCommercialRequest(latest))return false
- if(/\b(quais seguros|que seguros|seguros (?:eu )?tenho|meus? seguros|minhas? apolices|qual apolice|meus? contratos|meus? boletos|minhas? parcelas|meus? pagamentos|seguro que tenho|vencimentos?|faturas?|carteirinha|pendencias?|valores? das? parcelas?|detalhes completos|meus? valores?|minhas? coberturas?|meus? premios?|minhas? franquias?|meu capital segurado|meu seguro|minha apolice)\b/.test(latest))return true
+ if(/\b(quais seguros|que seguros|seguros (?:eu )?tenho|meus? seguros|minhas? apolices|qual apolice|meus? contratos|meus? boletos|minhas? parcelas|meus? pagamentos|seguro que tenho|vencimentos?|faturas?|carteirinha|pendencias?|valores? das? parcelas?|detalhes completos|meus? valores?|quais coberturas?|minhas? coberturas?|meus? premios?|minhas? franquias?|meu capital segurado|meu seguro|minha apolice)\b/.test(latest))return true
  if(accountHistory && /\b(coberturas?|franquias?|premios?|capital segurado|vencimentos?|seguradora|pendencias?)\b/.test(latest))return true
  if(accountHistory && (/^\s*(?:[\d./\-\s]{8,25})\s*$/.test(latest)||/\b(?:cpf|cnpj|nasci em|nascimento|cep)\b/.test(latest)))return true
  if(accountHistory && /^(?:sim|claro|isso|pode|detalhes|todos|todas|mais detalhes|quero saber mais)\b/.test(latest))return true
@@ -68,7 +68,7 @@ export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770}={})
  const add=(items,heading)=>{if(items.length)lines.push('',heading,...items)}
  const policiesLines=policies.map((p,index)=>{
    const fields=[safeLine(p.ramo||p.linha||'Seguro'),p.seguradora?'Seguradora: '+safeLine(p.seguradora):null,p.numero?'Apólice: '+safeLine(p.numero):null,p.fim_vigencia?'Vigência até: '+dateBR(p.fim_vigencia):null,
-    p.premio_total!=null&&brl(p.premio_total)?'Prêmio total (período contratado): '+brl(p.premio_total):null,
+    p.premio_total!=null&&brl(p.premio_total)?'Prêmio total: '+brl(p.premio_total)+' (período da apólice)':null,
     p.premio_mensal!=null&&brl(p.premio_mensal)?'Mensalidade: '+brl(p.premio_mensal):null,
     p.capital_segurado!=null&&brl(p.capital_segurado)?'Capital segurado da apólice: '+brl(p.capital_segurado):null,
     p.status?'Situação: '+(p.status==='em_vigor'?'Em vigor':safeLine(p.status)):null
