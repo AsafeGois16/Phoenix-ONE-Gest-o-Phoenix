@@ -1,6 +1,6 @@
 import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
-import {selectConversationAgent} from '../../../server/agent-routing.js'
+import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
 
@@ -40,6 +40,7 @@ const criticalInstructions=[
  'Não prometa que transferiu, encaminhou ou avisou alguém se humanHandoff=false. Se o departamento correto não for identificável, faça uma pergunta breve para esclarecê-lo antes de propor transferência.',
  'REGRA DE CONTINUIDADE: Quando oferecer a opção de encaminhar (por exemplo: "Deseja que eu encaminhe?"), envie humanHandoff=false e handoff=null, permitindo que o cliente responda. Marque humanHandoff=true somente quando o encaminhamento for efetivamente necessário ou solicitado, com resposta afirmativa declarando o encaminhamento. Não pergunte se pode encaminhar e ao mesmo tempo transfira.',
  'Se não há nada a responder, reply pode ser vazio e humanHandoff=false, handoff=null.',
+ 'O sistema pode fornecer continuidade operacional por protocolo: agente anterior, intenção e etapa sem dados pessoais. Não interprete memória operacional como prova de titularidade nem como autorização de dados privados.',
  'Nunca afirme que tem acesso ao histórico além das mensagens fornecidas.'
 ].join('\n')
 function outputText(payload){
@@ -78,7 +79,7 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'invalid_contract_payload'}))
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
- const agent=selectAgent(body)
+ let agent=selectAgent(body)
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
   return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
@@ -100,6 +101,7 @@ export default async function handler(req,res){
  let resultStatus='completed'
  let handoffRequested=false
  try{
+  const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:classifyConversationIntent(last.text),suggestedAgent:agent}
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
   const contextNeeded=shouldLookupPersonalData(body.messages,agent,requiresPersonalLookup(body.messages))
   const document=contextNeeded?findInboundDocument(body.messages):null
@@ -122,7 +124,7 @@ export default async function handler(req,res){
    // Sem prova, evita recuperar a biblioteca caso o Junior ainda solicite validação.
    if(proof){
      const started=performance.now()
-     knowledgeTask=bridge('context',{agent,query:query||'atendimento'},controller.signal)
+     knowledgeTask=bridge('context',{agent,query:query||'atendimento',...memoryParams},controller.signal)
        .then(data=>{timing.knowledgeMs=Math.round(performance.now()-started);return {data}})
        .catch(error=>({error}))
    }
@@ -169,9 +171,14 @@ export default async function handler(req,res){
   const startedKnowledge=performance.now()
   const knowledgeAction=isSimpleGreeting(last.text)?'prompt_only':'context'
   path=management?'verified_lookup':knowledgeAction==='prompt_only'?'greeting':'general'
-  const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await bridge(knowledgeAction,{agent,query:query||'atendimento'},controller.signal)}
+  const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await bridge(knowledgeAction,{agent,query:query||'atendimento',...memoryParams},controller.signal)}
   if(resultKnowledge.error)throw resultKnowledge.error
   const knowledge=resultKnowledge.data
+  // Intenção explícita tem prioridade; na continuidade neutra o estado preservado por protocolo decide.
+  if((knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
+    agent=knowledge.agent
+    console.info('phoenix_agent_orchestration',JSON.stringify({event:'agent_continuity',agent}))
+  }
   if(!knowledgeTask)timing.knowledgeMs=Math.round(performance.now()-startedKnowledge)
   const sources=knowledge.sources||[]
   const snippets=sources.map((s,i)=>'['+(i+1)+'] '+safeText(s.title,140)+'\n'+safeText(s.content,1150)).join('\n\n')

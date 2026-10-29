@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react'
+import ActionMatrix from './ActionMatrix.jsx'
 import {createClient} from '@supabase/supabase-js'
 import {CheckCircle2, Database, ExternalLink, KeyRound, LockKeyhole, RefreshCcw, Save, ShieldCheck, TestTube2, Unplug, UserRound, Workflow} from 'lucide-react'
 
@@ -119,6 +120,7 @@ export default function IntegrationsAdmin(){
        <div className="one-int-actions"><button type="submit" className="one-int-primary" disabled={saving||checking}><Save size={16}/> {saving?'Salvando…':'Salvar configuração'}</button><button type="button" className="one-int-secondary" disabled={saving||checking||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(testConversation.trim())} onClick={test}><TestTube2 size={16}/> Testar conexão</button></div>
        <p className="one-int-hint">A URL e a chave permanecem armazenadas no Supabase mesmo quando você atualiza a página ou encerra sua sessão. O teste exige um conversation_id com protocolo aberto e faz somente leitura: não envia mensagens nem cria tickets. {verifiedConnection?'A API já passou no teste de consulta; isso não ativa automaticamente os envios.':'O envio automático só deve ser habilitado após homologação no sistema do Junior.'}</p>
     </form>
+    <ActionMatrix />
     <div className="one-int-panel"><h3><KeyRound size={18}/> Credenciais e segurança</h3><p>Chave do Junior: <strong>{profile.secretConfigured?'Cadastrada no Supabase Vault':'Pendente'}</strong>. O valor não é exibido novamente. Apenas administradores do Phoenix ONE podem substituí-lo. O campo acima aceita somente <code>PHOENIX_ONE_API_TOKEN</code>, criado pelo sistema do Junior — não confunda com o token usado pelo Junior para chamar o Phoenix ONE.</p><div className="one-int-substates"><span>Armazenamento: <b>Vault criptografado</b></span><span>Último teste bem-sucedido: <b>{profile.connection.lastTestAt?new Date(profile.connection.lastTestAt).toLocaleString('pt-BR'):'Ainda não realizado'}</b></span></div></div>
    </>}
    {notice&&<div role="status" className={'one-int-message '+(noticeError?'error':'success')}>{notice}</div>}
