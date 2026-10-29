@@ -28,6 +28,19 @@
 
 **Restrição:** o material completo do sistema do Junior (estruturas de banco, regras de segurança, integrações e áreas internas) deve permanecer em documentação técnica restrita, não como conhecimento automaticamente publicado para todos os agentes.
 
+## Triagem validada de movimentações — revisão posterior de 29/10/2026
+A regra anterior de perguntar operadora/empresa antes da transferência fica **substituída** pelo fluxo abaixo para solicitações de movimentação de beneficiários.
+
+1. Clara pede somente **CPF/CNPJ do titular do plano**, não do menor ou dependente, e envia o documento apenas à ponte protegida do Phoenix ONE ↔ Gestão Junior.
+2. A gestão do Junior valida identidade/vínculo (eventual prova adicional/validação humana), ligada ao protocolo. O documento e a prova não vão ao modelo, aos logs nem à memória do Phoenix ONE.
+3. **Somente com resposta verified** Clara pode consultar as apólices autorizadas. Filtrar pelo produto mencionado; para o exemplo “incluir meu filho em plano de saúde”, listar **somente Saúde**, nunca Odonto ou Vida.
+4. Quando houver mais de um plano da categoria, apresentar opções numeradas com seguradora e identificação mínima; solicitar seleção explícita. Quando houver um só, solicitar confirmação. Reaproveitar titular/dependente da conversa.
+5. Com plano selecionado e vínculo conhecido, enviar proposta de `handoff.department=backoffice` com motivo/resumo e `humanHandoff=true`. O Junior realiza o encaminhamento e pausa a IA. Nenhuma inclusão é executada pela Clara.
+6. Se a validação ou consulta estiver indisponível, não revelar nem deduzir contratos. Encaminhar **para validação manual** ao Backoffice, distinguindo esse encaminhamento de uma triagem concluída.
+
+`POST /identity/resolve` e o escopo `policies:read` são os recursos existentes previstos. **Não solicitar nova API ao Junior**, não consultar o CRM LEADS, não salvar CPF ou prova no schema `phoenix_one`.
+O funcionamento real da seleção depende da integração/autorização estarem disponíveis em produção.
+
 ## Triagem contextual antes do encaminhamento — atualização 29/10/2026
 - Para pedidos de inclusão, exclusão e alteração cadastral, Clara **não transfere imediatamente** quando faltar identificar o seguro ou a categoria do beneficiário.
 - Primeiro pergunta **qual seguro** (Saúde, Odonto, Vida ou outro); depois, se ainda não souber, pergunta se é **titular ou dependente**. Sempre reutilizar as respostas anteriores do mesmo protocolo.
