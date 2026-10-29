@@ -91,3 +91,11 @@
 /* Distinguish stored credentials from a tested connection, without claiming live availability. */
 .one-int-state.is-configured{background:rgba(49,105,172,.09);color:#315e9a;border:1px solid rgba(49,105,172,.15)}
 .one-int-state.is-tested{background:rgba(17,142,98,.10);color:#167558;border:1px solid rgba(17,142,98,.20)}
+
+.one-action-matrix{margin-top:16px}.one-action-scroll{overflow-x:auto;max-width:100%}
+.one-action-matrix table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.one-action-matrix th,.one-action-matrix td{padding:11px 10px;border-bottom:1px solid #dce5f1;vertical-align:top}
+.one-action-matrix th{font-size:11px;color:#607897;text-transform:uppercase;letter-spacing:.04em;background:#f6f8fc}
+.one-action-state{display:inline-flex;gap:5px;align-items:center;white-space:nowrap;font-weight:600}
+.one-action-state.enabled{color:#167555}.one-action-state.pending_junior{color:#99630b}.one-action-state.forbidden{color:#7b4f58}
+@media(max-width:650px){.one-action-matrix table{min-width:650px}}
