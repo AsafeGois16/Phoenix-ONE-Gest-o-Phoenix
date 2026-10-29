@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {detectBackofficeRequest} from '../server/backoffice-routing.js'
+import {detectBackofficeRequest,assessBackofficeIntake} from '../server/backoffice-routing.js'
 import {checkCapability} from '../server/action-capabilities.js'
 test('triagem coleta produto e vínculo antes de transferir ao Backoffice',()=>{
  const generic=detectBackofficeRequest('Gostaria de incluir um beneficiário')
