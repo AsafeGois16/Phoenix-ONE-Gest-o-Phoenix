@@ -45,7 +45,7 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
    if(document.type==='cnpj'&&typeof proof.cep==='string')payload.proof={cep:proof.cep}
   }
   const data=await bridge('identity_context',payload,signal)
-  if(data?.status==='verified')return {status:'verified',policies:data.policies||[],installments:data.installments||[]}
+  if(data?.status==='verified')return {status:'verified',policies:data.policies||[],installments:data.installments||[],pending:data.pending||[]}
   const allowed=['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
   return {status:allowed.includes(data?.status)?data.status:'unavailable',
    method:data?.verification?.method||null,attemptsLeft:Number.isInteger(data?.verification?.attempts_left)?data.verification.attempts_left:null}

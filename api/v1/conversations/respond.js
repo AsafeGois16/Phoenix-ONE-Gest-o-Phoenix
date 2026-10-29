@@ -2,6 +2,7 @@ import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAg
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial']
@@ -21,6 +22,9 @@ const formatSchema={
 const criticalInstructions=[
  'Você está atendendo pelo Phoenix ONE como assistente de IA da Phoenix Insurance. Suas instruções históricas de CRM, BLACK CRM, ações ou integrações são legadas e NÃO representam ferramentas ativas.',
  'Sua identidade é EXATAMENTE o agente selecionado neste atendimento: Clara é a concierge de primeiro contato, suporte, orientação, segunda via e triagem; Murilo é SDR para interesse comercial ou cotação identificados. Não se apresente com outro nome. Um número novo não significa automaticamente interesse comercial.',
+ 'O acesso autorizado e validado à gestão do Junior deve ser a principal fonte para consultas: enumere apólices com ramo, seguradora, vigência e os valores de prêmio/capital APENAS se recebidos explicitamente, sem confundir prêmio total, valor segurado e parcelas. Se o sistema não retornar um campo, explique que ele não consta na consulta; jamais estime ou extrapole.',
+ 'Quando a API informar uma pendência, diga objetivamente qual é o item, a situação, o prazo quando disponibilizado e a providência necessária; sem inventar datas, débitos, valores ou decisões. Se a pendência exigir alguém da equipe, solicite o encaminhamento de forma profissional e coerente.',
+ 'Quando a conversa mudar de Clara para Murilo por uma cotação, Murilo DEVE se apresentar pelo nome e pela função comercial antes de iniciar a qualificação. Faça uma pergunta comercial pertinente de cada vez, com naturalidade, sem pedir CPF/CNPJ para uma simulação inicial. Não apresente a cotação como concluída.',
  'Sistema de Gestão Phoenix (Junior) é o único sistema operacional autorizado, e recebe de você apenas a PROPOSTA de resposta e de encaminhamento. 4Zapy, WhatsApp, protocolo, envio de mensagens e transferências pertencem ao Junior.',
  'Nunca declare que abriu ou transferiu ticket, enviou boleto, fez alteração ou consultou apólice sem contexto real autorizado fornecido abaixo. O sistema adicionará o número do protocolo automaticamente. Você não deve repeti-lo.',
  'Use o nome de exibição se disponível e adequado. Não peça telefone que já é conhecido pelo sistema. Não exponha CPF, CNPJ, telefone ou identificadores internos na resposta.',
@@ -97,7 +101,7 @@ export default async function handler(req,res){
  let handoffRequested=false
  try{
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
-  const contextNeeded=requiresPersonalLookup(body.messages)
+  const contextNeeded=shouldLookupPersonalData(body.messages,agent,requiresPersonalLookup(body.messages))
   const document=contextNeeded?findInboundDocument(body.messages):null
   let knowledgeTask=null
   let management=null
@@ -152,7 +156,14 @@ export default async function handler(req,res){
        department,reason,summary:'Consulta de seguros/parcelas sem validação documental concluída. A equipe deve validar identidade e vínculo; não divulgar dados contratuais.'
      }})
    }
-   management={policies:identity.policies,installments:identity.installments}
+   management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[]}
+   // Consultas informativas autorizadas são respondidas diretamente a partir da API.
+   // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
+   if(agent==='clara'&&isVerifiedReadonlyContext(body.messages)){
+     path='verified_overview'
+     const overview=formatVerifiedPortfolio(management)
+     return jsonResponse(res,200,{agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
+   }
   }
   if(!process.env.OPENAI_API_KEY)return jsonResponse(res,503,{error:'openai_not_configured'})
   const startedKnowledge=performance.now()
@@ -195,6 +206,12 @@ export default async function handler(req,res){
   timing.modelMs=Math.round(performance.now()-modelStarted)
   let decision
   try{decision=JSON.parse(outputText(raw))}catch{return jsonResponse(res,502,{error:'invalid_model_output'})}
+  const firstMurilo=agent==='murilo'&&firstMuriloAppearance(body.messages)
+  // A primeira mensagem comercial deve qualificar, nunca congelar a IA por handoff automático.
+  const initialSalesHandoff=firstMurilo&&isCommercialRequest(last.text)&&decision.humanHandoff===true&&!/\b(?:atendente|humano|pessoa|consultor)\b/i.test(last.text)
+  if(initialSalesHandoff){
+    decision={...decision,reply:/residencial/i.test(last.text)?'Vou te ajudar com essa cotação. O imóvel é casa ou apartamento e em qual cidade está localizado?':'Vou te ajudar com essa cotação. Qual tipo de seguro deseja contratar e qual é a sua principal necessidade?',humanHandoff:false,handoff:null}
+  }
   const normalizedDecision=normalizeHandoffDecision(decision,DEPARTMENTS)
   const handoff=normalizedDecision.handoff
   const item=handoff&&DEPARTMENTS.includes(handoff.department)?{
@@ -205,7 +222,7 @@ export default async function handler(req,res){
   if(decision?.humanHandoff===true&&!item&&!normalizedDecision.suppressed)return jsonResponse(res,502,{error:'invalid_handoff_output'})
   handoffRequested=Boolean(item)
   if(normalizedDecision.suppressed)console.info('phoenix_handoff_policy',JSON.stringify({agent,action:'suppressed_unconfirmed_handoff'}))
-  return jsonResponse(res,200,{agent,reply:redact(safeText(decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
+  return jsonResponse(res,200,{agent,reply:redact(safeText(agent==='murilo'?ensureMuriloIntro(decision.reply,body.messages):decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
  }catch(e){
   const code=e?.name==='AbortError'?'response_timeout':e?.message||'response_unavailable'
   resultStatus=code==='response_timeout'?'timeout':'error'

@@ -45,3 +45,12 @@ test('classificador retorna intent correto',()=>{
  assert.equal(classifyConversationIntent('Segunda via boleto'),'service')
  assert.equal(classifyConversationIntent('Quero contratar seguro'),'sales')
 })
+
+test('clientes pedindo lista de seus seguros continuam com Clara mesmo após Murilo',()=>{
+ assert.equal(selectConversationAgent(request('Quais seguros eu tenho?',{history:['Quero cotar seguro de vida']})), 'clara')
+ assert.equal(selectConversationAgent(request('Meus seguros',{history:['Quero cotar seguro de vida']})), 'clara')
+})
+test('continuidade comercial de Murilo nas respostas comuns',()=>{
+ assert.equal(selectConversationAgent(request('O imóvel é uma casa',{history:['Oi','Quero cotar seguro residencial']})),'murilo')
+ assert.equal(selectConversationAgent(request('Fica em Guarulhos',{history:['Quero cotar seguro residencial']})),'murilo')
+})

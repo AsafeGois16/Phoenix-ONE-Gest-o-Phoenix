@@ -12,7 +12,7 @@ const SERVICE_PATTERNS=[
   /\b(?:2\s*(?:a|via|vida)|segunda|segunda\s*via|segunda\s*vida)\s*(?:via\s*)?(?:do\s*)?(?:boleto|fatura|parcela|pagamento)?\b/,
   /\b(?:boleto|fatura|vencimento|parcela|pagamento|cobranca|debito|nota fiscal|quitacao|inadimplencia|segunda via|2a via|2 via)\b/,
   /\b(?:carteirinha|reembolso|sinistro|assistencia|emergencia|autorizacao|cirurgia|guia|beneficiario|dependente|exclusao|excluir|inclusao|incluir|movimentacao|cancelamento|cancelar|alteracao|atualizar dados|atualizacao cadastral)\b/,
-  /\b(?:minha apolice|meu contrato|minha cobertura|meu plano|minha seguradora|meu seguro|seguro que tenho|sou cliente|ja sou cliente|sou segurado|tenho um plano)\b/,
+  /\b(?:minha apolice|meu contrato|minha cobertura|meu plano|minha seguradora|meu seguro|seguro que tenho|sou cliente|ja sou cliente|sou segurado|tenho um plano|quais seguros|meus seguros|minhas apolices|quais apolices)\b/,
   /\b(?:nao recebi|nao consigo acessar|preciso de ajuda com|problema no atendimento|acompanhar meu pedido|quero falar com atendente)\b/
 ]
 const SALES_PATTERNS=[
@@ -39,14 +39,13 @@ export function selectConversationAgent(body) {
  // Somente respostas curtas de acompanhamento mantêm a intenção já identificada
  // no MESMO protocolo. Nunca transformar "Oi" inicial em Murilo por causa do hint.
  const stripped=fold(last)
- const shortFollowUp = stripped.length<=42 && /^(?:sim|claro|pode|pode ser|ok|certo|isso|entendi|vamos|por favor|quero sim|nao|não|obrigad[oa]|com certeza|perfeito|tenho interesse)$/.test(stripped)
- if(shortFollowUp){
-   for(const previous of history.slice(0,-1).reverse().slice(0,8)){
-      const prior=intent(previous)
-      if(prior==='service')return 'clara'
-      if(prior==='sales')return 'murilo'
-   }
+ // Manter Murilo durante a continuidade da cotação, mesmo em respostas não curtas.
+ for(const previous of history.slice(0,-1).reverse().slice(0,12)){
+   const prior=intent(previous)
+   if(prior==='service')return 'clara'
+   if(prior==='sales')return 'murilo'
  }
+
  // Contato desconhecido/lead e agent_hint "murilo" não são prova de venda.
  return 'clara'
 }
