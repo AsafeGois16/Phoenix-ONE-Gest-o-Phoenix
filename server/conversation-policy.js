@@ -142,12 +142,22 @@ export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770}={})
   }
   if(covers.length>shown.length)coverageLines.push('Mais '+(covers.length-shown.length)+' cobertura(s) cadastrada(s).')
  }
- const installmentLines=installments.slice(0,12).map((p,i)=>(i+1)+'. '+[
+ const selectedInstallments=selectInstallmentHighlights(installments)
+ const formatInstallment=(p,i)=>(i+1)+'. '+[
   p.apolice?'Apólice: '+safeLine(p.apolice):null,p.ramo?safeLine(p.ramo):null,
   p.vencimento?'Vencimento: '+dateBR(p.vencimento):null,
   brl(p.valor)?'Parcela: '+brl(p.valor):null,
   p.vencida===true?'Vencida':p.vencida===false?'Não vencida':null
- ].filter(Boolean).join(' | '))
+ ].filter(Boolean).join(' | ')
+ const installmentLines=selectedInstallments.listed.map(formatInstallment)
+ const overdueLines=selectedInstallments.overdue.map(formatInstallment)
+ const nextLine=selectedInstallments.next?formatInstallment(selectedInstallments.next,0):null
+ const addCompactInstallments=()=>{
+   if(overdueLines.length)add(overdueLines,overdueLines.length===1?'Parcela vencida:':'Parcelas vencidas:')
+   if(nextLine)add([nextLine],'Próximo vencimento:')
+   if(installments.length&&!overdueLines.length&&!nextLine)lines.push('Não encontrei parcelas com vencimento confirmado para exibir no resumo.')
+   if(installments.length>overdueLines.length+(nextLine?1:0))lines.push('Se quiser, posso mostrar a lista completa de parcelas em aberto.')
+ }
  const pendingLines=pending.slice(0,8).map((p,i)=>(i+1)+'. '+[
    safeLine(p.description??p.descricao),p.status||p.situacao?'Situação: '+safeLine(p.status??p.situacao):null,
    p.due_date||p.prazo?'Prazo: '+dateBR(p.due_date??p.prazo):null
@@ -159,13 +169,16 @@ export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770}={})
    add(policiesLines,'Apólices:')
    if(coverageLines.length)add(coverageLines,'Coberturas e franquias cadastradas:')
    else lines.push('Não há detalhes de coberturas disponíveis nesta consulta.')
- }else if(focus==='installments'){
-   add(installmentLines,'Parcelas em aberto retornadas pelo sistema (até 12):')
-   if(!installmentLines.length)lines.push('A consulta não retornou parcelas em aberto.')
+ }else if(focus==='installments'||focus==='installments_full'){
+   if(focus==='installments_full'){
+     add(installmentLines,'Lista completa de parcelas em aberto disponibilizadas pelo sistema (até 12):')
+     if(!installmentLines.length)lines.push('A consulta não retornou parcelas em aberto.')
+   }else addCompactInstallments()
  }else{
    add(policiesLines,'Seguros:')
    if(focus==='details')add(coverageLines,'Coberturas cadastradas:')
-   add(installmentLines,'Parcelas em aberto retornadas pelo sistema (até 12):')
+   if(focus==='details')add(installmentLines,'Parcelas em aberto disponibilizadas pelo sistema (até 12):')
+   else addCompactInstallments()
    if(pendingLines.length)add(pendingLines,'Pendências informadas pela gestão:')
    if(policies.length&&!policies.some(p=>brl(p.premio_total)||brl(p.premio_mensal)))lines.push('O valor do prêmio do seguro não foi disponibilizado nesta consulta. Valores de parcelas aparecem separadamente.')
  }
