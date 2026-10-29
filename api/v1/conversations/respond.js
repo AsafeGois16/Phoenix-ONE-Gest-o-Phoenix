@@ -2,7 +2,7 @@ import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAg
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {assessBackofficeIntake,detectBackofficeStatusRequest} from '../../../server/backoffice-routing.js'
+import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest,ensureClaraIntro,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
@@ -85,7 +85,10 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'invalid_contract_payload'}))
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
- let agent=selectAgent(body)
+ // Reaberturas e retornos do Backoffice devem iniciar um novo assunto;
+ // histórico completo continua disponível no Junior, sem reviver triagem encerrada.
+ const activeMessages=activeMovementHistory(body.messages)
+ let agent=selectAgent({...body,messages:activeMessages})
  const last=body.messages.at(-1)
  let introTask=null
  const replyToJunior=async payload=>{
@@ -109,7 +112,7 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'last_message_not_inbound',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
- const normalized=normalizeMessages(body.messages)
+ const normalized=normalizeMessages(activeMessages)
  if(!normalized.length||normalized.at(-1)?.role!=='user'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'no_inbound_text',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
@@ -122,20 +125,23 @@ export default async function handler(req,res){
   console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
   return null
  })
+ if(isStandaloneNewRequest(last.text)){
+   return replyToJunior({agent:'clara',reply:'Claro! 💙 Como posso ajudar com a sua nova solicitação?',humanHandoff:false,handoff:null})
+ }
  // A transferência humana é uma ação do sistema Junior, nunca uma movimentação
  // de beneficiário ou consulta privada executada pela Clara.
  const statusBackoffice=detectBackofficeStatusRequest(last.text)
- const backoffice=statusBackoffice||assessBackofficeIntake(body.messages)
+ const backoffice=statusBackoffice||assessBackofficeIntake(activeMessages)
  if(backoffice && !statusBackoffice){
    // Movimentação = identificação do titular, verificação via Junior e escolha
    // de uma apólice da categoria solicitada ANTES de qualquer handoff operacional.
-   const document=findInboundDocument(body.messages)
+   const document=findInboundDocument(activeMessages)
    const respond=payload=>replyToJunior(payload)
    if(document.status==='missing')return respond({agent:'clara',reply:movementDocumentPrompt,humanHandoff:false,handoff:null})
    if(document.status==='invalid'||document.status==='multiple')return respond({agent:'clara',
      reply:document.status==='multiple'?'Para sua segurança, informe apenas um CPF ou CNPJ do titular do plano.':'O documento informado não passou na validação de formato. Pode conferir e enviar novamente o CPF ou CNPJ do titular?',
      humanHandoff:false,handoff:null})
-   const proof=extractVerificationProof(body.messages,document.type)
+   const proof=extractVerificationProof(activeMessages,document.type)
    let verification
    try{
      verification=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
@@ -158,7 +164,7 @@ export default async function handler(req,res){
          summary:'Solicitação de '+backoffice.type+' de '+(backoffice.relation||'beneficiário')+' em '+(backoffice.product||'seguro não especificado')+'. Validação digital não concluída. Conferir titularidade e contratos antes de selecionar plano ou realizar qualquer movimentação.'
        }})
    }
-   const decision=verifiedMovementDecision(backoffice,verification.policies||[],body.messages)
+   const decision=verifiedMovementDecision(backoffice,verification.policies||[],activeMessages)
    console.info('phoenix_movement_intake',JSON.stringify({stage:decision.humanHandoff?'handoff':'verification_or_selection',category:backoffice.product||'unspecified',verified:true}))
    return respond(decision)
  }
@@ -176,8 +182,8 @@ export default async function handler(req,res){
  try{
   const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:classifyConversationIntent(last.text),suggestedAgent:agent}
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
-  const contextNeeded=shouldLookupPersonalData(body.messages,agent,requiresPersonalLookup(body.messages))
-  const document=contextNeeded?findInboundDocument(body.messages):null
+  const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
+  const document=contextNeeded?findInboundDocument(activeMessages):null
   let knowledgeTask=null
   let management=null
   if(contextNeeded){
@@ -192,7 +198,7 @@ export default async function handler(req,res){
      reply:document.status==='multiple'?'Recebi mais de um documento. Pode me informar apenas o CPF ou CNPJ do titular do seguro?':'Pode conferir o CPF ou CNPJ do titular e me enviar novamente? O número não passou na validação de formato.',
      humanHandoff:false,handoff:null
    })
-   const proof=extractVerificationProof(body.messages,document.type)
+   const proof=extractVerificationProof(activeMessages,document.type)
    // Se já houver prova, consultar contexto da IA e validar no Junior em paralelo.
    // Sem prova, evita recuperar a biblioteca caso o Junior ainda solicite validação.
    if(proof){
@@ -213,7 +219,7 @@ export default async function handler(req,res){
      return replyToJunior({agent,reply:retry+question+remaining,humanHandoff:false,handoff:null})
    }
    if(identity.status!=='verified'){
-     const department=handoffDepartment(body.messages)
+     const department=handoffDepartment(activeMessages)
      const reasons={
        verification_required:'Confirmação de identidade pela equipe necessária',
        verification_failed:'Verificação de identidade recusada ou bloqueada',
@@ -234,9 +240,9 @@ export default async function handler(req,res){
    management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[]}
    // Consultas informativas autorizadas são respondidas diretamente a partir da API.
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
-   if(agent==='clara'&&isVerifiedReadonlyContext(body.messages)){
+   if(agent==='clara'&&isVerifiedReadonlyContext(activeMessages)){
      path='verified_overview'
-     const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(body.messages),maxChars:1770})
+     const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(activeMessages),maxChars:1770})
      return replyToJunior({agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
    }
   }
