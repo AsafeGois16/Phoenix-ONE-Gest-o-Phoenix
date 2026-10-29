@@ -67,7 +67,7 @@ const newTopic=/\b(?:cotar|cotacao|orcamento|quais seguros|meus seguros|segunda 
  */
 export function isStandaloneNewRequest(text){
  const value=fold(text).replace(/[?!.]+$/,'').trim()
- return /^(?:(?:certo|ok|beleza|obrigad[oa]|tudo bem|entendi|perfeito|ta bom|combinado)[, ]+)?(?:pode(?:ria)? me ajudar (?:em|com) (?:mais )?uma? outra? coisa|pode(?:ria)? me ajudar (?:em|com) mais uma coisa|tenho (?:mais )?uma? outra? (?:duvida|pergunta|coisa)|tenho mais uma (?:duvida|pergunta|coisa)|posso (?:te )?pedir (?:mais )?uma? outra? coisa|posso (?:te )?fazer (?:mais )?uma? outra? pergunta|posso falar de outro assunto|podemos falar de outro assunto|preciso de ajuda com outra coisa|quero tratar de outro assunto|e sobre outro assunto|mais uma coisa|outra duvida|outra pergunta|outra coisa|pode me ajudar novamente)$/.test(value)
+ return /^(?:(?:certo|ok|beleza|obrigad[oa]|tudo bem|entendi|perfeito|ta bom|combinado)[, ]+)?(?:pode(?:ria)? me ajudar (?:em|com) (?:(?:mais )?uma|outra|uma outra) coisa|tem como me ajudar (?:em|com) (?:(?:mais )?uma|outra) coisa|tenho (?:(?:mais )?uma|outra) (?:duvida|pergunta|coisa)|posso (?:te )?pedir (?:(?:mais )?uma|outra) coisa|posso (?:te )?fazer (?:(?:mais )?uma|outra) pergunta|posso falar de outro assunto|podemos falar de outro assunto|preciso de ajuda com outra coisa|quero tratar de outro assunto|e sobre outro assunto|mais uma coisa|outra duvida|outra pergunta|outra coisa|pode me ajudar novamente)$/.test(value)
 }
 function movementHandoffCompleted(message){
  if(message?.direction!=='outbound'||message.author!=='agent'||typeof message.text!=='string')return false
