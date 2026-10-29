@@ -16,7 +16,7 @@ function categoryFor(intake){
 }
 function matchesCategory(policy,category){
  const value=fold([policy?.ramo,policy?.linha].filter(Boolean).join(' '))
- if(category==='Saúde')return /\b(?:saude|medic[ao]|hospitalar|health)\b/.test(value)&&!/\b(?:odonto|dental)\b/.test(value)
+ if(category==='Saúde')return /\b(?:saude|medic[ao]|hospitalar|health)\b/.test(value)&&!/\b(?:odonto|odontolog|dental)/.test(value)
  if(category==='Odonto')return /\b(?:odonto|odontolog|dental)\w*/.test(value)
  if(category==='Vida')return /\bvida\b/.test(value)&&!/\b(?:previdencia|saude)\b/.test(value)
  return false
@@ -68,6 +68,13 @@ export function verifiedMovementDecision(intake,policies,messages){
    department:'backoffice',
    reason:'Conferir plano de '+category+' não identificado na consulta',
    summary:'Cliente solicita '+routeName(type)+' no seguro '+category+'. Identidade verificada via gestão do Junior; nenhuma apólice da categoria foi identificada na consulta autorizada. Backoffice deve localizar o contrato e concluir a triagem antes de qualquer ação.'
+  })
+ }
+ const labels=choices.map(policy=>policyLabel(policy,category))
+ if(new Set(labels).size!==labels.length){
+  return base('Encontrei mais de um plano de '+category+' sem identificação suficiente para diferenciá-los com segurança. Vou direcionar ao Backoffice para identificar o contrato correto antes da movimentação.',true,{
+    department:'backoffice',reason:'Contratos da mesma categoria não distinguíveis',
+    summary:'Identidade verificada. Existem múltiplas apólices de '+category+' com identificação indistinguível nesta consulta. Backoffice precisa identificar o plano correto antes da '+routeName(type)+' de '+relation+'. Nenhuma movimentação executada.'
   })
  }
  const previous=lastAgentText(messages)
