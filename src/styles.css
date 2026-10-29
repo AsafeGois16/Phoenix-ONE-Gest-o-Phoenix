@@ -87,3 +87,7 @@
 
 .one-int-secret-input{display:flex;gap:8px;align-items:center}.one-int-secret-input input{flex:1;min-width:0;letter-spacing:.6px}.one-int-secret-input .one-int-secondary{flex-shrink:0}
 @media(max-width:650px){.one-int-secret-input{flex-direction:column;align-items:stretch}.one-int-secret-input .one-int-secondary{width:100%}}
+
+/* Distinguish stored credentials from a tested connection, without claiming live availability. */
+.one-int-state.is-configured{background:rgba(49,105,172,.09);color:#315e9a;border:1px solid rgba(49,105,172,.15)}
+.one-int-state.is-tested{background:rgba(17,142,98,.10);color:#167558;border:1px solid rgba(17,142,98,.20)}
