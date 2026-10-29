@@ -11,7 +11,7 @@ export function shouldLookupPersonalData(messages,agent,accountHistory){
  if(/\b(quais seguros|que seguros|seguros (?:eu )?tenho|meus? seguros|minhas? apolices|qual apolice|meus? contratos|meus? boletos|minhas? parcelas|meus? pagamentos|seguro que tenho|vencimentos?|faturas?|carteirinha|pendencias?|valores? das? parcelas?|detalhes completos|meus? valores?|quais coberturas?|minhas? coberturas?|meus? premios?|minhas? franquias?|meu capital segurado|meu seguro|minha apolice)\b/.test(latest))return true
  if(accountHistory && /\b(coberturas?|franquias?|premios?|capital segurado|vencimentos?|seguradora|pendencias?)\b/.test(latest))return true
  if(accountHistory && (/^\s*(?:[\d./\-\s]{8,25})\s*$/.test(latest)||/\b(?:cpf|cnpj|nasci em|nascimento|cep)\b/.test(latest)))return true
- if(accountHistory && /^(?:sim|claro|isso|pode|detalhes|todos|todas|mais detalhes|quero saber mais)\b/.test(latest))return true
+ if(accountHistory && /^(?:sim|claro|isso|pode|detalhes|todos|todas|mais detalhes|quero saber mais|quero (?:ver )?(?:todas?|completo)|mostr[ae] (?:todas?|a lista)|lista completa|relacao completa|me manda todas)\b/.test(latest))return true
  return false
 }
 
@@ -45,7 +45,7 @@ export function ensureMuriloIntro(reply,messages){
 export function isReadonlyConsultation(text){
  const t=plain(text)
  if(/\b(?:quero falar com|atendente|consultor|pessoa|transferir|encaminhar|mandar boleto|envia boleto|enviar boleto|cancelar|excluir|incluir|sinistro|indenizacao|solicitar|abrir chamado)\b/.test(t))return false
- return /\b(?:seguros? (?:eu )?tenho|meus? seguros|apolices?|detalhes? completos?|detalhes? (?:da|das|dos)|parcelas?|vencimentos?|valor(?:es)?|seguradora|coberturas?|franquias?|capital segurado|premios?|pendencias?|pagamento|quais seguros)\b/.test(t)
+ return /\b(?:seguros? (?:eu )?tenho|meus? seguros|apolices?|detalhes? completos?|detalhes? (?:da|das|dos)|parcelas?|vencimentos?|valor(?:es)?|seguradora|coberturas?|franquias?|capital segurado|premios?|pendencias?|pagamento|quais seguros|lista completa|relacao completa|todas as parcelas|todos os vencimentos|me mostre tudo)\b/.test(t)
 }
 export function isVerifiedReadonlyContext(messages){
  const recent=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='inbound'&&m.author==='contact').slice(-10).reverse()
@@ -63,18 +63,52 @@ export function isVerifiedReadonlyContext(messages){
 const safeLine=x=>String(x??'').replace(/[\r\n\0-\x1f]+/g,' ').trim().slice(0,160)
 const brl=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n):null
 const dateBR=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):safeLine(d)
+const fullInstallmentRequest=t=>/\b(?:todas?\s+(?:as\s+)?parcelas|todos?\s+(?:os\s+)?vencimentos|lista\s+completa|relacao\s+completa|lista\s+inteira|detalhes?\s+completos?|tudo\s+completo|mostr[ae]\s+tudo|quero\s+(?:ver\s+)?tud[oa]s?|me\s+envie\s+tudo)\b/.test(t)
 export function portfolioFocus(messages){
  const inbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='inbound'&&m.author==='contact')
- for(const m of inbound.slice(-10).reverse()){
-   const t=plain(m.text)
+ const entries=inbound.slice(-10).reverse()
+ for(let i=0;i<entries.length;i++){
+   const t=plain(entries[i].text)
    if(!t||/^\s*[\d.\-/ ]{8,25}\s*$/.test(t))continue
+   if(fullInstallmentRequest(t)){
+     if(/\b(?:parcelas?|vencimentos?|boletos?|pagamentos?|mensalidades?)\b/.test(t))return 'installments_full'
+     if(/\b(?:coberturas?|franquias?)\b/.test(t))return 'coverages'
+     const older=entries.slice(i+1).map(m=>plain(m.text))
+     if(older.some(text=>/\b(?:parcelas?|vencimentos?|boletos?|pagamentos?|mensalidades?)\b/.test(text)))return 'installments_full'
+     return 'details'
+   }
    if(/\b(?:coberturas?|franquias?|capital segurado)\b/.test(t))return 'coverages'
    if(/\b(?:pendencias?|documentos pendentes|o que esta pendente)\b/.test(t))return 'pending'
    if(/\b(?:parcelas?|vencimentos?|boletos?|pagamentos?|mensalidades?)\b/.test(t))return 'installments'
-   if(/\b(?:detalhes? completos?|todos os detalhes|informacoes completas)\b/.test(t))return 'details'
    if(/\b(?:seguros?|apolices?|seguradoras?)\b/.test(t))return 'summary'
  }
  return 'summary'
+}
+function saoPauloToday(){
+ const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date())
+ const p=Object.fromEntries(parts.map(v=>[v.type,v.value]))
+ return p.year+'-'+p.month+'-'+p.day
+}
+function dueISO(date){
+ if(typeof date!=='string')return null
+ const input=date.trim()
+ const iso=input.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+ const br=input.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+ const y=iso?Number(iso[1]):br?Number(br[3]):0
+ const m=iso?Number(iso[2]):br?Number(br[2]):0
+ const d=iso?Number(iso[3]):br?Number(br[1]):0
+ const stamp=new Date(Date.UTC(y,m-1,d))
+ if(!y||stamp.getUTCFullYear()!==y||stamp.getUTCMonth()+1!==m||stamp.getUTCDate()!==d)return null
+ return String(y).padStart(4,'0')+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')
+}
+export function selectInstallmentHighlights(installments,{today}={}){
+ const listed=Array.isArray(installments)?installments.slice(0,12):[]
+ const reference=dueISO(today)||saoPauloToday()
+ const entries=listed.map((value,index)=>({value,index,date:dueISO(value?.vencimento)}))
+ const sorted=(a,b)=>(a.date||'9999-99-99').localeCompare(b.date||'9999-99-99')||a.index-b.index
+ const overdue=entries.filter(x=>x.value?.vencida===true).sort(sorted)
+ const upcoming=entries.filter(x=>x.value?.vencida===false&&x.date&&x.date>=reference).sort(sorted)[0]||null
+ return {overdue:overdue.map(x=>x.value),next:upcoming?.value||null,listed}
 }
 export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770}={}){
  const policies=Array.isArray(data?.policies)?data.policies:[]
