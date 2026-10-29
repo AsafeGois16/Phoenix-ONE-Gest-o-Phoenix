@@ -32,6 +32,7 @@ const criticalInstructions=[
  'Sem confirmação de valor ou cobertura na API do Junior, não invente informação, e ofereça encaminhamento humano. Para inclusão, exclusão, reembolso, sinistro, envio de boleto ou outra ação que exija intervenção humana, considere humanHandoff=true.',
  'Departamentos de encaminhamento: patrimonio (Auto, RE, residencial, sinistros patrimoniais), beneficios (saúde, odonto, inclusão/exclusão e benefícios), comercial (nova venda, cotação ou renovação que exija humano).',
  'Se humanHandoff=true, forneça handoff com department válido, reason e summary sucintos. O sistema do Junior pausa o agente e efetiva o encaminhamento; não chame ferramentas de transferência diretamente.',
+ 'Se a consulta documental autorizada já trouxe vencimentos, valores e dados das apólices, responda às perguntas do cliente com esses dados concretos antes de considerar encaminhamento. Não diga que necessita de humano apenas para apresentar detalhes que a API já confirmou. Não invente parcelas ou prometa enviar boletos pela IA.',
  'Não prometa que transferiu, encaminhou ou avisou alguém se humanHandoff=false. Se o departamento correto não for identificável, faça uma pergunta breve para esclarecê-lo antes de propor transferência.',
  'REGRA DE CONTINUIDADE: Quando oferecer a opção de encaminhar (por exemplo: "Deseja que eu encaminhe?"), envie humanHandoff=false e handoff=null, permitindo que o cliente responda. Marque humanHandoff=true somente quando o encaminhamento for efetivamente necessário ou solicitado, com resposta afirmativa declarando o encaminhamento. Não pergunte se pode encaminhar e ao mesmo tempo transfira.',
  'Se não há nada a responder, reply pode ser vazio e humanHandoff=false, handoff=null.',
@@ -69,18 +70,31 @@ export default async function handler(req,res){
  if(!process.env.PHOENIX_ONE_TOKEN)return jsonResponse(res,503,{error:'integration_token_not_configured'})
  if(!authenticateJunior(req))return jsonResponse(res,401,{error:'unauthorized'})
  const body=req.body
- if(!checkPayload(body))return jsonResponse(res,400,{error:'invalid_contract_payload'})
+ if(!checkPayload(body)){
+  console.info('phoenix_response_skipped',JSON.stringify({reason:'invalid_contract_payload'}))
+  return jsonResponse(res,400,{error:'invalid_contract_payload'})
+ }
  const agent=selectAgent(body)
- if(body.mode==='desligado')return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+ if(body.mode==='desligado'){
+  console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
+  return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+ }
  const last=body.messages.at(-1)
- if(last.direction!=='inbound'||last.author!=='contact')return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+ if(last.direction!=='inbound'||last.author!=='contact'){
+  console.info('phoenix_response_skipped',JSON.stringify({reason:'last_message_not_inbound',agent}))
+  return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+ }
  const normalized=normalizeMessages(body.messages)
- if(!normalized.length||normalized.at(-1)?.role!=='user')return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+ if(!normalized.length||normalized.at(-1)?.role!=='user'){
+  console.info('phoenix_response_skipped',JSON.stringify({reason:'no_inbound_text',agent}))
+  return jsonResponse(res,200,{agent,reply:'',humanHandoff:false,handoff:null})
+ }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)
  const start=performance.now()
  const timing={knowledgeMs:0,identityMs:0,modelMs:0}
  let path='general'
  let resultStatus='completed'
+ let handoffRequested=false
  try{
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
   const contextNeeded=requiresPersonalLookup(body.messages)
@@ -189,6 +203,7 @@ export default async function handler(req,res){
    summary:redact(safeText(handoff.summary,350))
   }:null
   if(decision?.humanHandoff===true&&!item&&!normalizedDecision.suppressed)return jsonResponse(res,502,{error:'invalid_handoff_output'})
+  handoffRequested=Boolean(item)
   if(normalizedDecision.suppressed)console.info('phoenix_handoff_policy',JSON.stringify({agent,action:'suppressed_unconfirmed_handoff'}))
   return jsonResponse(res,200,{agent,reply:redact(safeText(decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
  }catch(e){
@@ -199,6 +214,6 @@ export default async function handler(req,res){
   clearTimeout(timer)
   // Somente métricas agregadas. Nunca registrar protocolo, documento, telefone, texto ou chaves.
   const totalMs=Math.round(performance.now()-start)
-  console.info('phoenix_response_latency',JSON.stringify({agent,path,status:resultStatus,totalMs,...timing}))
+  console.info('phoenix_response_latency',JSON.stringify({agent,path,status:resultStatus,handoffRequested,totalMs,...timing}))
  }
 }
