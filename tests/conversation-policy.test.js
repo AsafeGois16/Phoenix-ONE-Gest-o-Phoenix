@@ -15,7 +15,7 @@ test('Clara mantém consulta documental quando necessário',()=>{
  assert.equal(shouldLookupPersonalData([c('Oi')],'clara',false),false)
 })
 test('resumo autorizado separa prêmio, valor da parcela e seguradora',()=>{
- const x=formatVerifiedPortfolio({policies:[{ramo:'Auto',seguradora:'Exemplo Seguradora',premio_total:1200}],installments:[{valor:100}]})
+ const x=formatVerifiedPortfolio({policies:[{ramo:'Auto',seguradora:'Exemplo Seguradora',premio_total:1200}],installments:[{valor:100}]},{focus:'details'})
  assert.match(x,/Prêmio total: R\$\s1.200,00/);assert.match(x,/Parcela: R\$\s100,00/)
 })
 test('valor da parcela nunca inferido como prêmio',()=>{
@@ -52,7 +52,7 @@ test('contrato Junior v1.2: coberturas com capital e franquia, sem object Object
 })
 test('prêmio mensal de benefício não é convertido em prêmio anual',async()=>{
  const {formatVerifiedPortfolio}=await import('../server/conversation-policy.js')
- const t=formatVerifiedPortfolio({policies:[{numero:'SAUDE-TESTE',ramo:'Saúde',premio_mensal:680.25,premio_total:null}],installments:[{valor:680.25}]})
+ const t=formatVerifiedPortfolio({policies:[{numero:'SAUDE-TESTE',ramo:'Saúde',premio_mensal:680.25,premio_total:null}],installments:[{valor:680.25}]},{focus:'details'})
  assert.match(t,/Mensalidade: R\$\s680,25/)
  assert.doesNotMatch(t,/Prêmio total:/)
  assert.match(t,/Parcela: R\$\s680,25/)
@@ -103,4 +103,58 @@ test('Clara não duplica apresentação produzida pelo próprio modelo',async()=
  const {ensureClaraIntro}=await import('../server/conversation-policy.js')
  const reply='Olá! Sou a Clara, da Phoenix Insurance. Como posso ajudar?'
  assert.equal(ensureClaraIntro(reply,[c('Oi')]),reply)
+})
+
+
+test('Clara resume só parcela vencida e o vencimento futuro mais próximo',async()=>{
+ const {selectInstallmentHighlights,formatVerifiedPortfolio}=await import('../server/conversation-policy.js')
+ const installments=[
+  {apolice:'132401612',ramo:'Serviços',vencimento:'2026-10-20',valor:63.31,vencida:true},
+  {apolice:'132401612',ramo:'Serviços',vencimento:'2026-11-20',valor:63.31,vencida:false},
+  {apolice:'132401612',ramo:'Serviços',vencimento:'2026-12-20',valor:63.31,vencida:false},
+  {apolice:'132401612',ramo:'Serviços',vencimento:'2027-01-20',valor:63.31,vencida:false}
+ ]
+ const selected=selectInstallmentHighlights(installments,{today:'2026-10-29'})
+ assert.equal(selected.overdue.length,1)
+ assert.equal(selected.next.vencimento,'2026-11-20')
+ const reply=formatVerifiedPortfolio({installments},{focus:'installments',today:'2026-10-29'})
+ assert.match(reply,/20\/10\/2026/)
+ assert.match(reply,/20\/11\/2026/)
+ assert.doesNotMatch(reply,/20\/12\/2026|20\/01\/2027/)
+ assert.match(reply,/lista completa de parcelas/)
+ const summary=formatVerifiedPortfolio({policies:[{ramo:'Serviços'}],installments},{focus:'summary',today:'2026-10-29'})
+ assert.doesNotMatch(summary,/20\/12\/2026/)
+})
+test('pedido de lista completa mostra todas as parcelas retornadas',async()=>{
+ const {portfolioFocus,formatVerifiedPortfolio,shouldLookupPersonalData}=await import('../server/conversation-policy.js')
+ const data=[{vencimento:'2026-10-20',valor:63.31,vencida:true},{vencimento:'2026-11-20',valor:63.31,vencida:false},{vencimento:'2026-12-20',valor:63.31,vencida:false}]
+ const c=text=>({direction:'inbound',author:'contact',text})
+ assert.equal(portfolioFocus([c('Quais são minhas parcelas?'),c('Quero a lista completa')]),'installments_full')
+ assert.equal(portfolioFocus([c('Mostre todas as parcelas em aberto')]),'installments_full')
+ assert.equal(portfolioFocus([c('Preciso dos detalhes completos das parcelas')]),'installments_full')
+ assert.equal(shouldLookupPersonalData([c('Quais são minhas parcelas?'),c('Me mostra a lista completa')],'clara',true),true)
+ const full=formatVerifiedPortfolio({installments:data},{focus:'installments_full',today:'2026-10-29'})
+ assert.match(full,/20\/10\/2026/)
+ assert.match(full,/20\/11\/2026/)
+ assert.match(full,/20\/12\/2026/)
+})
+test('várias parcelas vencidas e só o próximo pagamento em ordem cronológica',async()=>{
+ const {selectInstallmentHighlights}=await import('../server/conversation-policy.js')
+ const data=[{vencimento:'2026-12-10',vencida:false},{vencimento:'2026-10-05',vencida:true},{vencimento:'2026-11-02',vencida:false},{vencimento:'2026-09-25',vencida:true},{vencimento:'2026-11-09',vencida:false}]
+ const selected=selectInstallmentHighlights(data,{today:'2026-10-29'})
+ assert.deepEqual(selected.overdue.map(x=>x.vencimento),['2026-09-25','2026-10-05'])
+ assert.equal(selected.next.vencimento,'2026-11-02')
+})
+test('sem vencidas: apenas o próximo; não presumir atraso por data sem status',async()=>{
+ const {selectInstallmentHighlights}=await import('../server/conversation-policy.js')
+ const data=[{vencimento:'2026-10-01',vencida:false},{vencimento:'2026-11-12',vencida:false},{vencimento:'2026-12-12',vencida:false},{vencimento:'2026-09-01'}]
+ const result=selectInstallmentHighlights(data,{today:'2026-10-29'})
+ assert.equal(result.overdue.length,0)
+ assert.equal(result.next.vencimento,'2026-11-12')
+})
+test('sem perder intenção quando cliente muda de parcelas para seguros',async()=>{
+ const {portfolioFocus}=await import('../server/conversation-policy.js')
+ const c=text=>({direction:'inbound',author:'contact',text})
+ assert.equal(portfolioFocus([c('Todas as parcelas'),c('Quais seguros eu tenho?')]),'summary')
+ assert.equal(portfolioFocus([c('Quais seguros eu tenho?'),c('Parcelas')]),'installments')
 })
