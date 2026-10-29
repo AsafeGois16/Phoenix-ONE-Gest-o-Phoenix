@@ -2,7 +2,7 @@ import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAg
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,formatVerifiedPortfolio,isCommercialRequest} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial']
@@ -159,7 +159,7 @@ export default async function handler(req,res){
    management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[]}
    // Consultas informativas autorizadas são respondidas diretamente a partir da API.
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
-   if(agent==='clara'&&isReadonlyConsultation(last.text)){
+   if(agent==='clara'&&isVerifiedReadonlyContext(body.messages)){
      path='verified_overview'
      const overview=formatVerifiedPortfolio(management)
      return jsonResponse(res,200,{agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})

@@ -16,7 +16,7 @@ test('Clara mantém consulta documental quando necessário',()=>{
 })
 test('resumo autorizado separa prêmio, valor da parcela e seguradora',()=>{
  const x=formatVerifiedPortfolio({policies:[{ramo:'Auto',seguradora:'Exemplo Seguradora',premio_total:1200}],installments:[{valor:100}]})
- assert.match(x,/Prêmio total: R\$ 1.200,00/);assert.match(x,/Parcela: R\$ 100,00/)
+ assert.match(x,/Prêmio total: R\$\s1.200,00/);assert.match(x,/Parcela: R\$\s100,00/)
 })
 test('valor da parcela nunca inferido como prêmio',()=>{
  const x=formatVerifiedPortfolio({policies:[{ramo:'Auto'}],installments:[{valor:214.41}]})
@@ -26,4 +26,11 @@ test('consultas informativas não geram transferência',()=>{
  assert.equal(isReadonlyConsultation('Quais seguros eu tenho com vocês?'),true)
  assert.equal(isReadonlyConsultation('Detalhes completos das parcelas'),true)
  assert.equal(isReadonlyConsultation('Quero que um atendente envie boleto'),false)
+})
+
+test('continuidade após CPF/data mantém consulta informativa autorizada',async()=>{
+ const {isVerifiedReadonlyContext}=await import('../server/conversation-policy.js')
+ const h=[c('Quais seguros eu tenho?'),c('111.444.777-35'),c('25/11/1990')]
+ assert.equal(isVerifiedReadonlyContext(h),true)
+ assert.equal(isVerifiedReadonlyContext([c('Quais seguros eu tenho?'),c('Quero cotar seguro residencial')]),false)
 })

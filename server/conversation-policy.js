@@ -27,6 +27,15 @@ export function isReadonlyConsultation(text){
  if(/\b(?:quero falar com|atendente|consultor|pessoa|transferir|encaminhar|mandar boleto|envia boleto|enviar boleto|cancelar|excluir|incluir|sinistro|indenizacao|solicitar|abrir chamado)\b/.test(t))return false
  return /\b(?:seguros? (?:eu )?tenho|meus? seguros|apolices?|detalhes? completos?|detalhes? (?:da|das|dos)|parcelas?|vencimentos?|valor(?:es)?|seguradora|cobertura|pendencia|pagamento|quais seguros)\b/.test(t)
 }
+export function isVerifiedReadonlyContext(messages){
+ const recent=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='inbound'&&m.author==='contact').slice(-10).reverse()
+ for(const m of recent){
+  const text=plain(m.text)
+  if(isReadonlyConsultation(text))return true
+  if(isCommercialRequest(text)||/\b(?:cancelar|enviar boleto|encaminhar|atendente|excluir|incluir|sinistro)\b/.test(text))return false
+ }
+ return false
+}
 export function formatVerifiedPortfolio(data){
  const policies=Array.isArray(data?.policies)?data.policies:[]
  const installments=Array.isArray(data?.installments)?data.installments:[]
@@ -35,7 +44,7 @@ export function formatVerifiedPortfolio(data){
  const clean=x=>String(x??'').replace(/[\r\n]+/g,' ').trim().slice(0,200)
  const money=x=>typeof x==='number'&&Number.isFinite(x)?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(x):null
  const pl=policies.map((p,i)=>{
-  const f=[clean(p.ramo||p.linha||'Seguro'),p.seguradora?'Seguradora: '+clean(p.seguradora):null,p.numero?'Apólice: '+clean(p.numero):null,p.fim_vigencia?'Vigência até: '+clean(p.fim_vigencia):null,p.premio_total!=null?'Prêmio total: '+money(p.premio_total):null,p.premio_mensal!=null?'Prêmio mensal: '+money(p.premio_mensal):null,p.capital_segurado!=null?'Capital segurado: '+money(p.capital_segurado):null].filter(Boolean)
+  const f=[clean(p.ramo||p.linha||'Seguro'),p.seguradora?'Seguradora: '+clean(p.seguradora):null,p.numero?'Apólice: '+clean(p.numero):null,p.fim_vigencia?'Vigência até: '+clean(p.fim_vigencia):null,p.premio_total!=null?'Prêmio total: '+money(p.premio_total):null,p.premio_mensal!=null?'Prêmio mensal: '+money(p.premio_mensal):null,p.capital_segurado!=null?'Capital segurado: '+money(p.capital_segurado):null,p.status?'Situação: '+clean(p.status):null,Array.isArray(p.coberturas)&&p.coberturas.length?'Coberturas informadas: '+p.coberturas.slice(0,6).map(clean).join(', '):null].filter(Boolean)
   return String(i+1)+'. '+f.join(' | ')
  })
  const il=installments.slice(0,12).map((p,i)=>String(i+1)+'. '+[p.apolice?'Apólice: '+clean(p.apolice):null,p.ramo?clean(p.ramo):null,p.vencimento?'Vencimento: '+clean(p.vencimento):null,p.valor!=null?'Parcela: '+money(p.valor):null,p.vencida===true?'Vencida':p.vencida===false?'Não vencida':null].filter(Boolean).join(' | '))
