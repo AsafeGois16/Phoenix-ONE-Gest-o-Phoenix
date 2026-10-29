@@ -12,6 +12,7 @@ export function shouldLookupPersonalData(messages,agent,accountHistory){
  if(accountHistory && /\b(coberturas?|franquias?|premios?|capital segurado|vencimentos?|seguradora|pendencias?)\b/.test(latest))return true
  if(accountHistory && (/^\s*(?:[\d./\-\s]{8,25})\s*$/.test(latest)||/\b(?:cpf|cnpj|nasci em|nascimento|cep)\b/.test(latest)))return true
  if(accountHistory && /^(?:sim|claro|isso|pode|detalhes|todos|todas|mais detalhes|quero saber mais|quero (?:ver )?(?:todas?|completo)|mostr[ae] (?:todas?|a lista)|lista completa|relacao completa|me manda todas)\b/.test(latest))return true
+ if(accountHistory && fullInstallmentRequest(latest))return true
  return false
 }
 
@@ -110,7 +111,7 @@ export function selectInstallmentHighlights(installments,{today}={}){
  const upcoming=entries.filter(x=>x.value?.vencida===false&&x.date&&x.date>=reference).sort(sorted)[0]||null
  return {overdue:overdue.map(x=>x.value),next:upcoming?.value||null,listed}
 }
-export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770}={}){
+export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770,today}={}){
  const policies=Array.isArray(data?.policies)?data.policies:[]
  const installments=Array.isArray(data?.installments)?data.installments:[]
  const pending=Array.isArray(data?.pending)?data.pending:[]
@@ -142,7 +143,7 @@ export function formatVerifiedPortfolio(data,{focus='summary',maxChars=1770}={})
   }
   if(covers.length>shown.length)coverageLines.push('Mais '+(covers.length-shown.length)+' cobertura(s) cadastrada(s).')
  }
- const selectedInstallments=selectInstallmentHighlights(installments)
+ const selectedInstallments=selectInstallmentHighlights(installments,{today})
  const formatInstallment=(p,i)=>(i+1)+'. '+[
   p.apolice?'Apólice: '+safeLine(p.apolice):null,p.ramo?safeLine(p.ramo):null,
   p.vencimento?'Vencimento: '+dateBR(p.vencimento):null,
