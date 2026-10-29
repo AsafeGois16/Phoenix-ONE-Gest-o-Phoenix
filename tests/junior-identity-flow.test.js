@@ -254,7 +254,7 @@ test('Clara não transfere para patrimônio em consulta autorizada com pendênci
   const d=JSON.parse(options.body)
   if(d.action==='identity_context')return json({status:'verified',
    policies:[{numero:'APOLICE-AUTO',ramo:'Automóvel',seguradora:'Bradesco',premio_total:1360,capital_segurado:45000}],
-   installments:[{apolice:'APOLICE-AUTO',valor:214.41,vencimento:'2026-11-23',vencida:false}],
+   installments:[{apolice:'APOLICE-AUTO',valor:214.41,vencimento:'2026-10-20',vencida:true}],
    pending:[{description:'Comprovante de endereço pendente',status:'aguardando documento',due_date:'2026-11-10'}]
   })
   if(d.action==='context')return json({prompt:'Clara',sources:[]})
