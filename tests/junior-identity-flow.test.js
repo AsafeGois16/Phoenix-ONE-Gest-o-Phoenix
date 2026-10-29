@@ -364,7 +364,7 @@ test('seleção após identidade verificada encaminha resumo somente de Saúde',
   throw Error('Sem modelo ou acesso operacional')
  }
  const input=request(['Preciso incluir meu filho no plano de saúde',testCPF])
- input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Qual destes planos de Saúde você deseja movimentar? Responda com o número da opção.'},
+ input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:['Identidade confirmada. Encontrei estes planos de Saúde vinculados ao cadastro verificado:','1. Saúde — Amil · apólice final 1111','2. Saúde — SulAmérica · apólice final 3333','','Qual destes planos de Saúde você deseja movimentar? Responda com o número da opção.'].join('\n')},
   {direction:'inbound',author:'contact',type:'text',text:'2'})
  const res=response();await handler(input,res)
  assert.equal(res.code,200)
