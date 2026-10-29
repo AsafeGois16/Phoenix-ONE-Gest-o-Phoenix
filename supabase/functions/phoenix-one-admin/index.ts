@@ -75,10 +75,16 @@ Deno.serve(async req=>{
          if(existing.length)await tx.unsafe('select vault.update_secret($1::uuid,$2)',[existing[0].id,token])
          else await tx.unsafe('select vault.create_secret($1,$2,$3)',[token,credentialName,'Token da API de gestão do Junior para o Phoenix ONE'])
        }
-       await tx.unsafe("update phoenix_one.integration_connections set api_base_url=$1,granted_scopes=CASE WHEN $2='' THEN '{}'::text[] ELSE string_to_array($2,',') END,state='disabled',last_sync_at=null,updated_at=now() where provider='junior_management'",[endpoint||null,selected.join(',')])
+       const previous=await tx.unsafe("select api_base_url,granted_scopes,state,last_sync_at from phoenix_one.integration_connections where provider='junior_management'")
+       const old=previous[0]||{}
+       const previousScopes=Array.isArray(old.granted_scopes)?old.granted_scopes.slice().sort():[]
+       const changed=Boolean(token)||old.api_base_url!==(endpoint||null)||JSON.stringify(previousScopes)!==JSON.stringify(selected.slice().sort())
+       const nextState=changed?'disabled':old.state||'disabled'
+       const nextTestTime=changed?null:old.last_sync_at||null
+       await tx.unsafe("update phoenix_one.integration_connections set api_base_url=$1,granted_scopes=CASE WHEN $2='' THEN '{}'::text[] ELSE string_to_array($2,',') END,state=$3,last_sync_at=$4::timestamptz,updated_at=now() where provider='junior_management'",[endpoint||null,selected.join(','),nextState,nextTestTime])
        await tx.unsafe("insert into phoenix_one.audit_events(actor_id,action,entity_kind,entity_id,metadata) values ($1::uuid,'management_connection_updated','integration','junior_management',$2::jsonb)",[user.id,JSON.stringify({api_host:endpoint?new URL(endpoint).hostname:null,scopes:selected,credential_updated:!!token})])
      })
-     return respond(200,{saved:true,state:'disabled',note:'Configuração salva no Phoenix ONE. A chave foi armazenada no Supabase Vault, sem exibir o valor.'})
+     return respond(200,{saved:true,note:token?'Configuração salva no Phoenix ONE. A nova chave foi protegida no Supabase Vault.':'Configuração salva no Phoenix ONE. A chave já cadastrada foi mantida no Supabase Vault.'})
    }
    if(action==='probe'){
      const conversationId=typeof request.conversationId==='string'?request.conversationId.trim():''
