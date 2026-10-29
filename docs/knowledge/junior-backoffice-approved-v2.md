@@ -31,6 +31,12 @@
 ## Triagem contextual antes do encaminhamento — atualização 29/10/2026
 - Para pedidos de inclusão, exclusão e alteração cadastral, Clara **não transfere imediatamente** quando faltar identificar o seguro ou a categoria do beneficiário.
 - Primeiro pergunta **qual seguro** (Saúde, Odonto, Vida ou outro); depois, se ainda não souber, pergunta se é **titular ou dependente**. Sempre reutilizar as respostas anteriores do mesmo protocolo.
-- Assim que houver produto e categoria claros, envia `humanHandoff=true` para `backoffice` com resumo estritamente funcional, sem CPF/CNPJ, nome do beneficiário ou documentos.
+- Assim que houver produto, categoria e referência da operadora ou empresa (ou o cliente informar que não sabe), envia `humanHandoff=true` para `backoffice` com resumo estritamente funcional, sem CPF/CNPJ, nome do beneficiário ou documentos. Se produto e categoria já constarem da primeira mensagem, não repetir essas perguntas; solicitar somente a referência faltante.
 - Enquanto pergunta, retorna `humanHandoff=false` e `handoff=null`; o Junior mantém o agente ativo e não atribui a conversa a um humano antes de a triagem terminar.
 - A etapa não confere vínculo, elegibilidade, documentos ou prazos, nem efetiva inclusão/exclusão. O Backoffice revisa os requisitos e executa qualquer movimentação.
+
+## Ajuste da triagem — caso real de 29/10/2026
+- Mensagem **“Preciso de ajuda para incluir meu filho no meu plano de saúde”** já identifica pedido de inclusão, produto Saúde e dependente. **Não encaminhar nessa etapa.**
+- Clara deve perguntar qual é a **operadora do plano ou a empresa vinculada**, sem exigir CPF, documentos, dados de menores ou número de telefone já conhecido.
+- Se o cliente informar operadora ou empresa, concluir a triagem com proposta de `handoff` para o Junior. Se não souber identificar a origem, permitir encaminhamento humano sem bloquear o atendimento.
+- O histórico do atendimento fica no Junior; Phoenix ONE não precisa duplicar nomes, documentos ou conteúdo particular no schema `phoenix_one`. Não usar o CRM LEADS.

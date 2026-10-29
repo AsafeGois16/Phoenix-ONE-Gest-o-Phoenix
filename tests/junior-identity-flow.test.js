@@ -317,21 +317,39 @@ test('após informar Saúde, Clara identifica titular ou dependente antes do han
  assert.equal(res.body.handoff,null)
  assert.match(res.body.reply,/titular ou dependente/)
 }))
-test('após identificar seguro e vínculo, encaminha ao Backoffice com resumo seguro',()=>withMock(async()=>{
- globalThis.fetch=async()=>{throw Error('Não precisa OpenAI/gestão para decidir encaminhamento')}
- const res=response();await handler(request(['Gostaria de incluir um beneficiário','É no plano de saúde','É um dependente']),res)
+test('Clara qualifica referência do plano antes de encaminhar inclusão',()=>withMock(async()=>{
+ globalThis.fetch=async()=>{throw Error('Não consultar API operacional antes da triagem')}
+ const pending=response();await handler(request(['Gostaria de incluir um beneficiário','É no plano de saúde','É um dependente']),pending)
+ assert.equal(pending.code,200)
+ assert.equal(pending.body.agent,'clara')
+ assert.equal(pending.body.humanHandoff,false)
+ assert.equal(pending.body.handoff,null)
+ assert.match(pending.body.reply,/operadora do plano ou a empresa/)
+ const ready=response();await handler(request(['Gostaria de incluir um beneficiário','É no plano de saúde','É um dependente','É pela Amil']),ready)
+ assert.equal(ready.code,200)
+ assert.equal(ready.body.humanHandoff,true)
+ assert.equal(ready.body.handoff.department,'backoffice')
+ assert.match(ready.body.handoff.summary,/Saúde/)
+ assert.match(ready.body.handoff.summary,/dependente/)
+ assert.match(ready.body.reply,/ainda não foi efetivada/)
+}))
+test('regressão protocolo 20261029-0007: Clara não transfere filho em Saúde antes da referência',()=>withMock(async()=>{
+ globalThis.fetch=async()=>{throw Error('Não consultar dados durante triagem')}
+ const res=response();await handler(request(['Preciso de ajuda para incluir meu filho no meu plano de saúde']),res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'clara')
- assert.equal(res.body.humanHandoff,true)
- assert.equal(res.body.handoff.department,'backoffice')
- assert.match(res.body.handoff.summary,/Saúde/)
- assert.match(res.body.handoff.summary,/dependente/)
- assert.match(res.body.reply,/ainda não foi efetivada/)
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/operadora do plano ou a empresa/)
+ assert.doesNotMatch(res.body.reply,/titular ou dependente/)
 }))
-test('pedido completo de exclusão já identifica contexto e permite encaminhamento',()=>withMock(async()=>{
+test('pedido completo de exclusão ainda coleta a referência do plano',()=>withMock(async()=>{
  globalThis.fetch=async()=>{throw Error('Não consultar sistemas')}
  const res=response();await handler(request(['Preciso excluir minha filha do plano de saúde']),res)
- assert.equal(res.code,200);assert.equal(res.body.humanHandoff,true);assert.equal(res.body.handoff.department,'backoffice')
+ assert.equal(res.code,200)
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/operadora/)
 }))
 test('Clara encaminha consulta de andamento de movimentação à equipe humana',()=>withMock(async()=>{
  globalThis.fetch=async()=>{throw Error('Não consultar APIs de movimentação não disponíveis')}
@@ -345,7 +363,7 @@ test('Clara encaminha consulta de andamento de movimentação à equipe humana',
 
 test('apresentação da Clara sobrevive à saída do histórico recente',()=>withMock(async()=>{
  const messages=Array.from({length:20},(_,i)=>({direction:i%2?'outbound':'inbound',author:i%2?'agent':'contact',type:'text',text:i%2?'Está bem, posso ajudar.':'Continuando atendimento'}))
- messages[19]={direction:'inbound',author:'contact',type:'text',text:'Preciso excluir minha filha do plano de saúde'}
+ messages[19]={direction:'inbound',author:'contact',type:'text',text:'Preciso excluir minha filha do plano de saúde da Amil'}
  globalThis.fetch=async(url,opts)=>{
   const data=JSON.parse(opts.body)
   assert.equal(data.action,'intro_status')

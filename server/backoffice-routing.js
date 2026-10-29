@@ -60,10 +60,32 @@ const commonReply=kind=>({
 })
 const newTopic=/\b(?:cotar|cotacao|orcamento|quais seguros|meus seguros|segunda via|parcela|boleto|sinistro)\b/
 /**
- * Coleta mínima antes da transferência: qual seguro e se a operação envolve
- * titular ou dependente. Usa somente mensagens recebidas no mesmo protocolo.
- * Não coleta documentos ou nomes de terceiros, nem consulta dados particulares.
+ * Coleta antes do Backoffice: produto, titular/dependente e referência do
+ * plano (operadora OU empresa). Não pede documentos de menores ou terceiros.
+ * O nome da empresa fica no histórico do Junior, não no resumo do Phoenix ONE.
  */
+function routingReference(turns,messages){
+ const corpus=turns.map(m=>fold(m.text)).join(' ')
+ const latest=fold(turns.at(-1)?.text)
+ if(/\b(?:amil|bradesco|sulamerica|sul america|hapvida|notredame|notre dame|intermedica|porto seguro|porto saude|unimed|prevent senior|med senior|sao cristovao|sao miguel|santa helena|assim saude|care plus|omint)\b/.test(corpus))
+   return 'operadora'
+ const company=corpus.match(/\b(?:empresa|empregadora)\s+(?:(?:e|eh|se chama|chamada|da|do)\s+)?([a-z][a-z0-9 .'-]{2,65})/)
+ if(company&&!/^(?:que|onde|a|o|para|qual|responsavel|tem|possui|vincul|trabalh|contrat|oferece|fornece|do meu plano)\b/.test(company[1].trim()))
+   return 'empresa'
+ // Apenas interpretar respostas livres quando a última mensagem enviada
+ // pela Clara fez exatamente esta pergunta de qualificação.
+ const lastAgent=[...(Array.isArray(messages)?messages:[])].reverse()
+  .find(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string')
+ const askedReference=/\boperadora\b/.test(fold(lastAgent?.text))&&/\bempresa\b/.test(fold(lastAgent?.text))
+ if(!askedReference||turns.length<2)return null
+ if(/^(?:nao sei|nao lembro|desconheco|nao tenho essa informacao|nao sei informar|prefiro nao informar)[.! ]*$/.test(latest))
+   return 'não informada'
+ if(latest.length>=3&&latest.length<=110&&/[a-z]{3}/.test(latest)&&
+    !/\b(?:cpf|cnpj|rg|data de nascimento|meu filho|minha filha|beneficiario|dependente|titular|incluir|excluir|documentos|documentacao)\b/.test(latest)&&
+    !/^(?:sim|nao|ok|certo|obrigado|obrigada|entendi|saude|odonto|vida)\b/.test(latest))
+   return 'informada'
+ return null
+}
 export function assessBackofficeIntake(messages){
  const history=(Array.isArray(messages)?messages:[])
   .filter(m=>m?.direction==='inbound'&&m.author==='contact'&&typeof m.text==='string')
@@ -94,14 +116,22 @@ export function assessBackofficeIntake(messages){
    return {...base,stage:'ask_relation',humanHandoff:false,
     reply:'Entendi, a solicitação é referente a '+product+'. É para um titular ou dependente? Assim consigo encaminhar ao Backoffice com as informações corretas.'}
  }
- // Não transferir se a pessoa ainda está perguntando sobre a documentação.
- if(/\b(?:quais documentos|documentos necessarios|documentacao|o que precisa apresentar)\b/.test(last)){
+ const reference=routingReference(turns,messages)
+ const documentsQuestion=/\b(?:quais documentos|documentos necessarios|documentacao|o que precisa apresentar)\b/.test(last)
+ if(!reference){
+   const intro=documentsQuestion?'Os documentos variam conforme a operadora e o vínculo, e serão confirmados pelo Backoffice. ':''
+   return {...base,stage:'ask_reference',humanHandoff:false,
+    reply:intro+'Entendi! Para direcionar seu pedido de '+displayKind[kind]+' ('+relation+', '+product+'), pode informar a operadora do plano ou a empresa à qual ele está vinculado? Se não souber, tudo bem.'}
+ }
+ // Dúvidas sobre requisitos são respondidas sem encaminhamento automático.
+ if(documentsQuestion){
    return {...base,stage:'ask_confirmation',humanHandoff:false,
      reply:'Os documentos específicos dependem da operadora e do vínculo. O Backoffice poderá confirmar a relação aplicável ao seu caso. Deseja que eu encaminhe sua solicitação?'}
  }
  const details=displayKind[kind]+' de '+relation+' em '+product
+ const origin=reference==='não informada'?'A operadora/empresa não foi identificada pelo cliente.':'O cliente informou a referência da operadora/empresa no histórico da conversa.'
  return {...base,stage:'handoff',humanHandoff:true,
-  summary:'Cliente solicita '+details+'. Backoffice deve conferir elegibilidade, documentos, operadora e eventual vínculo entre Saúde e Odonto. Nenhuma movimentação foi executada pela IA.',
+  summary:'Cliente solicita '+details+'. '+origin+' Backoffice deve conferir elegibilidade, documentos, operadora e eventual vínculo entre Saúde e Odonto. Nenhuma movimentação foi executada pela IA.',
   reply:'Obrigada pelas informações! Vou encaminhar seu pedido de '+displayKind[kind]+' ('+relation+', '+product+') ao Backoffice da Phoenix Insurance, responsável pela conferência documental e execução. A solicitação ainda não foi efetivada.'}
 }
 /** Compatibilidade com integrações que enviam só a mensagem inicial. */
