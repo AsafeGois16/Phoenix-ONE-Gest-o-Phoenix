@@ -269,3 +269,30 @@ test('Clara não transfere para patrimônio em consulta autorizada com pendênci
  assert.match(res.body.reply,/Parcela:/)
  assert.match(res.body.reply,/Comprovante de endereço pendente/)
 }))
+
+test('memória de cotação preserva Murilo quando histórico de mensagens ficou curto',()=>withMock(async()=>{
+ let reachedModel=false
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')){
+   assert.equal(d.action,'context')
+   assert.equal(d.intent,'neutral')
+   assert.equal(d.suggestedAgent,'clara')
+   return json({agent:'murilo',prompt:'Você é Murilo, vendedor da Phoenix.',sources:[]})
+  }
+  if(url.includes('api.openai.com')){
+   reachedModel=true;return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Qual é o tipo de imóvel?',humanHandoff:false,handoff:null})}]}]})
+  }
+  throw Error('Fetch inesperado')
+ }
+ const res=response();await handler(request(['Fica na região central da cidade']),res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'murilo')
+ assert.equal(res.body.humanHandoff,false);assert.match(res.body.reply,/Sou o Murilo/)
+ assert.ok(reachedModel)
+}))
+test('protocolo atribuído ao humano não prossegue atendimento com IA',()=>withMock(async()=>{
+ globalThis.fetch=async(url,opts)=>({ok:false,status:409,async json(){return {error:'assigned_to_human'}}})
+ const res=response();await handler(request(['Oi']),res)
+ assert.equal(res.code,503)
+ assert.equal(res.body.error,'assigned_to_human')
+}))

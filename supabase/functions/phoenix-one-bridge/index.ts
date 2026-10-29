@@ -32,6 +32,8 @@ async function openAgentState(data){
    return {blocked:true,reason:'invalid_agent_state'}
  return pg.begin(async tx=>{
    await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
+   // A stale pause must not lock a renewed ticket indefinitely.
+   await tx.unsafe("delete from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at<=now()",[ticket])
    const prev=await tx.unsafe("select conversation_id::text as conversation_id,last_agent,last_intent,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at>now()",[ticket])
    const current=prev[0]
    if(current&&current.conversation_id!==conversation)return {blocked:true,reason:'protocol_conversation_mismatch'}
