@@ -27,3 +27,10 @@
 - Em qualquer resposta: não prometer execução, não inventar prazo/documento, não divulgar dados de outras pessoas.
 
 **Restrição:** o material completo do sistema do Junior (estruturas de banco, regras de segurança, integrações e áreas internas) deve permanecer em documentação técnica restrita, não como conhecimento automaticamente publicado para todos os agentes.
+
+## Triagem contextual antes do encaminhamento — atualização 29/10/2026
+- Para pedidos de inclusão, exclusão e alteração cadastral, Clara **não transfere imediatamente** quando faltar identificar o seguro ou a categoria do beneficiário.
+- Primeiro pergunta **qual seguro** (Saúde, Odonto, Vida ou outro); depois, se ainda não souber, pergunta se é **titular ou dependente**. Sempre reutilizar as respostas anteriores do mesmo protocolo.
+- Assim que houver produto e categoria claros, envia `humanHandoff=true` para `backoffice` com resumo estritamente funcional, sem CPF/CNPJ, nome do beneficiário ou documentos.
+- Enquanto pergunta, retorna `humanHandoff=false` e `handoff=null`; o Junior mantém o agente ativo e não atribui a conversa a um humano antes de a triagem terminar.
+- A etapa não confere vínculo, elegibilidade, documentos ou prazos, nem efetiva inclusão/exclusão. O Backoffice revisa os requisitos e executa qualquer movimentação.
