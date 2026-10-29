@@ -34,3 +34,53 @@ test('continuidade após CPF/data mantém consulta informativa autorizada',async
  assert.equal(isVerifiedReadonlyContext(h),true)
  assert.equal(isVerifiedReadonlyContext([c('Quais seguros eu tenho?'),c('Quero cotar seguro residencial')]),false)
 })
+
+
+test('contrato Junior v1.2: coberturas com capital e franquia, sem object Object',async()=>{
+ const {formatVerifiedPortfolio}=await import('../server/conversation-policy.js')
+ const result=formatVerifiedPortfolio({policies:[{
+  numero:'APOLICE-TESTE',ramo:'Automóvel',seguradora:'Seguradora Exemplo',
+  premio_total:3456.78,premio_mensal:null,status:'em_vigor',
+  coberturas:[{nome:'RCF Danos Materiais',capital_segurado:100000,franquia:null},{nome:'Casco (100% FIPE)',capital_segurado:85000,franquia:4200}]
+ }],installments:[{apolice:'APOLICE-TESTE',valor:345.68,vencida:false}]},{focus:'coverages'})
+ assert.match(result,/RCF Danos Materiais/)
+ assert.match(result,/Capital: R\$\s100.000,00/)
+ assert.match(result,/Franquia: R\$\s4.200,00/)
+ assert.match(result,/Prêmio total: R\$\s3.456,78/)
+ assert.doesNotMatch(result,/\[object Object\]/)
+ assert.doesNotMatch(result,/Parcela: R\$\s3.456,78/)
+})
+test('prêmio mensal de benefício não é convertido em prêmio anual',async()=>{
+ const {formatVerifiedPortfolio}=await import('../server/conversation-policy.js')
+ const t=formatVerifiedPortfolio({policies:[{numero:'SAUDE-TESTE',ramo:'Saúde',premio_mensal:680.25,premio_total:null}],installments:[{valor:680.25}]})
+ assert.match(t,/Mensalidade: R\$\s680,25/)
+ assert.doesNotMatch(t,/Prêmio total:/)
+ assert.match(t,/Parcela: R\$\s680,25/)
+})
+test('pendências em português são entendidas, mas vazio não é confirmação de inexistência',async()=>{
+ const {formatVerifiedPortfolio}=await import('../server/conversation-policy.js')
+ const given=formatVerifiedPortfolio({policies:[{ramo:'Saúde'}],pending:[{descricao:'Documento de dependente',situacao:'Em análise',prazo:'2026-11-10'}]},{focus:'pending'})
+ assert.match(given,/Documento de dependente/)
+ assert.match(given,/Em análise/)
+ assert.match(given,/10\/11\/2026/)
+ const missing=formatVerifiedPortfolio({policies:[{ramo:'Saúde'}],pending:[]},{focus:'pending'})
+ assert.match(missing,/não consigo confirmar/i)
+ assert.doesNotMatch(missing,/não existem pendências|nenhuma pendência/i)
+})
+test('consulta de franquia ou coberturas continua pela Clara',async()=>{
+ const {portfolioFocus,isReadonlyConsultation,shouldLookupPersonalData}=await import('../server/conversation-policy.js')
+ const m=text=>({direction:'inbound',author:'contact',text})
+ assert.equal(portfolioFocus([m('Quais coberturas eu tenho?')]),'coverages')
+ assert.equal(portfolioFocus([m('Quais coberturas eu tenho?'),m('111.444.777-35'),m('25/11/1990')]),'coverages')
+ assert.equal(portfolioFocus([m('Há pendências no meu seguro?')]),'pending')
+ assert.equal(isReadonlyConsultation('Quais são as franquias da minha apólice?'),true)
+ assert.equal(shouldLookupPersonalData([m('Quais coberturas eu tenho?')],'clara',false),true)
+})
+test('resposta longa não deve cortar nomes de coberturas no meio de uma linha',async()=>{
+ const {formatVerifiedPortfolio}=await import('../server/conversation-policy.js')
+ const coverages=Array.from({length:30},(_,i)=>({nome:'Cobertura '+(i+1),capital_segurado:50000,franquia:1000}))
+ const reply=formatVerifiedPortfolio({policies:[{numero:'AP-1',ramo:'Auto',coberturas:coverages}]},{focus:'coverages',maxChars:1770})
+ assert.ok(reply.length<=1770)
+ assert.ok(!reply.includes('[object Object]'))
+ assert.match(reply,/Há outros detalhes cadastrados|Mais \d+ cobertura/)
+})

@@ -150,3 +150,22 @@ Se o sistema de gestão não devolver algum campo, Clara NÃO deve inventar o va
 **Matriz de autonomia:** fonte em `server/action-capabilities.js`, exibida aos administradores em Integrações. Orientação geral e propostas de encaminhamento não exigem documento; leitura de apólices, parcelas e pendências exige verificação de identidade por API do Junior + escopos específicos. `tickets:comment`, emissão/solicitação de boleto, movimentações, criação de lead/cotação e outras operações de escrita permanecem DESABILITADAS até existir endpoint homologado e uma ação explícita aprovada. 4Zapy e envio de WhatsApp são exclusivos do Junior. Escopos marcados no formulário não significam que a API daquele escopo já foi homologada.
 
 **Próximos contratos a construir (sem executá-los neste release):** segunda via com ação confirmada e retorno do sistema; consulta e registro de pendências; histórico de solicitações; abertura/atualização de ticket; criação de oportunidade comercial no sistema Junior (nunca no CRM LEADS). Cada ação deverá declarar parâmetros mínimos, escopo, autorização, necessidade de confirmação, idempotência, prazos, trilha de auditoria e resultado operacional verificado.
+
+
+## Contrato Junior v1.2 recebido em 29/10/2026
+
+O documento recebido do Junior afirma que POST /identity/resolve retorna, somente após status verified, os campos status, premio_total, premio_mensal, capital_segurado e coberturas para cada apólice.
+
+Itens em coberturas são objetos com nome, capital_segurado e franquia, até 30 por apólice, ordenados por capital. O bridge anterior perdia tais objetos; a correção preserva esses dados, com sanitização e limites de exibição.
+
+Prêmio total refere-se ao período da apólice e não é necessariamente anual. Prêmio mensal é mensalidade/fatura de Benefícios. Capital da apólice refere-se ao seguro Vida; nos outros ramos pode haver limite por cobertura. Valor da parcela não é prêmio nem capital.
+
+Campos null significam dado não fornecido, não ausência da cobertura ou garantia. Nunca calcular valores ausentes.
+
+O campo pending está especificado como lista de objetos {descricao, situacao, prazo}, com compatibilidade aos nomes anteriores em inglês. A origem das pendências AINDA NÃO ESTÁ DEFINIDA pelo Junior e a gestão devolve sempre lista vazia. A Clara não deve afirmar ausência de pendências a partir disso.
+
+O Junior confirma que, para trocar de Clara para Murilo ou vice-versa, basta retornar agent apropriado com humanHandoff false e handoff null. A chamada ao endpoint de transferência é sempre para humano e pausa a IA.
+
+Esta entrega NÃO inclui novos endpoints homologados de segunda via, criação de oportunidade comercial, movimentações ou acompanhamento operacional; ações de escrita permanecem bloqueadas na matriz de autonomia.
+
+Homologar com protocolo aberto e dados fictícios/autorizados, verificando identidade e autorização antes de usar modo Automático.
