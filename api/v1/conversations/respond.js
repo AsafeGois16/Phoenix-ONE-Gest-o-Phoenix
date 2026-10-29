@@ -2,7 +2,7 @@ import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAg
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {detectBackofficeRequest} from '../../../server/backoffice-routing.js'
+import {detectBackofficeRequest,detectBackofficeStatusRequest} from '../../../server/backoffice-routing.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest,ensureClaraIntro} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
@@ -100,7 +100,7 @@ export default async function handler(req,res){
  }
  // A transferência humana é uma ação do sistema Junior, nunca uma movimentação
  // de beneficiário ou consulta privada executada pela Clara.
- const backoffice=detectBackofficeRequest(last.text)
+ const backoffice=detectBackofficeRequest(last.text)||detectBackofficeStatusRequest(last.text)
  if(backoffice){
    console.info('phoenix_backoffice_handoff',JSON.stringify({category:backoffice.type,agent:'clara'}))
    return replyToJunior({agent:'clara',reply:backoffice.reply,humanHandoff:true,handoff:{department:backoffice.department,reason:backoffice.reason,summary:backoffice.summary}})

@@ -7,6 +7,22 @@
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const movementSubjects=/\b(beneficiari[oa]s?|dependentes?|titulares?|funcionari[oa]s?|colaborador(?:es|as)?|empregad[oa]s?|filh[oa]s?|espos[oa]|conjuge|vidas?|plano(?: de saude| odontologico| odonto)?|cadastro|dados cadastrais|matricula)\b/
 const productFor=t=>/\bodonto|odontologico\b/.test(t)?'Odonto':/\bsaude|medico|medica\b/.test(t)?'Saúde':'plano ou cadastro'
+
+export function detectBackofficeStatusRequest(message){
+ const t=fold(message)
+ if(!t||t.length>4000)return null
+ if(!/\b(?:minha|meu|nosso|nossa|pedido|solicitacao|processo)\b/.test(t))return null
+ if(!/\b(?:inclusao|exclusao|movimentacao|alteracao cadastral|incluir|excluir|dependente|beneficiario)\b/.test(t))return null
+ if(!/\b(?:andamento|status|situacao|retorno|novidade|concluid[ao]|finalizad[ao]|resolvid[ao]|foi realizad[ao]|ja foi|quando fica pronto)\b/.test(t))return null
+ return {
+   type:'andamento',
+   department:'backoffice',
+   reason:'Consulta sobre andamento de movimentação',
+   summary:'Cliente solicita posição sobre movimentação interna. A API da Fase 2 não expõe andamento, pendências ou prazos da equipe; Backoffice deve conferir o processo e comunicar somente informações autorizadas.',
+   reply:'O andamento das movimentações internas precisa ser confirmado pelo Backoffice. Vou encaminhar seu atendimento à equipe responsável para verificar a situação e orientar você com segurança.'
+ }
+}
+
 export function detectBackofficeRequest(message){
  const t=fold(message)
  if(!t||t.length>4000)return null
