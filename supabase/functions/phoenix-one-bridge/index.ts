@@ -111,7 +111,7 @@ Deno.serve(async request=>{
     })
    }catch{return reply(200,{status:'unavailable'})}
    let junior
-   try{const raw=await response.text();if(raw.length>32000)return reply(200,{status:'unavailable'});junior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
+   try{const raw=await response.text();if(raw.length>128000)return reply(200,{status:'unavailable'});junior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
    // Não revelar diferenças internas de documento: status apenas para fluxo do agente.
    const allowed=new Set(['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches'])
    let status=junior?.status
@@ -141,7 +141,13 @@ Deno.serve(async request=>{
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
     premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
     capital_segurado:typeof p?.capital_segurado==='number'&&Number.isFinite(p.capital_segurado)&&p.capital_segurado>=0?p.capital_segurado:null,
-    status:cleanString(p?.status,45),coberturas:Array.isArray(p?.coberturas)?p.coberturas.slice(0,8).map(c=>cleanString(c,140)).filter(Boolean):[]
+    status:cleanString(p?.status,45),
+    coberturas:Array.isArray(p?.coberturas)?p.coberturas.slice(0,30).map(c=>{
+     if(typeof c==='string')return {nome:cleanString(c,140),capital_segurado:null,franquia:null}
+     if(!c||typeof c!=='object'||Array.isArray(c))return null
+     const validMoney=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0?x:null
+     return {nome:cleanString(c.nome,140),capital_segurado:validMoney(c.capital_segurado),franquia:validMoney(c.franquia)}
+    }).filter(c=>c&&c.nome):[]
    })):[]
    const installments=conn[0].granted_scopes.includes('installments:read')&&Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),vencimento:cleanString(i?.vencimento,30),
@@ -150,7 +156,9 @@ Deno.serve(async request=>{
    // Pendências são fornecidas exclusivamente pela API do Junior após verificação.
    // Nunca pesquisar documentos ou valores a partir do número do WhatsApp.
    const pending=conn[0].granted_scopes.includes('clients:read')&&Array.isArray(junior.pending)?junior.pending.slice(0,8).map(p=>({
-    description:cleanString(p?.description,200),status:cleanString(p?.status,45),due_date:cleanString(p?.due_date,30)
+    description:cleanString(p?.descricao??p?.description,200),
+    status:cleanString(p?.situacao??p?.status,45),
+    due_date:cleanString(p?.prazo??p?.due_date,30)
    })).filter(p=>p.description):[]
    return reply(200,{status:'verified',policies,installments,pending})
   }
