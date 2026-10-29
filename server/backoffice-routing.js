@@ -107,7 +107,7 @@ export function assessBackofficeIntake(messages){
  const corpus=turns.map(m=>fold(m.text)).join(' ')
  const product=getProduct(corpus)
  const relation=getRelation(corpus)
- const base=commonReply(kind)
+ const base={...commonReply(kind),product,relation}
  if(!product){
    return {...base,stage:'ask_product',humanHandoff:false,
     reply:'Claro! Antes de encaminhar sua solicitação ao Backoffice, preciso confirmar a qual seguro ela se refere: Saúde, Odonto, Vida ou outro?'}

@@ -21,22 +21,25 @@
 - URA opcional pode encaminhar departamento antes de chamar os agentes; não assumir que a IA recebeu toda primeira mensagem quando URA está ativa.
 
 ## Abordagem aprovada
-- Cliente pede ação: “Recebi seu pedido de exclusão. Vou encaminhar ao Backoffice responsável pela análise e execução. A exclusão ainda não foi efetivada.”
+- Cliente pede ação: “Recebi seu pedido de exclusão. Antes de encaminhar, vou confirmar sua identidade e localizar o plano correto para que você indique qual contrato deseja movimentar.”
 - Cliente pergunta status: “O andamento interno não está disponível para consulta automática neste canal. Vou direcionar sua solicitação à equipe responsável para conferência.”
 - Cliente pergunta documentos específicos: “Os documentos necessários dependem da operadora, do vínculo e do tipo de movimentação. O Backoffice confirmará a relação aplicável ao seu caso.”
 - Em qualquer resposta: não prometer execução, não inventar prazo/documento, não divulgar dados de outras pessoas.
 
 **Restrição:** o material completo do sistema do Junior (estruturas de banco, regras de segurança, integrações e áreas internas) deve permanecer em documentação técnica restrita, não como conhecimento automaticamente publicado para todos os agentes.
 
-## Triagem contextual antes do encaminhamento — atualização 29/10/2026
-- Para pedidos de inclusão, exclusão e alteração cadastral, Clara **não transfere imediatamente** quando faltar identificar o seguro ou a categoria do beneficiário.
-- Primeiro pergunta **qual seguro** (Saúde, Odonto, Vida ou outro); depois, se ainda não souber, pergunta se é **titular ou dependente**. Sempre reutilizar as respostas anteriores do mesmo protocolo.
-- Assim que houver produto, categoria e referência da operadora ou empresa (ou o cliente informar que não sabe), envia `humanHandoff=true` para `backoffice` com resumo estritamente funcional, sem CPF/CNPJ, nome do beneficiário ou documentos. Se produto e categoria já constarem da primeira mensagem, não repetir essas perguntas; solicitar somente a referência faltante.
-- Enquanto pergunta, retorna `humanHandoff=false` e `handoff=null`; o Junior mantém o agente ativo e não atribui a conversa a um humano antes de a triagem terminar.
-- A etapa não confere vínculo, elegibilidade, documentos ou prazos, nem efetiva inclusão/exclusão. O Backoffice revisa os requisitos e executa qualquer movimentação.
+## Triagem validada de movimentações — revisão posterior de 29/10/2026
+A regra anterior de perguntar operadora/empresa antes da transferência fica **substituída** pelo fluxo abaixo para solicitações de movimentação de beneficiários.
 
-## Ajuste da triagem — caso real de 29/10/2026
-- Mensagem **“Preciso de ajuda para incluir meu filho no meu plano de saúde”** já identifica pedido de inclusão, produto Saúde e dependente. **Não encaminhar nessa etapa.**
-- Clara deve perguntar qual é a **operadora do plano ou a empresa vinculada**, sem exigir CPF, documentos, dados de menores ou número de telefone já conhecido.
-- Se o cliente informar operadora ou empresa, concluir a triagem com proposta de `handoff` para o Junior. Se não souber identificar a origem, permitir encaminhamento humano sem bloquear o atendimento.
-- O histórico do atendimento fica no Junior; Phoenix ONE não precisa duplicar nomes, documentos ou conteúdo particular no schema `phoenix_one`. Não usar o CRM LEADS.
+1. Clara pede somente **CPF/CNPJ do titular do plano**, não do menor ou dependente, e envia o documento apenas à ponte protegida do Phoenix ONE ↔ Gestão Junior.
+2. A gestão do Junior valida identidade/vínculo (eventual prova adicional/validação humana), ligada ao protocolo. O documento e a prova não vão ao modelo, aos logs nem à memória do Phoenix ONE.
+3. **Somente com resposta verified** Clara pode consultar as apólices autorizadas. Filtrar pelo produto mencionado; para o exemplo “incluir meu filho em plano de saúde”, listar **somente Saúde**, nunca Odonto ou Vida.
+4. Quando houver mais de um plano da categoria, apresentar opções numeradas com seguradora e identificação mínima; solicitar seleção explícita. Quando houver um só, solicitar confirmação. Reaproveitar titular/dependente da conversa.
+5. Com plano selecionado e vínculo conhecido, enviar proposta de `handoff.department=backoffice` com motivo/resumo e `humanHandoff=true`. O Junior realiza o encaminhamento e pausa a IA. Nenhuma inclusão é executada pela Clara.
+6. Se a validação ou consulta estiver indisponível, não revelar nem deduzir contratos. Encaminhar **para validação manual** ao Backoffice, distinguindo esse encaminhamento de uma triagem concluída.
+
+`POST /identity/resolve` e o escopo `policies:read` são os recursos existentes previstos. **Não solicitar nova API ao Junior**, não consultar o CRM LEADS, não salvar CPF ou prova no schema `phoenix_one`.
+O funcionamento real da seleção depende da integração/autorização estarem disponíveis em produção.
+
+## Histórico da mudança
+A versão anterior perguntava primeiro produto, vínculo e operadora/empresa e depois transferia. Essa abordagem foi substituída pela triagem validada acima, que exige identificação e consulta à apólice específica antes do encaminhamento de movimentações.
