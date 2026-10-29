@@ -64,7 +64,7 @@ export function isVerifiedReadonlyContext(messages){
 const safeLine=x=>String(x??'').replace(/[\r\n\0-\x1f]+/g,' ').trim().slice(0,160)
 const brl=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n):null
 const dateBR=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):safeLine(d)
-const fullInstallmentRequest=t=>/\b(?:quero\s+(?:ver\s+)?(?:a\s+)?(?:lista\s+)?completa?|(?:me\s+)?mostr[ae]\s+(?:a\s+)?lista\s+completa|todas?\s+(?:as\s+)?parcelas|todos?\s+(?:os\s+)?vencimentos|lista\s+completa|relacao\s+completa|lista\s+inteira|detalhes?\s+completos?|tudo\s+completo|mostr[ae]\s+tudo|quero\s+(?:ver\s+)?tud[oa]s?|me\s+envie\s+tudo)\b/.test(t)
+const fullInstallmentRequest=t=>/\b(?:quero\s+(?:ver\s+)?(?:a\s+)?(?:lista\s+)?complet[oa]|(?:me\s+)?mostr[ae]\s+(?:a\s+)?lista\s+completa|todas?\s+(?:as\s+)?parcelas|todos?\s+(?:os\s+)?vencimentos|lista\s+completa|relacao\s+completa|lista\s+inteira|detalhes?\s+completos?|tudo\s+completo|mostr[ae]\s+tudo|quero\s+(?:ver\s+)?tud[oa]s?|me\s+envie\s+tudo)\b/.test(t)
 export function portfolioFocus(messages){
  const inbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='inbound'&&m.author==='contact')
  const entries=inbound.slice(-10).reverse()
