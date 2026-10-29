@@ -9,7 +9,7 @@ export function normalizeHandoffDecision(decision,departments){
  const department=handoff?.department
  if(!handoff||!departments.includes(department))return {handoff:null,suppressed:false}
  const reply=String(decision?.reply||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
- const asksPermission=/(?:\b(?:deseja|gostaria|quer|queria)\b[^?!.]{0,140}\b(?:encaminh|transfer|passar para|chamar (?:um|uma)|colocar em contato)\w*|\b(?:posso|poderia)\b[^?!.]{0,140}\b(?:encaminh|transfer|passar para)\w*)\s*\?/i.test(reply)
+ const asksPermission=/\b(?:deseja|gostaria|quer|queria|posso|poderia)\b[^?!.]{0,150}\b(?:encaminh\w*|transfer\w*|pass\w*|cham\w*|coloc\w*)[^?!.]{0,150}\?/i.test(reply)
  // A intenção expressa na resposta ainda é perguntar, não efetuar o handoff.
  if(asksPermission)return {handoff:null,suppressed:true}
  return {handoff:decision.handoff,suppressed:false}
