@@ -62,6 +62,7 @@ export function verifiedMovementDecision(intake,policies,messages){
   return base('Identidade confirmada. Para continuar sua movimentação, ela é referente ao seguro Saúde, Odonto ou Vida? Vou consultar somente os planos da categoria que você indicar.')
  }
  const choices=categoryPolicies(policies,category)
+ if(!relation)return base('Identidade confirmada. Para seguir com a '+routeName(type)+', a movimentação envolve titular ou dependente?')
  if(!choices.length){
   return base('Concluí a etapa de verificação, mas não consegui identificar um plano de '+category+' para seleção nesta consulta. Vou direcionar sua solicitação ao Backoffice para conferência, sem realizar nenhuma movimentação.',true,{
    department:'backoffice',
@@ -72,7 +73,6 @@ export function verifiedMovementDecision(intake,policies,messages){
  const previous=lastAgentText(messages)
  const chosen=selectedIndex(last,choices,previous)
  if(chosen>=0){
-  if(!relation)return base('Perfeito! Antes de encaminhar, a '+routeName(type)+' será de titular ou dependente?')
   const selected=choices[chosen]
   const ref=policyLabel(selected,category)
   const summary='Cliente solicita '+routeName(type)+' de '+relation+' no seguro '+category+'. Plano selecionado após validação do titular pela gestão: '+ref+'. Backoffice deve confirmar vínculo, documentos, elegibilidade e se há movimentação correspondente em outro produto. Nenhuma movimentação foi executada.'
