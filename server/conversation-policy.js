@@ -26,8 +26,8 @@ export function ensureClaraIntro(reply,messages,alreadyPresented=false){
  const content=String(reply??'').trim()
  if(!content)return content
  const history=Array.isArray(messages)?messages:[]
- const hasAgentResponse=history.some(m=>m?.direction==='outbound'&&m?.author==='agent'&&typeof m.text==='string'&&m.text.trim())
- if(alreadyPresented||hasAgentResponse)return content
+ const hasClaraIntroduction=observedAgentIntroductions(history).clara
+ if(alreadyPresented||hasClaraIntroduction)return content
  const normalized=plain(content)
  if(/\b(?:sou a clara|aqui e a clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(normalized))return content
  const introduction='Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance. 💙\n\n'

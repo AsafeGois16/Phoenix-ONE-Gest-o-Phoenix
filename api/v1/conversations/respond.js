@@ -3,7 +3,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest} from '../../../server/backoffice-routing.js'
-import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest,ensureClaraIntro} from '../../../server/conversation-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest,ensureClaraIntro,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice']
@@ -27,6 +27,7 @@ const criticalInstructions=[
  'No contrato v1.2, coberturas vêm em objetos {nome, capital_segurado, franquia}; valores numéricos são em reais. O prêmio total refere-se ao período da apólice (não necessariamente anual), mensalidade pode ser separada e capital/limite por cobertura não é capital global. Pendências são enviadas em {descricao, situacao, prazo} e a origem está em construção: uma lista vazia não prova ausência de pendências.',
  'Quando a API informar uma pendência, diga objetivamente qual é o item, a situação, o prazo quando disponibilizado e a providência necessária; sem inventar datas, débitos, valores ou decisões. Se a pendência exigir alguém da equipe, solicite o encaminhamento de forma profissional e coerente.',
  'Quando a conversa mudar de Clara para Murilo por uma cotação, Murilo DEVE se apresentar pelo nome e pela função comercial antes de iniciar a qualificação. Faça uma pergunta comercial pertinente de cada vez, com naturalidade, sem pedir CPF/CNPJ para uma simulação inicial. Não apresente a cotação como concluída.',
+ 'REGRA DE APRESENTAÇÃO ÚNICA POR PROTOCOLO: Clara e Murilo se apresentam na primeira resposta própria, mesmo quando alternam. Se já se apresentaram neste protocolo, não repitam nome, cargo nem fórmula de primeira apresentação. Cumprimente naturalmente sem se reapresentar. O servidor mantém memória privada independente de cada agente.',
  'Sistema de Gestão Phoenix (Junior) é o único sistema operacional autorizado, e recebe de você apenas a PROPOSTA de resposta e de encaminhamento. 4Zapy, WhatsApp, protocolo, envio de mensagens e transferências pertencem ao Junior.',
  'Nunca declare que abriu ou transferiu ticket, enviou boleto, fez alteração ou consultou apólice sem contexto real autorizado fornecido abaixo. O sistema adicionará o número do protocolo automaticamente. Você não deve repeti-lo.',
  'Use o nome de exibição se disponível e adequado. Não peça telefone que já é conhecido pelo sistema. Não exponha CPF, CNPJ, telefone ou identificadores internos na resposta.',
@@ -84,7 +85,20 @@ export default async function handler(req,res){
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
  let agent=selectAgent(body)
- const replyToJunior=payload=>jsonResponse(res,200,{...payload,reply:payload.agent==='clara'?ensureClaraIntro(payload.reply,body.messages):payload.reply})
+ let introTask=null
+ const replyToJunior=async payload=>{
+  // Only confirmed outbound introductions are stored. A proposal in Sugestão
+  // mode must not be treated as delivered until Junior reports it in history.
+  const saved=introTask?await introTask:null
+  if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
+  const isClara=payload.agent==='clara',isMurilo=payload.agent==='murilo'
+  const seen=Boolean(isClara?saved?.clara_apresentada:isMurilo?saved?.murilo_apresentado:false)
+  let reply=String(payload.reply||'')
+  reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
+  if(isClara)reply=ensureClaraIntro(reply,body.messages,seen)
+  if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
+  return jsonResponse(res,200,{...payload,reply:redact(safeText(reply,1800))})
+ }
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
@@ -99,6 +113,14 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'no_inbound_text',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
+ const observed=observedAgentIntroductions(body.messages)
+ introTask=bridge('intro_status',{
+  conversationId:body.conversation_id,protocolo:body.protocolo,
+  observedClara:observed.clara,observedMurilo:observed.murilo
+ },AbortSignal.timeout(2800)).catch(e=>{
+  console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
+  return null
+ })
  // A transferência humana é uma ação do sistema Junior, nunca uma movimentação
  // de beneficiário ou consulta privada executada pela Clara.
  const statusBackoffice=detectBackofficeStatusRequest(last.text)
@@ -227,7 +249,8 @@ export default async function handler(req,res){
   timing.modelMs=Math.round(performance.now()-modelStarted)
   let decision
   try{decision=JSON.parse(outputText(raw))}catch{return jsonResponse(res,502,{error:'invalid_model_output'})}
-  const firstMurilo=agent==='murilo'&&firstMuriloAppearance(body.messages)
+  const persistedIntro=introTask?await introTask:null
+  const firstMurilo=agent==='murilo'&&firstMuriloAppearance(body.messages,Boolean(persistedIntro?.murilo_apresentado))
   // A primeira mensagem comercial deve qualificar, nunca congelar a IA por handoff automático.
   const initialSalesHandoff=firstMurilo&&isCommercialRequest(last.text)&&decision.humanHandoff===true&&!/\b(?:atendente|humano|pessoa|consultor)\b/i.test(last.text)
   if(initialSalesHandoff){
@@ -243,7 +266,7 @@ export default async function handler(req,res){
   if(decision?.humanHandoff===true&&!item&&!normalizedDecision.suppressed)return jsonResponse(res,502,{error:'invalid_handoff_output'})
   handoffRequested=Boolean(item)
   if(normalizedDecision.suppressed)console.info('phoenix_handoff_policy',JSON.stringify({agent,action:'suppressed_unconfirmed_handoff'}))
-  return replyToJunior({agent,reply:redact(safeText(agent==='murilo'?ensureMuriloIntro(decision.reply,body.messages,last.text):decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
+  return replyToJunior({agent,reply:redact(safeText(decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
  }catch(e){
   const code=e?.name==='AbortError'?'response_timeout':e?.message||'response_unavailable'
   resultStatus=code==='response_timeout'?'timeout':'error'
