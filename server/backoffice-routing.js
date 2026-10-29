@@ -59,6 +59,39 @@ const commonReply=kind=>({
  reason:'Solicitação de '+displayKind[kind]
 })
 const newTopic=/\b(?:cotar|cotacao|orcamento|quais seguros|meus seguros|segunda via|parcela|boleto|sinistro)\b/
+
+/**
+ * A pergunta "posso pedir outra coisa?" inicia um NOVO assunto, mesmo quando
+ * o histórico do Junior ainda contém uma movimentação concluída.
+ * Só identifica aberturas sem uma nova solicitação específica no mesmo texto.
+ */
+export function isStandaloneNewRequest(text){
+ const value=fold(text).replace(/[?!.]+$/,'').trim()
+ return /^(?:(?:certo|ok|beleza|obrigad[oa]|tudo bem|entendi|perfeito|ta bom|combinado)[, ]+)?(?:pode(?:ria)? me ajudar (?:em|com) (?:mais )?uma? outra? coisa|pode(?:ria)? me ajudar (?:em|com) mais uma coisa|tenho (?:mais )?uma? outra? (?:duvida|pergunta|coisa)|tenho mais uma (?:duvida|pergunta|coisa)|posso (?:te )?pedir (?:mais )?uma? outra? coisa|posso (?:te )?fazer (?:mais )?uma? outra? pergunta|posso falar de outro assunto|podemos falar de outro assunto|preciso de ajuda com outra coisa|quero tratar de outro assunto|e sobre outro assunto|mais uma coisa|outra duvida|outra pergunta|outra coisa|pode me ajudar novamente)$/.test(value)
+}
+function movementHandoffCompleted(message){
+ if(message?.direction!=='outbound'||message.author!=='agent'||typeof message.text!=='string')return false
+ const value=fold(message.text)
+ // Só considerar o encaminhamento que o agente AFIRMOU estar realizando,
+ // jamais perguntas do tipo "Deseja que eu encaminhe?".
+ return /\bbackoffice\b/.test(value)&&
+   /\b(?:vou|irei|estou|sera)\s+(?:(?:te|seu atendimento|sua solicitacao|seu pedido)\s+)?(?:direcionar|encaminhar|passar|transferir)\b/.test(value)
+}
+/**
+ * Descarta apenas o contexto operacional da triagem encerrada.
+ * O histórico continua integral no Junior e os controles de saudação permanecem
+ * por protocolo no Supabase. Não persistimos nem alteramos mensagens.
+ */
+export function activeMovementHistory(messages){
+ const list=Array.isArray(messages)?messages:[]
+ let boundary=-1
+ for(let i=0;i<list.length;i++){
+   if(movementHandoffCompleted(list[i]))boundary=i
+   if(list[i]?.direction==='inbound'&&list[i]?.author==='contact'&&
+      isStandaloneNewRequest(list[i].text))boundary=i-1
+ }
+ return list.slice(boundary+1)
+}
 /**
  * Coleta antes do Backoffice: produto, titular/dependente e referência do
  * plano (operadora OU empresa). Não pede documentos de menores ou terceiros.
@@ -87,7 +120,8 @@ function routingReference(turns,messages){
  return null
 }
 export function assessBackofficeIntake(messages){
- const history=(Array.isArray(messages)?messages:[])
+ const current=activeMovementHistory(messages)
+ const history=current
   .filter(m=>m?.direction==='inbound'&&m.author==='contact'&&typeof m.text==='string')
   .slice(-12)
  if(!history.length)return null
@@ -116,7 +150,7 @@ export function assessBackofficeIntake(messages){
    return {...base,stage:'ask_relation',humanHandoff:false,
     reply:'Entendi, a solicitação é referente a '+product+'. É para um titular ou dependente? Assim consigo encaminhar ao Backoffice com as informações corretas.'}
  }
- const reference=routingReference(turns,messages)
+ const reference=routingReference(turns,current)
  const documentsQuestion=/\b(?:quais documentos|documentos necessarios|documentacao|o que precisa apresentar)\b/.test(last)
  if(!reference){
    const intro=documentsQuestion?'Os documentos variam conforme a operadora e o vínculo, e serão confirmados pelo Backoffice. ':''
