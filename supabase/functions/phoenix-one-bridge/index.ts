@@ -26,6 +26,24 @@ async function authenticate(token){
  for(let i=0;i<actual.length;i++)difference|=actual.charCodeAt(i)^expected.charCodeAt(i)
  return difference===0
 }
+async function openAgentState(data){
+ const ticket=data.protocolo,conversation=data.conversationId,intent=data.intent,suggested=data.suggestedAgent||data.agent
+ if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}$/.test(ticket)||!['neutral','service','sales'].includes(intent)||!agentOk(suggested))
+   return {blocked:true,reason:'invalid_agent_state'}
+ return pg.begin(async tx=>{
+   await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
+   const prev=await tx.unsafe("select conversation_id::text as conversation_id,last_agent,last_intent,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at>now()",[ticket])
+   const current=prev[0]
+   if(current&&current.conversation_id!==conversation)return {blocked:true,reason:'protocol_conversation_mismatch'}
+   if(['assigned','resolved'].includes(current?.stage))return {blocked:true,reason:current.stage==='assigned'?'assigned_to_human':'protocol_resolved'}
+   // Fresh explicit intent wins. For neutral follow-ups, preserve prior active agent.
+   const agent=intent==='neutral'&&agentOk(current?.last_agent)&&current?.last_intent!=='neutral'?current.last_agent:suggested
+   const savedIntent=intent==='neutral'&&['sales','service'].includes(current?.last_intent)?current.last_intent:intent
+   const updated=await tx.unsafe("insert into phoenix_one.protocol_agent_state(source_system,external_ticket_id,conversation_id,last_agent,last_intent,stage,expires_at) values('junior_management',$1,$2::uuid,$3,$4,'with_agent',now()+interval '7 days') on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,last_agent=excluded.last_agent,last_intent=excluded.last_intent,updated_at=now(),expires_at=excluded.expires_at where phoenix_one.protocol_agent_state.stage not in ('assigned','resolved') returning last_agent,last_intent,stage",[ticket,conversation,agent,savedIntent])
+   if(!updated.length)return {blocked:true,reason:'assigned_to_human'}
+   return {blocked:false,agent:updated[0].last_agent,intent:updated[0].last_intent,stage:updated[0].stage,changed:agentOk(current?.last_agent)&&current.last_agent!==agent}
+ })
+}
 Deno.serve(async request=>{
  if(request.method!=='POST')return reply(405,{error:'method_not_allowed'})
  const rawAuth=request.headers.get('authorization')||''
@@ -34,34 +52,19 @@ Deno.serve(async request=>{
   if(!await authenticate(token))return reply(401,{error:'bridge_unauthorized'})
   const data=await request.json().catch(()=>null)
   if(!data||typeof data!=='object')return reply(400,{error:'invalid_json'})
-  if(data.action==='agent_state_open'){
-   const ticket=data.protocolo,conversation=data.conversationId,intent=data.intent,suggested=data.suggestedAgent
-   if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}$/.test(ticket)||!['neutral','service','sales'].includes(intent)||!agentOk(suggested))
-     return reply(400,{error:'invalid_agent_state'})
-   const result=await pg.begin(async tx=>{
-     // Serialize independent requests for one protocol. The table stores no personal data or text.
-     await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
-     const prev=await tx.unsafe("select conversation_id::text as conversation_id,last_agent,last_intent,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at>now()",[ticket])
-     const current=prev[0]
-     if(current&&current.conversation_id!==conversation)return {blocked:true,reason:'protocol_conversation_mismatch'}
-     if(current?.stage==='assigned'||current?.stage==='resolved')return {blocked:true,reason:current.stage==='assigned'?'assigned_to_human':'protocol_resolved'}
-     const agent=intent==='neutral'&&agentOk(current?.last_agent)&&current?.last_intent!=='neutral'?current.last_agent:suggested
-     const savedIntent=intent==='neutral'&&['sales','service'].includes(current?.last_intent)?current.last_intent:intent
-     const updated=await tx.unsafe("insert into phoenix_one.protocol_agent_state(source_system,external_ticket_id,conversation_id,last_agent,last_intent,stage,expires_at) values('junior_management',$1,$2::uuid,$3,$4,'with_agent',now()+interval '7 days') on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,last_agent=excluded.last_agent,last_intent=excluded.last_intent,updated_at=now(),expires_at=excluded.expires_at where phoenix_one.protocol_agent_state.stage not in ('assigned','resolved') returning last_agent,last_intent,stage",[ticket,conversation,agent,savedIntent])
-     if(!updated.length)return {blocked:true,reason:'assigned_to_human'}
-     return {blocked:false,agent:updated[0].last_agent,intent:updated[0].last_intent,stage:updated[0].stage,changed:agentOk(current?.last_agent)&&current.last_agent!==agent}
-   })
-   return reply(200,result)
-  }
   if(data.action==='prompt_only'){
-   const agent=data.agent
+   const state=data.conversationId?await openAgentState(data):{agent:data.agent}
+   if(state.blocked)return reply(409,{error:state.reason})
+   const agent=state.agent
    if(!agentOk(agent))return reply(400,{error:'invalid_agent'})
    const active=await pg.unsafe("select v.version,v.system_prompt from phoenix_one.agent_versions v where v.agent_id=$1 and v.active=true limit 1",[agent])
    if(!active.length)return reply(409,{error:'agent_prompt_not_available'})
    return reply(200,{agent,version:active[0].version,prompt:active[0].system_prompt,sources:[]})
   }
   if(data.action==='context'){
-   const agent=data.agent,query=cleanString(data.query,850)
+   const state=data.conversationId?await openAgentState(data):{agent:data.agent}
+   if(state.blocked)return reply(409,{error:state.reason})
+   const agent=state.agent,query=cleanString(data.query,850)
    if(!agentOk(agent)||!query.trim())return reply(400,{error:'invalid_context'})
    const agents=await pg.unsafe("select v.version,v.system_prompt from phoenix_one.agent_versions v where v.agent_id=$1 and v.active=true limit 1",[agent])
    if(!agents.length)return reply(409,{error:'agent_prompt_not_available'})
