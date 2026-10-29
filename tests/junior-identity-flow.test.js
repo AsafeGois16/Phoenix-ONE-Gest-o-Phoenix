@@ -299,57 +299,94 @@ test('protocolo atribuído ao humano não prossegue atendimento com IA',()=>with
 }))
 
 
-test('primeiro esclarece seguro em vez de transferir inclusão genérica',()=>withMock(async()=>{
- let calls=0;globalThis.fetch=async(url,opts)=>{calls++;assert.equal(JSON.parse(opts.body).action,'intro_status');return json({clara_apresentada:false,murilo_apresentado:false})}
- const res=response();await handler(request(['Gostaria de incluir um beneficiário']),res)
- assert.equal(res.code,200)
- assert.equal(res.body.agent,'clara')
- assert.equal(res.body.humanHandoff,false)
- assert.equal(res.body.handoff,null)
- assert.match(res.body.reply,/Saúde, Odonto, Vida/)
- assert.equal(calls,1)
-}))
-test('após informar Saúde, Clara identifica titular ou dependente antes do handoff',()=>withMock(async()=>{
- globalThis.fetch=async()=>{throw Error('Não consultar dados de cliente antes da triagem')}
- const res=response();await handler(request(['Gostaria de incluir um beneficiário','É no plano de saúde']),res)
- assert.equal(res.code,200)
- assert.equal(res.body.humanHandoff,false)
- assert.equal(res.body.handoff,null)
- assert.match(res.body.reply,/titular ou dependente/)
-}))
-test('Clara qualifica referência do plano antes de encaminhar inclusão',()=>withMock(async()=>{
- globalThis.fetch=async()=>{throw Error('Não consultar API operacional antes da triagem')}
- const pending=response();await handler(request(['Gostaria de incluir um beneficiário','É no plano de saúde','É um dependente']),pending)
- assert.equal(pending.code,200)
- assert.equal(pending.body.agent,'clara')
- assert.equal(pending.body.humanHandoff,false)
- assert.equal(pending.body.handoff,null)
- assert.match(pending.body.reply,/operadora do plano ou a empresa/)
- const ready=response();await handler(request(['Gostaria de incluir um beneficiário','É no plano de saúde','É um dependente','É pela Amil']),ready)
- assert.equal(ready.code,200)
- assert.equal(ready.body.humanHandoff,true)
- assert.equal(ready.body.handoff.department,'backoffice')
- assert.match(ready.body.handoff.summary,/Saúde/)
- assert.match(ready.body.handoff.summary,/dependente/)
- assert.match(ready.body.reply,/ainda não foi efetivada/)
-}))
-test('regressão protocolo 20261029-0007: Clara não transfere filho em Saúde antes da referência',()=>withMock(async()=>{
- globalThis.fetch=async()=>{throw Error('Não consultar dados durante triagem')}
+test('movimentação inicia pelo CPF/CNPJ do titular, sem transferir nem consultar outros planos',()=>withMock(async()=>{
+ globalThis.fetch=async()=>{throw Error('Ainda não consultar API antes do documento')}
  const res=response();await handler(request(['Preciso de ajuda para incluir meu filho no meu plano de saúde']),res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'clara')
  assert.equal(res.body.humanHandoff,false)
  assert.equal(res.body.handoff,null)
- assert.match(res.body.reply,/operadora do plano ou a empresa/)
- assert.doesNotMatch(res.body.reply,/titular ou dependente/)
+ assert.match(res.body.reply,/CPF ou CNPJ do titular/)
+ assert.doesNotMatch(res.body.reply,/operadora do plano ou a empresa/)
 }))
-test('pedido completo de exclusão ainda coleta a referência do plano',()=>withMock(async()=>{
- globalThis.fetch=async()=>{throw Error('Não consultar sistemas')}
- const res=response();await handler(request(['Preciso excluir minha filha do plano de saúde']),res)
+test('mesmo sem produto ou vínculo, primeiro solicita identificação',()=>withMock(async()=>{
+ globalThis.fetch=async()=>{throw Error('Sem consulta prévia à identificação')}
+ const res=response();await handler(request(['Gostaria de incluir um beneficiário']),res)
  assert.equal(res.code,200)
  assert.equal(res.body.humanHandoff,false)
- assert.equal(res.body.handoff,null)
- assert.match(res.body.reply,/operadora/)
+ assert.match(res.body.reply,/CPF ou CNPJ do titular/)
+}))
+test('após CPF, Clara espera prova de identidade do Junior antes de listar Saúde',()=>withMock(async()=>{
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
+  if(d.action==='identity_context'){
+   assert.equal(d.documentType,'cpf')
+   return json({status:'verification_required',verification:{method:'birth_date',attempts_left:2}})
+  }
+  throw Error('Não consultar modelo ou base de conhecimento')
+ }
+ const res=response();await handler(request(['Preciso incluir meu filho no plano de saúde',testCPF]),res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/data de nascimento/)
+ assert.doesNotMatch(res.body.reply,/Amil|Unimed/)
+}))
+test('identidade confirmada: listar apenas apólices de Saúde e aguardar seleção',()=>withMock(async()=>{
+ const set=[
+  {ramo:'Saúde',numero:'SAU-1111',seguradora:'Amil',linha:'Saúde'},
+  {ramo:'Odonto',numero:'ODO-2222',seguradora:'Porto Seguro',linha:'Odonto'},
+  {ramo:'Assistência Médica',numero:'SAU-3333',seguradora:'SulAmérica',linha:'Saúde'}
+ ]
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
+  if(d.action==='identity_context')return json({status:'verified',policies:set,installments:[]})
+  throw Error('Não chamar OpenAI nem outro serviço')
+ }
+ const input=request(['Preciso incluir meu filho no plano de saúde',testCPF])
+ input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Pode informar a data de nascimento do titular?'},
+  {direction:'inbound',author:'contact',type:'text',text:'25/11/1990'})
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'clara')
+ assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/Amil/)
+ assert.match(res.body.reply,/SulAmérica/)
+ assert.doesNotMatch(res.body.reply,/Porto Seguro|Odonto/)
+ assert.match(res.body.reply,/Qual destes planos de Saúde/)
+}))
+test('seleção após identidade verificada encaminha resumo somente de Saúde',()=>withMock(async()=>{
+ const set=[{ramo:'Saúde',numero:'AP-1111',seguradora:'Amil'},{ramo:'Odonto',numero:'OD-2222',seguradora:'Porto'},{ramo:'Saúde',numero:'AP-3333',seguradora:'SulAmérica'}]
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
+  if(d.action==='identity_context')return json({status:'verified',policies:set,installments:[]})
+  throw Error('Sem modelo ou acesso operacional')
+ }
+ const input=request(['Preciso incluir meu filho no plano de saúde',testCPF])
+ input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Qual destes planos de Saúde você deseja movimentar? Responda com o número da opção.'},
+  {direction:'inbound',author:'contact',type:'text',text:'2'})
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.humanHandoff,true)
+ assert.equal(res.body.handoff.department,'backoffice')
+ assert.match(res.body.handoff.summary,/SulAmérica/)
+ assert.doesNotMatch(res.body.handoff.summary,/Porto|OD-2222/)
+ assert.doesNotMatch(res.body.reply,/111\.444\.777-35/)
+}))
+test('sem confirmação da gestão o fluxo encaminha apenas para validação manual',()=>withMock(async()=>{
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
+  if(d.action==='identity_context')return json({status:'unavailable'})
+  throw Error('Não consultar outros serviços')
+ }
+ const res=response();await handler(request(['Preciso excluir minha filha do plano de saúde',testCPF]),res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.humanHandoff,true)
+ assert.equal(res.body.handoff.department,'backoffice')
+ assert.match(res.body.reply,/não consegui concluir a validação/i)
+ assert.doesNotMatch(JSON.stringify(res.body),/11144477735|111\.444\.777-35/)
 }))
 test('Clara encaminha consulta de andamento de movimentação à equipe humana',()=>withMock(async()=>{
  globalThis.fetch=async()=>{throw Error('Não consultar APIs de movimentação não disponíveis')}
@@ -374,7 +411,8 @@ test('apresentação da Clara sobrevive à saída do histórico recente',()=>wit
  const res=response();await handler(input,res)
  assert.equal(res.code,200);assert.equal(res.body.agent,'clara')
  assert.doesNotMatch(res.body.reply,/Sou a Clara/)
- assert.equal(res.body.humanHandoff,true)
+ assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/CPF ou CNPJ do titular/)
 }))
 test('Murilo não se apresenta novamente quando histórico perdeu a apresentação',()=>withMock(async()=>{
  globalThis.fetch=async(url,opts)=>{
