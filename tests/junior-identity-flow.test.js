@@ -67,7 +67,7 @@ test('documento inválido não consulta apólices nem envia dado ao modelo',()=>
  assert.equal(res.code,200);assert.match(res.body.reply,/conferir/i)
  assert.equal(identityCalls,0)
 }))
-test('somente após verificação confirmada o modelo recebe dados filtrados sem documento',()=>withMock(async()=>{
+test('após verificação a Clara responde diretamente com informação autorizada sem chamar OpenAI',()=>withMock(async()=>{
  let openAiPayload=null
  globalThis.fetch=async(url,opts)=>{
   const d=JSON.parse(opts.body)
@@ -80,10 +80,11 @@ test('somente após verificação confirmada o modelo recebe dados filtrados sem
  }
  const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
  assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false)
- assert.ok(openAiPayload)
- assert.match(openAiPayload.instructions,/FICTICIO/)
- assert.ok(!JSON.stringify(openAiPayload).includes('11144477735'))
- assert.ok(!JSON.stringify(openAiPayload).includes(testCPF))
+ assert.equal(openAiPayload,null)
+ assert.match(res.body.reply,/FICTICIO/)
+ assert.match(res.body.reply,/Automóvel/)
+ assert.ok(!JSON.stringify(res.body).includes('11144477735'))
+ assert.ok(!JSON.stringify(res.body).includes(testCPF))
 }))
 
 
@@ -104,7 +105,7 @@ test('CPF: verification_required solicita nascimento, sem handoff imediato',()=>
  assert.equal(res.code,200);assert.equal(res.body.agent,'clara');assert.equal(res.body.humanHandoff,false)
  assert.match(res.body.reply,/data de nascimento/i);assert.equal(calls,1)
 }))
-test('CPF: data de nascimento vai apenas ao Junior e é removida da OpenAI',()=>withMock(async()=>{
+test('CPF: nascimento vai ao Junior e carteira verificada é respondida sem OpenAI',()=>withMock(async()=>{
  let called=false,model=null
  globalThis.fetch=async(url,options)=>{
   const d=JSON.parse(options.body)
@@ -121,10 +122,12 @@ test('CPF: data de nascimento vai apenas ao Junior e é removida da OpenAI',()=>
  const res=response(),input=request(['Quais seguros eu tenho?',testCPF])
  input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Pode informar sua data de nascimento no formato DD/MM/AAAA?'},{direction:'inbound',author:'contact',type:'text',text:'25/11/1990'})
  await handler(input,res)
- assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false);assert.ok(called&&model)
- assert.ok(!JSON.stringify(model).includes('25/11/1990'))
- assert.ok(!JSON.stringify(model).includes('1990-11-25'))
- assert.ok(!JSON.stringify(model).includes('11144477735'))
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false);assert.equal(called,true)
+ assert.equal(model,null)
+ assert.match(res.body.reply,/APOLICE-FICTICIA/)
+ assert.ok(!JSON.stringify(res.body).includes('25/11/1990'))
+ assert.ok(!JSON.stringify(res.body).includes('1990-11-25'))
+ assert.ok(!JSON.stringify(res.body).includes('11144477735'))
 }))
 test('CNPJ: CEP enviado apenas ao bridge e nova tentativa permitida',()=>withMock(async()=>{
  let called=false
@@ -228,4 +231,41 @@ test('identidade comprovada: RAG e identity_context iniciam antes de aguardar re
  await work
  assert.equal(res.code,200)
  assert.equal(res.body.humanHandoff,false)
+}))
+
+test('Murilo apresenta-se ao assumir cotação residencial após Clara, sem consultar CPF de novo',()=>withMock(async()=>{
+ let seenModel=false
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(url.includes('phoenix-one-bridge')&&d.action==='context')return json({prompt:'Prompt comercial',sources:[]})
+  if(url.includes('api.openai.com')){seenModel=true;return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'É uma casa ou apartamento?',humanHandoff:false,handoff:null})}]}]})}
+  throw Error('Não deveria exigir identidade em cotação')
+ }
+ const input=request(['Quais seguros eu tenho?',testCPF,'Eu queria cotar sobre seguro residencial'])
+ input.body.messages.splice(input.body.messages.length-1,0,{direction:'outbound',author:'agent',type:'text',text:'Você possui seguro Auto pela Bradesco.'})
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'murilo');assert.equal(res.body.humanHandoff,false);assert.ok(seenModel)
+ assert.match(res.body.reply,/Sou o Murilo/)
+ assert.match(res.body.reply,/casa ou apartamento/)
+}))
+test('Clara não transfere para patrimônio em consulta autorizada com pendências e prêmio',()=>withMock(async()=>{
+ let calledModel=false
+ globalThis.fetch=async(url,options)=>{
+  const d=JSON.parse(options.body)
+  if(d.action==='identity_context')return json({status:'verified',
+   policies:[{numero:'APOLICE-AUTO',ramo:'Automóvel',seguradora:'Bradesco',premio_total:1360,capital_segurado:45000}],
+   installments:[{apolice:'APOLICE-AUTO',valor:214.41,vencimento:'2026-11-23',vencida:false}],
+   pending:[{description:'Comprovante de endereço pendente',status:'aguardando documento',due_date:'2026-11-10'}]
+  })
+  if(d.action==='context')return json({prompt:'Clara',sources:[]})
+  if(url.includes('api.openai.com')){calledModel=true;throw Error('Não deve usar OpenAI para listar dados verificados')}
+  throw Error('Unexpected call')
+ }
+ const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'clara');assert.equal(res.body.humanHandoff,false)
+ assert.equal(calledModel,false)
+ assert.match(res.body.reply,/Bradesco/)
+ assert.match(res.body.reply,/Prêmio total:/)
+ assert.match(res.body.reply,/Parcela:/)
+ assert.match(res.body.reply,/Comprovante de endereço pendente/)
 }))
