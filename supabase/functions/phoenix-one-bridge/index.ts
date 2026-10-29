@@ -34,6 +34,13 @@ Deno.serve(async request=>{
   if(!await authenticate(token))return reply(401,{error:'bridge_unauthorized'})
   const data=await request.json().catch(()=>null)
   if(!data||typeof data!=='object')return reply(400,{error:'invalid_json'})
+  if(data.action==='prompt_only'){
+   const agent=data.agent
+   if(!agentOk(agent))return reply(400,{error:'invalid_agent'})
+   const active=await pg.unsafe("select v.version,v.system_prompt from phoenix_one.agent_versions v where v.agent_id=$1 and v.active=true limit 1",[agent])
+   if(!active.length)return reply(409,{error:'agent_prompt_not_available'})
+   return reply(200,{agent,version:active[0].version,prompt:active[0].system_prompt,sources:[]})
+  }
   if(data.action==='context'){
    const agent=data.agent,query=cleanString(data.query,850)
    if(!agentOk(agent)||!query.trim())return reply(400,{error:'invalid_context'})
