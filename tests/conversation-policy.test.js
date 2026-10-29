@@ -132,6 +132,7 @@ test('pedido de lista completa mostra todas as parcelas retornadas',async()=>{
  assert.equal(portfolioFocus([c('Quais são minhas parcelas?'),c('Quero a lista completa')]),'installments_full')
  assert.equal(portfolioFocus([c('Mostre todas as parcelas em aberto')]),'installments_full')
  assert.equal(portfolioFocus([c('Preciso dos detalhes completos das parcelas')]),'installments_full')
+ assert.equal(portfolioFocus([c('Quais são minhas parcelas?'),c('Quero completo')]),'installments_full')
  assert.equal(shouldLookupPersonalData([c('Quais são minhas parcelas?'),c('Me mostra a lista completa')],'clara',true),true)
  const full=formatVerifiedPortfolio({installments:data},{focus:'installments_full',today:'2026-10-29'})
  assert.match(full,/20\/10\/2026/)

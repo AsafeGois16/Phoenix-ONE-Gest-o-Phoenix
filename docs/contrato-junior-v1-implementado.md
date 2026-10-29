@@ -169,3 +169,12 @@ O Junior confirma que, para trocar de Clara para Murilo ou vice-versa, basta ret
 Esta entrega NÃO inclui novos endpoints homologados de segunda via, criação de oportunidade comercial, movimentações ou acompanhamento operacional; ações de escrita permanecem bloqueadas na matriz de autonomia.
 
 Homologar com protocolo aberto e dados fictícios/autorizados, verificando identidade e autorização antes de usar modo Automático.
+
+
+## Visualização compacta de parcelas — 29/10/2026
+
+A Clara deve mostrar por padrão apenas as parcelas explicitamente marcadas como vencidas (vencida=true) e a próxima parcela não vencida, escolhida pelo menor vencimento igual ou posterior à data local de São Paulo. Uma data vencida sem confirmação de vencida=true não autoriza classificar a parcela como atrasada. A ordem da API não determina qual é a próxima.
+
+Exemplo: uma apólice com parcelas em 20/10/2026 (vencida), 20/11/2026 e 20/12/2026 (não vencidas) mostra inicialmente apenas 20/10 e 20/11. Oferecer a opção de consultar a lista completa; ao receber 'mostre todas as parcelas', 'lista completa' ou 'quero completo', disponibilizar todas as parcelas até o limite de 12 retornadas pela API Junior. Não inventar parcelas adicionais nem afirmar que 12 corresponde ao total do contrato.
+
+O resumo inicial de seguros também evita apresentar 12 parcelas automaticamente. Esta regra é de apresentação no Phoenix ONE; não altera datas, pagamentos, autenticação, transferência humana ou a API do Junior.
