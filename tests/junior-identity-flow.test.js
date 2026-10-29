@@ -55,7 +55,7 @@ test('documento recebido gera revisão humana sem contrato v1.1',()=>withMock(as
  assert.equal(res.body.handoff.department,'comercial')
  assert.ok(!JSON.stringify(res.body).includes('11144477735'))
  assert.ok(!JSON.stringify(res.body).includes(testCPF))
- assert.equal(calls.length,1) // evita RAG antes de verificação documental
+ assert.deepEqual(calls.map(x=>x.action).sort(),['identity_context','intro_status']) // registro de apresentação sem RAG ou modelo
 }))
 test('documento inválido não consulta apólices nem envia dado ao modelo',()=>withMock(async()=>{
  let identityCalls=0
@@ -176,7 +176,8 @@ test('cumprimento curto consulta só prompt e não pesquisa a biblioteca RAG',()
   const d=JSON.parse(opts.body)
   if(url.includes('phoenix-one-bridge')){
    actions.push(d.action)
-   assert.equal(d.action,'prompt_only')
+   if(d.action==='intro_status')return json({clara_apresentada:false,murilo_apresentado:false})
+    assert.equal(d.action,'prompt_only')
    return json({prompt:'Você é Clara, concierge da Phoenix Insurance.',sources:[]})
   }
   if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Olá! 💙 Como posso ajudar você?',humanHandoff:false,handoff:null})}]}]})
@@ -186,24 +187,24 @@ test('cumprimento curto consulta só prompt e não pesquisa a biblioteca RAG',()
  await handler(request(['Oi']),res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'clara')
- assert.deepEqual(actions,['prompt_only'])
+ assert.deepEqual(actions,['intro_status','prompt_only'])
 }))
 test('CPF ausente: resposta imediata sem buscar RAG e sem chamar OpenAI',()=>withMock(async()=>{
  let requests=0
- globalThis.fetch=async()=>{requests++;throw Error('Não deveria consultar serviço externo')}
+ globalThis.fetch=async(url,opts)=>{requests++;const d=JSON.parse(opts.body);assert.equal(d.action,'intro_status');return json({clara_apresentada:false,murilo_apresentado:false})}
  const res=response()
  await handler(request(['Quais seguros eu tenho?']),res)
  assert.equal(res.code,200)
- assert.equal(requests,0)
+ assert.equal(requests,1) // única consulta à memória; nenhuma consulta a clientes, RAG ou OpenAI
  assert.match(res.body.reply,/CPF ou CNPJ/)
 }))
 test('CPF inválido: resposta imediata sem consulta externa',()=>withMock(async()=>{
  let requests=0
- globalThis.fetch=async()=>{requests++;throw Error('Não deveria consultar serviço externo')}
+ globalThis.fetch=async(url,opts)=>{requests++;const d=JSON.parse(opts.body);assert.equal(d.action,'intro_status');return json({clara_apresentada:false,murilo_apresentado:false})}
  const res=response()
  await handler(request(['Quais seguros eu tenho?','111.444.777-36']),res)
  assert.equal(res.code,200)
- assert.equal(requests,0)
+ assert.equal(requests,1) // única consulta à memória; nenhuma consulta a clientes, RAG ou OpenAI
  assert.match(res.body.reply,/conferir/i)
 }))
 test('identidade comprovada: RAG e identity_context iniciam antes de aguardar retorno',()=>withMock(async()=>{
@@ -299,14 +300,14 @@ test('protocolo atribuído ao humano não prossegue atendimento com IA',()=>with
 
 
 test('primeiro esclarece seguro em vez de transferir inclusão genérica',()=>withMock(async()=>{
- let calls=0;globalThis.fetch=async()=>{calls++;throw Error('A triagem determinística não deve chamar serviços externos')}
+ let calls=0;globalThis.fetch=async(url,opts)=>{calls++;assert.equal(JSON.parse(opts.body).action,'intro_status');return json({clara_apresentada:false,murilo_apresentado:false})}
  const res=response();await handler(request(['Gostaria de incluir um beneficiário']),res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'clara')
  assert.equal(res.body.humanHandoff,false)
  assert.equal(res.body.handoff,null)
  assert.match(res.body.reply,/Saúde, Odonto, Vida/)
- assert.equal(calls,0)
+ assert.equal(calls,1)
 }))
 test('após informar Saúde, Clara identifica titular ou dependente antes do handoff',()=>withMock(async()=>{
  globalThis.fetch=async()=>{throw Error('Não consultar dados de cliente antes da triagem')}
@@ -340,3 +341,53 @@ test('Clara encaminha consulta de andamento de movimentação à equipe humana',
  assert.equal(res.body.humanHandoff,true)
  assert.match(res.body.reply,/precisa ser confirmado/i)
 }))
+
+
+test('apresentação da Clara sobrevive à saída do histórico recente',()=>withMock(async()=>{
+ const messages=Array.from({length:20},(_,i)=>({direction:i%2?'outbound':'inbound',author:i%2?'agent':'contact',type:'text',text:i%2?'Está bem, posso ajudar.':'Continuando atendimento'}))
+ messages[19]={direction:'inbound',author:'contact',type:'text',text:'Preciso excluir minha filha do plano de saúde'}
+ globalThis.fetch=async(url,opts)=>{
+  const data=JSON.parse(opts.body)
+  assert.equal(data.action,'intro_status')
+  assert.equal(data.observedClara,false)
+  return json({clara_apresentada:true,murilo_apresentado:false,blocked:false})
+ }
+ const input=request([]);input.body.messages=messages
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'clara')
+ assert.doesNotMatch(res.body.reply,/Sou a Clara/)
+ assert.equal(res.body.humanHandoff,true)
+}))
+test('Murilo não se apresenta novamente quando histórico perdeu a apresentação',()=>withMock(async()=>{
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:true})
+  if(d.action==='context')return json({agent:'murilo',prompt:'Atenda como Murilo SDR',sources:[]})
+  if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Olá! Sou o Murilo, do time comercial da Phoenix Insurance. O imóvel é casa ou apartamento?',humanHandoff:false,handoff:null})}]}]})
+  throw Error('chamada inesperada')
+ }
+ const input=request(['Quero cotar um seguro residencial'])
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200);assert.equal(res.body.agent,'murilo')
+ assert.doesNotMatch(res.body.reply,/Sou o Murilo/)
+ assert.match(res.body.reply,/casa ou apartamento/)
+}))
+test('cada agente tem sua própria apresentação mesmo após outro agente já ter falado',()=>withMock(async()=>{
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
+  if(d.action==='context')return json({agent:'murilo',prompt:'Atenda como Murilo SDR',sources:[]})
+  if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'É uma casa ou apartamento?',humanHandoff:false,handoff:null})}]}]})
+  throw Error('chamada inesperada')
+ }
+ const res=response();await handler(request(['Quero cotar seguro residencial']),res)
+ assert.equal(res.code,200);assert.match(res.body.reply,/Sou o Murilo/)
+ assert.doesNotMatch(res.body.reply,/Sou a Clara/)
+}))
+test('propostas não são confundidas com apresentações realmente enviadas',async()=>{
+ const {observedAgentIntroductions}=await import('../server/conversation-policy.js')
+ assert.deepEqual(observedAgentIntroductions([{direction:'inbound',author:'contact',text:'Sou a Clara'}]),{clara:false,murilo:false})
+ assert.deepEqual(observedAgentIntroductions([{direction:'outbound',author:'staff',text:'Sou o Murilo'}]),{clara:false,murilo:false})
+ const sent=[{direction:'outbound',author:'agent',text:'Olá! Sou a Clara, concierge Phoenix.'},{direction:'outbound',author:'agent',text:'Sou o Murilo, comercial Phoenix.'}]
+ assert.deepEqual(observedAgentIntroductions(sent),{clara:true,murilo:true})
+})

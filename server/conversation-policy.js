@@ -22,19 +22,44 @@ export function shouldLookupPersonalData(messages,agent,accountHistory){
  * Nunca adiciona conteúdo quando a IA não responderá e não repete a apresentação
  * caso já exista resposta de agente no mesmo protocolo.
  */
-export function ensureClaraIntro(reply,messages){
+export function ensureClaraIntro(reply,messages,alreadyPresented=false){
  const content=String(reply??'').trim()
  if(!content)return content
  const history=Array.isArray(messages)?messages:[]
- const hasAgentResponse=history.some(m=>m?.direction==='outbound'&&m?.author==='agent'&&typeof m.text==='string'&&m.text.trim())
- if(hasAgentResponse)return content
+ const hasClaraIntroduction=observedAgentIntroductions(history).clara
+ if(alreadyPresented||hasClaraIntroduction)return content
  const normalized=plain(content)
  if(/\b(?:sou a clara|aqui e a clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(normalized))return content
  const introduction='Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance. 💙\n\n'
  return (introduction+content).slice(0,1800)
 }
 
-export function firstMuriloAppearance(messages){
+
+/** Only recognize introductions in messages that Junior confirms as outbound agent speech.
+ * Do not persist message content, identities, contact data or attempted suggestions.
+ */
+export function observedAgentIntroductions(messages){
+ const texts=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string').map(m=>plain(m.text))
+ return {
+  clara:texts.some(t=>/\b(?:sou a clara|aqui e a clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(t)),
+  murilo:texts.some(t=>/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|meu nome e murilo|murilo aqui)\b/.test(t))
+ }
+}
+/** Remove redundant self-introduction at the start of a generated response,
+ * preserving the useful answer and any greeting that is not a new self-introduction.
+ */
+export function omitRepeatedAgentIntroduction(reply,agent,alreadyPresented=false){
+ const content=String(reply??'').trim()
+ if(!content||!alreadyPresented)return content
+ const named=agent==='clara'?'clara':agent==='murilo'?'murilo':null
+ if(!named)return content
+ const expression=new RegExp("^(?:ol[aá][!,. ]*|bom dia[!,. ]*|boa tarde[!,. ]*|boa noite[!,. ]*)?(?:sou (?:a|o) "+named+"|aqui [eé] (?:a|o) "+named+"|me chamo "+named+"|meu nome [eé] "+named+")[^.!?\\n]{0,95}[.!?]?\\s*","i")
+ const stripped=content.replace(expression,'').trim()
+ return stripped||'Como posso ajudar?'
+}
+
+export function firstMuriloAppearance(messages,alreadyPresented=false){
+ if(alreadyPresented)return false
  const outbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent').map(m=>plain(m.text))
  return !outbound.some(t=>/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(t))
 }
@@ -56,10 +81,10 @@ export function refineMuriloFirstResidentialReply(reply,customerText,firstTurn=t
  if(!premature||alreadyQualified)return content
  return 'Vou te ajudar com essa cotação. Para começar, o imóvel é uma casa ou apartamento e em qual cidade ele fica?'
 }
-export function ensureMuriloIntro(reply,messages,customerText=''){
+export function ensureMuriloIntro(reply,messages,customerText='',alreadyPresented=false){
  const content=String(reply??'').trim()
  if(!content)return ''
- const first=firstMuriloAppearance(messages)
+ const first=firstMuriloAppearance(messages,alreadyPresented)
  if(!first)return content
  const candidate=refineMuriloFirstResidentialReply(content,customerText,first)
  if(/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(plain(candidate)))return candidate
