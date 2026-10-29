@@ -39,14 +39,13 @@ export function selectConversationAgent(body) {
  // Somente respostas curtas de acompanhamento mantêm a intenção já identificada
  // no MESMO protocolo. Nunca transformar "Oi" inicial em Murilo por causa do hint.
  const stripped=fold(last)
- const shortFollowUp = stripped.length<=42 && /^(?:sim|claro|pode|pode ser|ok|certo|isso|entendi|vamos|por favor|quero sim|nao|não|obrigad[oa]|com certeza|perfeito|tenho interesse)$/.test(stripped)
- if(shortFollowUp){
-   for(const previous of history.slice(0,-1).reverse().slice(0,8)){
-      const prior=intent(previous)
-      if(prior==='service')return 'clara'
-      if(prior==='sales')return 'murilo'
-   }
+ // Manter Murilo durante a continuidade da cotação, mesmo em respostas não curtas.
+ for(const previous of history.slice(0,-1).reverse().slice(0,12)){
+   const prior=intent(previous)
+   if(prior==='service')return 'clara'
+   if(prior==='sales')return 'murilo'
  }
+
  // Contato desconhecido/lead e agent_hint "murilo" não são prova de venda.
  return 'clara'
 }
