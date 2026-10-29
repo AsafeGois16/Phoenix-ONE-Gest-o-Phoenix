@@ -126,3 +126,16 @@ No Phoenix ONE, mensagens de identificação (pedido de CPF/CNPJ ou correção d
 O backend gera logs com marcador `phoenix_response_latency` e somente medições agregadas: `agent`, `path`, `status`, `totalMs`, `knowledgeMs`, `identityMs`, `modelMs`. **Nunca registrar número do protocolo, CPF/CNPJ, nascimento, CEP, telefones, mensagens, documentos ou tokens.** Esses tempos se aplicam apenas à chamada no Phoenix ONE e não incluem o debounce, processamento do 4Zapy ou entrega WhatsApp.
 
 **Ajuste recomendado ao Junior (não aplicado por este repositório):** o contrato V1 atualmente espera até 4 segundos para agregar mensagens. Avaliar em homologação um debounce adaptativo de ~1,5–2 segundos somente se não aumentar respostas duplicadas a sequências de mensagens. O Junior deve registrar durações sem PII: `debounceMs`, `phoenixApiMs`, `whatsappSendMs`, `endToEndMs` por protocolo de teste, sem IDs pessoais no log. Medir p50/p95 com amostra antes/depois; não prometer ganho numérico sem esses dados. Manter timeout total previsto no contrato e fallback humano.
+
+
+## Campos adicionais solicitados — consulta Clara V1.2 (29/10/2026)
+
+O Phoenix ONE já interpreta, SOMENTE APÓS identity/resolve com status verified, os campos antigos de apólices e parcelas. Para um atendimento concierge completo, o sistema do Junior deverá adicionar de forma opcional e tipada os seguintes campos na resposta verificada:
+
+- Em cada item de policies: `premio_total` (number, BRL), `premio_mensal` (number, BRL), `capital_segurado` (number, BRL), `status` (string), `coberturas` (string[]). As três grandezas monetárias são diferentes: não deduzir prêmio a partir de parcela e não tratar capital segurado como prêmio.
+- Em `installments`: manter `apolice, ramo, vencimento, valor, vencida`. O limite atual é até 12 parcelas; não interpretar 12 como número total de parcelas do contrato.
+- Na raiz após autorização: `pending: [{description, status, due_date}]`, contendo SOMENTE pendências do titular autorizado e informação estritamente necessária ao atendimento, sem CPF/CNPJ, dados de terceiros ou notas administrativas internas.
+
+Se o sistema de gestão não devolver algum campo, Clara NÃO deve inventar o valor, seguradora, cobertura ou pendência. Não afirmar que não existem pendências se a API não informou que são zero. A inclusão desses campos no contrato operacional depende da implementação e homologação do Junior.
+
+**Prioridade de atendimento:** Clara deve resolver autonomamente consultas informativas (apólices, seguradoras, vigências, parcelas, valores retornados e pendências autorizadas). Encaminhar à fila patrimonio/beneficios somente quando uma ação humana é necessária ou o cliente expressamente pede atendimento. Murilo apresenta-se quando recebe nova intenção comercial (cotação/contratação), sem redistribuir o protocolo entre filas sem motivo. Ambos preservam o contrato `/v1/conversations/respond` e o gateway de envio permanece exclusivamente no Junior.

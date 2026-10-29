@@ -113,13 +113,22 @@ Deno.serve(async request=>{
      (junior.verification&&junior.verification.status!=='verified'))
      return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
    const policies=Array.isArray(junior.policies)?junior.policies.slice(0,12).map(p=>({
-    numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60)
+    numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
+    premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
+    premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
+    capital_segurado:typeof p?.capital_segurado==='number'&&Number.isFinite(p.capital_segurado)&&p.capital_segurado>=0?p.capital_segurado:null,
+    status:cleanString(p?.status,45),coberturas:Array.isArray(p?.coberturas)?p.coberturas.slice(0,8).map(c=>cleanString(c,140)).filter(Boolean):[]
    })):[]
    const installments=Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),vencimento:cleanString(i?.vencimento,30),
     valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
    })):[]
-   return reply(200,{status:'verified',policies,installments})
+   // Pendências são fornecidas exclusivamente pela API do Junior após verificação.
+   // Nunca pesquisar documentos ou valores a partir do número do WhatsApp.
+   const pending=Array.isArray(junior.pending)?junior.pending.slice(0,8).map(p=>({
+    description:cleanString(p?.description,200),status:cleanString(p?.status,45),due_date:cleanString(p?.due_date,30)
+   })).filter(p=>p.description):[]
+   return reply(200,{status:'verified',policies,installments,pending})
   }
   if(data.action==='event'){
    const v=data.event
