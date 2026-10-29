@@ -159,3 +159,32 @@ test('sem perder intenção quando cliente muda de parcelas para seguros',async(
  assert.equal(portfolioFocus([c('Todas as parcelas'),c('Quais seguros eu tenho?')]),'summary')
  assert.equal(portfolioFocus([c('Quais seguros eu tenho?'),c('Parcelas')]),'installments')
 })
+
+test('Murilo no Laboratório RAG se apresenta e não pede endereço completo na abertura residencial',async()=>{
+ const {ensureMuriloIntro}=await import('../server/conversation-policy.js')
+ const question='Olá, quero cotar um seguro residencial.'
+ const result=ensureMuriloIntro('Olá! Para começarmos sua cotação de seguro residencial, poderia informar o endereço do imóvel que deseja proteger?',[],question)
+ assert.match(result,/Sou o Murilo, do time comercial da Phoenix Insurance/)
+ assert.match(result,/casa ou apartamento/)
+ assert.match(result,/qual cidade|em qual cidade/i)
+ assert.doesNotMatch(result,/endereço do imóvel|CEP|CPF|CNPJ/i)
+})
+test('Murilo não repete apresentação após a primeira resposta e respeita perguntas progressivas',async()=>{
+ const {ensureMuriloIntro}=await import('../server/conversation-policy.js')
+ const history=[c('Quero um seguro residencial'),a('Olá! Sou o Murilo, do time comercial da Phoenix Insurance.'),c('É um apartamento em Guarulhos')]
+ assert.equal(ensureMuriloIntro('Ótimo! É para morar ou alugar?',history,'É um apartamento em Guarulhos'),'Ótimo! É para morar ou alugar?')
+ assert.equal(ensureMuriloIntro('',[], 'Quero cotar seguro residencial'),'')
+})
+test('Murilo não altera perguntas adequadas ou produtos fora de residencial',async()=>{
+ const {ensureMuriloIntro}=await import('../server/conversation-policy.js')
+ const good='Para começar, é uma casa ou apartamento e em qual cidade fica?'
+ assert.match(ensureMuriloIntro(good,[],'Quero cotar seguro residencial'),/casa ou apartamento/)
+ const auto='Qual é o modelo e o ano do veículo?'
+ assert.match(ensureMuriloIntro(auto,[],'Quero cotar seguro auto'),/modelo e o ano do veículo/)
+})
+test('Murilo não se apresenta como cotação comercial em resposta a simples cumprimento',async()=>{
+ const {ensureMuriloIntro}=await import('../server/conversation-policy.js')
+ const result=ensureMuriloIntro('Como posso ajudar?',[],'Oi')
+ assert.match(result,/Sou o Murilo/)
+ assert.doesNotMatch(result,/Vou te ajudar com essa cotação/)
+})

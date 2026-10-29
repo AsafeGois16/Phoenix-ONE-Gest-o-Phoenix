@@ -240,7 +240,7 @@ export default async function handler(req,res){
   if(decision?.humanHandoff===true&&!item&&!normalizedDecision.suppressed)return jsonResponse(res,502,{error:'invalid_handoff_output'})
   handoffRequested=Boolean(item)
   if(normalizedDecision.suppressed)console.info('phoenix_handoff_policy',JSON.stringify({agent,action:'suppressed_unconfirmed_handoff'}))
-  return replyToJunior({agent,reply:redact(safeText(agent==='murilo'?ensureMuriloIntro(decision.reply,body.messages):decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
+  return replyToJunior({agent,reply:redact(safeText(agent==='murilo'?ensureMuriloIntro(decision.reply,body.messages,last.text):decision.reply,1800)),humanHandoff:Boolean(item),handoff:item})
  }catch(e){
   const code=e?.name==='AbortError'?'response_timeout':e?.message||'response_unavailable'
   resultStatus=code==='response_timeout'?'timeout':'error'

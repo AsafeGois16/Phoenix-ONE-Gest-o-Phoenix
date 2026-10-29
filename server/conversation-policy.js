@@ -38,10 +38,35 @@ export function firstMuriloAppearance(messages){
  const outbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent').map(m=>plain(m.text))
  return !outbound.some(t=>/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(t))
 }
-export function ensureMuriloIntro(reply,messages){
- const content=String(reply||'').trim()
- if(!firstMuriloAppearance(messages)||/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(plain(content)))return content
- return 'Prazer! Sou o Murilo, do time comercial da Phoenix Insurance. Vou te ajudar com essa cotação. '+content
+/**
+ * Primeira cotação residencial: a abertura deve ser progressiva. O endereço
+ * completo, CEP e documento não são necessários nessa etapa.
+ * Só corrige uma pergunta invasiva gerada pelo modelo; nos demais casos mantém
+ * a resposta natural e a consulta ao prompt mestre/RAG.
+ */
+export function refineMuriloFirstResidentialReply(reply,customerText,firstTurn=true){
+ const content=String(reply??'').trim()
+ if(!content||!firstTurn)return content
+ const asked=plain(customerText)
+ if(!/\b(?:residencial|residencia)\b/.test(asked)||!/\b(?:cotacao|cotar|orcamento|contratar|seguro)\b/.test(asked))return content
+ const answer=plain(content)
+ const premature=/\b(?:endereco|cep|logradouro|rua|numero do imovel|cpf|cnpj)\b/.test(answer)
+ // Só corrige quando o modelo adiantou documentação/endereço antes da triagem.
+ const alreadyQualified=/\b(?:casa ou apartamento|tipo de imovel|em qual cidade|qual cidade|cidade e o tipo|cidade fica)\b/.test(answer)
+ if(!premature||alreadyQualified)return content
+ return 'Vou te ajudar com essa cotação. Para começar, o imóvel é uma casa ou apartamento e em qual cidade ele fica?'
+}
+export function ensureMuriloIntro(reply,messages,customerText=''){
+ const content=String(reply??'').trim()
+ if(!content)return ''
+ const first=firstMuriloAppearance(messages)
+ if(!first)return content
+ const candidate=refineMuriloFirstResidentialReply(content,customerText,first)
+ if(/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(plain(candidate)))return candidate
+ const sales= /\b(?:cotacao|cotar|contratar|orcamento|seguro)\b/.test(plain(customerText))
+ const intro='Olá! Sou o Murilo, do time comercial da Phoenix Insurance. '
+ const connector=sales && !/\b(?:vou te ajudar|ajudo voce|vamos comecar)\b/.test(plain(candidate))?'Vou te ajudar com essa cotação. ':''
+ return (intro+connector+candidate).slice(0,1800)
 }
 export function isReadonlyConsultation(text){
  const t=plain(text)
