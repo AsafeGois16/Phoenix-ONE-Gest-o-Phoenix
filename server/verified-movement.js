@@ -71,7 +71,8 @@ export function verifiedMovementDecision(intake,policies,messages){
   })
  }
  const previous=lastAgentText(messages)
- const chosen=selectedIndex(last,choices,previous)
+ const optionsUnchanged=choices.every((policy,index)=>previous.includes((index+1)+'. '+policyLabel(policy,category)))
+ const chosen=optionsUnchanged?selectedIndex(last,choices,previous):-1
  if(chosen>=0){
   const selected=choices[chosen]
   const ref=policyLabel(selected,category)
