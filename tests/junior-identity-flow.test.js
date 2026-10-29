@@ -363,7 +363,7 @@ test('Clara encaminha consulta de andamento de movimentação à equipe humana',
 
 test('apresentação da Clara sobrevive à saída do histórico recente',()=>withMock(async()=>{
  const messages=Array.from({length:20},(_,i)=>({direction:i%2?'outbound':'inbound',author:i%2?'agent':'contact',type:'text',text:i%2?'Está bem, posso ajudar.':'Continuando atendimento'}))
- messages[19]={direction:'inbound',author:'contact',type:'text',text:'Preciso excluir minha filha do plano de saúde'}
+ messages[19]={direction:'inbound',author:'contact',type:'text',text:'Preciso excluir minha filha do plano de saúde da Amil'}
  globalThis.fetch=async(url,opts)=>{
   const data=JSON.parse(opts.body)
   assert.equal(data.action,'intro_status')
