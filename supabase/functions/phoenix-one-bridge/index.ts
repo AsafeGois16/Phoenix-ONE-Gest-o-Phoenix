@@ -54,6 +54,24 @@ Deno.serve(async request=>{
   if(!await authenticate(token))return reply(401,{error:'bridge_unauthorized'})
   const data=await request.json().catch(()=>null)
   if(!data||typeof data!=='object')return reply(400,{error:'invalid_json'})
+  if(data.action==='intro_status'){
+   const ticket=data.protocolo,conversation=data.conversationId
+   if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}$/.test(ticket)||
+      typeof data.observedClara!=='boolean'||typeof data.observedMurilo!=='boolean')
+     return reply(400,{error:'invalid_intro_status'})
+   const result=await pg.begin(async tx=>{
+     await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
+     await tx.unsafe("delete from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at<=now()",[ticket])
+     const prev=await tx.unsafe("select conversation_id::text as conversation_id,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1",[ticket])
+     if(prev[0]&&prev[0].conversation_id!==conversation)return {blocked:true,reason:'protocol_conversation_mismatch'}
+     if(['assigned','resolved'].includes(prev[0]?.stage))return {blocked:true,reason:'protocol_not_with_agent'}
+     // Confirmation comes from OUTBOUND agent messages observed by the Junior.
+     // Proposal-only messages in Sugestão mode do not set these flags.
+     const saved=await tx.unsafe("insert into phoenix_one.protocol_agent_state(source_system,external_ticket_id,conversation_id,clara_apresentada,murilo_apresentado,expires_at) values('junior_management',$1,$2::uuid,$3,$4,now()+interval '7 days') on conflict(source_system,external_ticket_id) do update set clara_apresentada=phoenix_one.protocol_agent_state.clara_apresentada or excluded.clara_apresentada,murilo_apresentado=phoenix_one.protocol_agent_state.murilo_apresentado or excluded.murilo_apresentado,updated_at=now(),expires_at=now()+interval '7 days' returning clara_apresentada,murilo_apresentado",[ticket,conversation,data.observedClara,data.observedMurilo])
+     return {blocked:false,clara_apresentada:saved[0].clara_apresentada,murilo_apresentado:saved[0].murilo_apresentado}
+   })
+   return reply(200,result)
+  }
   if(data.action==='prompt_only'){
    const state=data.conversationId?await openAgentState(data):{agent:data.agent}
    if(state.blocked)return reply(409,{error:state.reason})
