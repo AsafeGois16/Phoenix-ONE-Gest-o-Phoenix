@@ -14,6 +14,25 @@ export function shouldLookupPersonalData(messages,agent,accountHistory){
  if(accountHistory && /^(?:sim|claro|isso|pode|detalhes|todos|todas|mais detalhes|quero saber mais)\b/.test(latest))return true
  return false
 }
+
+/**
+ * Clara precisa se identificar mesmo quando a resposta é gerada por uma regra
+ * direta do servidor (por exemplo, solicitação inicial de CPF/CNPJ).
+ * Nunca adiciona conteúdo quando a IA não responderá e não repete a apresentação
+ * caso já exista resposta de agente no mesmo protocolo.
+ */
+export function ensureClaraIntro(reply,messages){
+ const content=String(reply??'').trim()
+ if(!content)return content
+ const history=Array.isArray(messages)?messages:[]
+ const hasAgentResponse=history.some(m=>m?.direction==='outbound'&&m?.author==='agent'&&typeof m.text==='string'&&m.text.trim())
+ if(hasAgentResponse)return content
+ const normalized=plain(content)
+ if(/\b(?:sou a clara|aqui e a clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(normalized))return content
+ const introduction='Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance. 💙\n\n'
+ return (introduction+content).slice(0,1800)
+}
+
 export function firstMuriloAppearance(messages){
  const outbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent').map(m=>plain(m.text))
  return !outbound.some(t=>/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(t))
