@@ -447,3 +447,48 @@ test('propostas não são confundidas com apresentações realmente enviadas',as
  const sent=[{direction:'outbound',author:'agent',text:'Olá! Sou a Clara, concierge Phoenix.'},{direction:'outbound',author:'agent',text:'Sou o Murilo, comercial Phoenix.'}]
  assert.deepEqual(observedAgentIntroductions(sent),{clara:true,murilo:true})
 })
+
+test('após retorno do Backoffice, Clara responde a novo assunto sem repetir transferência',()=>withMock(async()=>{
+ const input=request(['Preciso de ajuda para incluir meu filho no meu plano de saúde'])
+ input.body.messages.push(
+  {direction:'outbound',author:'agent',type:'text',text:'Concluí a etapa de verificação, mas não consegui identificar um plano de Saúde para seleção nesta consulta. Vou direcionar sua solicitação ao Backoffice para conferência, sem realizar nenhuma movimentação.'},
+  {direction:'outbound',author:'staff',type:'text',text:'O Backoffice devolveu o atendimento ao agente.'},
+  {direction:'inbound',author:'contact',type:'text',text:'Certo pode me ajudar em mais uma coisa?'}
+ )
+ let calls=0
+ globalThis.fetch=async(url,opts)=>{
+  const data=JSON.parse(opts.body);calls++
+  assert.equal(data.action,'intro_status')
+  return json({clara_apresentada:true,murilo_apresentado:false})
+ }
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.agent,'clara')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/Como posso ajudar com a sua nova solicitação/)
+ assert.doesNotMatch(res.body.reply,/não consegui identificar|Backoffice|Sou a Clara/)
+ assert.equal(calls,1)
+}))
+test('após retorno, nova movimentação não utiliza o documento anterior',()=>withMock(async()=>{
+ const input=request(['Quero incluir meu filho no plano de saúde',testCPF])
+ input.body.messages.push(
+  {direction:'outbound',author:'agent',type:'text',text:'Vou direcionar sua solicitação ao Backoffice para conferência manual.'},
+  {direction:'inbound',author:'contact',type:'text',text:'Certo, pode me ajudar em mais uma coisa?'},
+  {direction:'outbound',author:'agent',type:'text',text:'Claro! Como posso ajudar?'},
+  {direction:'inbound',author:'contact',type:'text',text:'Quero excluir minha esposa do plano Odonto'}
+ )
+ let calls=0
+ globalThis.fetch=async(url,opts)=>{
+  const data=JSON.parse(opts.body);calls++
+  assert.equal(data.action,'intro_status')
+  return json({clara_apresentada:true,murilo_apresentado:false})
+ }
+ const res=response();await handler(input,res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.agent,'clara')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/CPF ou CNPJ do titular/)
+ assert.equal(calls,1)
+}))
