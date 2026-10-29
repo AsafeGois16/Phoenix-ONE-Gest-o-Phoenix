@@ -188,3 +188,12 @@ test('Murilo não se apresenta como cotação comercial em resposta a simples cu
  assert.match(result,/Sou o Murilo/)
  assert.doesNotMatch(result,/Vou te ajudar com essa cotação/)
 })
+
+test('Clara e Murilo têm memória de apresentações independentes',async()=>{
+ const {ensureClaraIntro,ensureMuriloIntro,omitRepeatedAgentIntroduction}=await import('../server/conversation-policy.js')
+ const msg=[a('Sou o Murilo, do time comercial')]
+ assert.match(ensureClaraIntro('Como posso ajudar?',msg,false),/Sou a Clara/)
+ assert.equal(ensureClaraIntro('Posso consultar seus seguros.',[],true),'Posso consultar seus seguros.')
+ assert.equal(ensureMuriloIntro('O imóvel é uma casa ou apartamento?',[], 'Quero cotar seguro residencial',true),'O imóvel é uma casa ou apartamento?')
+ assert.equal(omitRepeatedAgentIntroduction('Olá! Sou o Murilo, do time comercial da Phoenix Insurance. Você prefere casa ou apartamento?','murilo',true),'Você prefere casa ou apartamento?')
+})

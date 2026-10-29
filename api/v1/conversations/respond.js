@@ -85,6 +85,7 @@ export default async function handler(req,res){
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
  let agent=selectAgent(body)
+ const last=body.messages.at(-1)
  let introTask=null
  const replyToJunior=async payload=>{
   // Only confirmed outbound introductions are stored. A proposal in Sugestão
@@ -103,7 +104,6 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
- const last=body.messages.at(-1)
  if(last.direction!=='inbound'||last.author!=='contact'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'last_message_not_inbound',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
