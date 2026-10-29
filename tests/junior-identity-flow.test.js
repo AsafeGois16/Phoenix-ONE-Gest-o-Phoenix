@@ -55,7 +55,7 @@ test('documento recebido gera revisão humana sem contrato v1.1',()=>withMock(as
  assert.equal(res.body.handoff.department,'comercial')
  assert.ok(!JSON.stringify(res.body).includes('11144477735'))
  assert.ok(!JSON.stringify(res.body).includes(testCPF))
- assert.equal(calls.length,2)
+ assert.equal(calls.length,1) // evita RAG antes de verificação documental
 }))
 test('documento inválido não consulta apólices nem envia dado ao modelo',()=>withMock(async()=>{
  let identityCalls=0
@@ -164,4 +164,68 @@ test('Junior pede validação humana, não nascimento/CEP',()=>withMock(async()=
  }
  const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
  assert.equal(res.code,200);assert.equal(res.body.humanHandoff,true)
+}))
+
+
+test('cumprimento curto consulta só prompt e não pesquisa a biblioteca RAG',()=>withMock(async()=>{
+ const actions=[]
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')){
+   actions.push(d.action)
+   assert.equal(d.action,'prompt_only')
+   return json({prompt:'Você é Clara, concierge da Phoenix Insurance.',sources:[]})
+  }
+  if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Olá! 💙 Como posso ajudar você?',humanHandoff:false,handoff:null})}]}]})
+  throw Error('chamada inesperada')
+ }
+ const res=response()
+ await handler(request(['Oi']),res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.agent,'clara')
+ assert.deepEqual(actions,['prompt_only'])
+}))
+test('CPF ausente: resposta imediata sem buscar RAG e sem chamar OpenAI',()=>withMock(async()=>{
+ let requests=0
+ globalThis.fetch=async()=>{requests++;throw Error('Não deveria consultar serviço externo')}
+ const res=response()
+ await handler(request(['Quais seguros eu tenho?']),res)
+ assert.equal(res.code,200)
+ assert.equal(requests,0)
+ assert.match(res.body.reply,/CPF ou CNPJ/)
+}))
+test('CPF inválido: resposta imediata sem consulta externa',()=>withMock(async()=>{
+ let requests=0
+ globalThis.fetch=async()=>{requests++;throw Error('Não deveria consultar serviço externo')}
+ const res=response()
+ await handler(request(['Quais seguros eu tenho?','111.444.777-36']),res)
+ assert.equal(res.code,200)
+ assert.equal(requests,0)
+ assert.match(res.body.reply,/conferir/i)
+}))
+test('identidade comprovada: RAG e identity_context iniciam antes de aguardar retorno',()=>withMock(async()=>{
+ let started=[]
+ let contextResolve
+ let identityResolve
+ const pendingContext=new Promise(resolve=>contextResolve=resolve)
+ const pendingIdentity=new Promise(resolve=>identityResolve=resolve)
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')&&d.action==='context'){started.push('context');await pendingContext;return json({prompt:'Clara',sources:[]})}
+  if(url.includes('phoenix-one-bridge')&&d.action==='identity_context'){started.push('identity');await pendingIdentity;return json({status:'verified',policies:[],installments:[]})}
+  if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Identidade confirmada. Como posso ajudar?',humanHandoff:false,handoff:null})}]}]})
+  throw Error('chamada inesperada')
+ }
+ const input=request(['Quais seguros eu tenho?',testCPF])
+ input.body.messages.push({direction:'outbound',author:'agent',type:'text',text:'Pode informar sua data de nascimento no formato DD/MM/AAAA?'},{direction:'inbound',author:'contact',type:'text',text:'25/11/1990'})
+ const res=response()
+ const work=handler(input,res)
+ // Ao contrário da implementação anterior, ambas requisições devem começar sem depender uma da outra.
+ await new Promise(resolve=>setImmediate(resolve))
+ assert.deepEqual(started.sort(),['context','identity'])
+ contextResolve()
+ identityResolve()
+ await work
+ assert.equal(res.code,200)
+ assert.equal(res.body.humanHandoff,false)
 }))

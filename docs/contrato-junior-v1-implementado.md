@@ -117,3 +117,12 @@ A API do Junior é responsável pelos limites de 3 documentos por protocolo, 3 t
 Risco residual: data de nascimento e CEP podem ser conhecidos por terceiros, portanto são fatores relativamente fracos. Recomenda-se confirmação por segundo canal confiável, ou revisão humana, antes de liberar detalhes financeiros em modo automático.
 
 Validação de homologação: executar o fluxo completo de prova com CPF e CNPJ fictícios/autorizados, bem como bloqueio, 404 e tentativas incorretas; os testes automatizados validam o comportamento do Phoenix ONE, mas não substituem a prova fim a fim com a API real do Junior.
+
+
+## Otimização de latência — 29/10/2026
+
+No Phoenix ONE, mensagens de identificação (pedido de CPF/CNPJ ou correção de documento) agora respondem diretamente, **sem executar RAG nem OpenAI**. Quando o cliente devolve a prova de identidade pedida pela Clara, o contexto do Knowledge Hub e a consulta documental do Junior são iniciados em paralelo; nunca libera dados antes da verificação pelo Junior. Saudações curtas recuperam apenas o prompt mestre, sem pesquisa desnecessária nos documentos. As respostas geradas pela OpenAI continuam usando o prompt completo publicado e o mesmo JSON de resposta/handoff.
+
+O backend gera logs com marcador `phoenix_response_latency` e somente medições agregadas: `agent`, `path`, `status`, `totalMs`, `knowledgeMs`, `identityMs`, `modelMs`. **Nunca registrar número do protocolo, CPF/CNPJ, nascimento, CEP, telefones, mensagens, documentos ou tokens.** Esses tempos se aplicam apenas à chamada no Phoenix ONE e não incluem o debounce, processamento do 4Zapy ou entrega WhatsApp.
+
+**Ajuste recomendado ao Junior (não aplicado por este repositório):** o contrato V1 atualmente espera até 4 segundos para agregar mensagens. Avaliar em homologação um debounce adaptativo de ~1,5–2 segundos somente se não aumentar respostas duplicadas a sequências de mensagens. O Junior deve registrar durações sem PII: `debounceMs`, `phoenixApiMs`, `whatsappSendMs`, `endToEndMs` por protocolo de teste, sem IDs pessoais no log. Medir p50/p95 com amostra antes/depois; não prometer ganho numérico sem esses dados. Manter timeout total previsto no contrato e fallback humano.
