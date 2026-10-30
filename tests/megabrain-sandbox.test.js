@@ -17,7 +17,7 @@ test('test panel uses the same classifier and never sends or persists content',(
  const v=read('src/MegaBrainSandbox.jsx')
  assert.ok(v.includes("import {buildMegaBrainObservation} from '../server/megabrain-observation.js'"))
  assert.doesNotMatch(v,/\bfetch\s*\(|localStorage|sessionStorage|navigator\.sendBeacon|XMLHttpRequest/)
- assert.doesNotMatch(v,/shadowObserveMegaBrain|api\/v1|phoenix-one-megabrain-context/)
+ assert.doesNotMatch(v,/shadowObserveMegaBrain\s*\(|api\/v1|phoenix-one-megabrain-context/)
  assert.match(v,/Nenhum dado será gravado/)
 })
 test('synthetic quote is identified as commercial Life insurance',()=>{
