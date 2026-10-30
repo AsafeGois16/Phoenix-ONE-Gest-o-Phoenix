@@ -555,3 +555,31 @@ test('sem identidade verificada, não confirmar identidade por texto da IA',()=>
  assert.doesNotMatch(res.body.reply,/identidade foi confirmada/)
  assert.match(res.body.reply,/validação de identidade.*ainda não foi concluída/)
 }))
+
+test('cobertura de Vida dentro de cotação nunca coleta CPF por engano de Backoffice',()=>withMock(async()=>{
+ let calledOpenAi=false
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')){
+   if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:true})
+   if(d.action==='context')return json({agent:'murilo',prompt:'Você é Murilo, comercial.',sources:[]})
+   throw Error('Ação não permitida neste cenário: '+d.action)
+  }
+  if(url.includes('api.openai.com')){
+   calledOpenAi=true
+   return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({
+    reply:'Entendi a cobertura funeral. Qual valor de indenização deseja avaliar?',
+    humanHandoff:false,handoff:null
+   })}]}]})
+  }
+  throw Error('Não consultar identidade durante cotação')
+ }
+ const res=response()
+ await handler(request(['Quero cotar seguro de Vida','Quero incluir assistência funeral familiar na cotação do seguro de Vida']),res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.agent,'murilo')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/valor de indenização/)
+ assert.equal(calledOpenAi,true)
+}))
