@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useState} from 'react'
 import {createClient} from '@supabase/supabase-js'
+import MegaBrain from './MegaBrain.jsx'
 import {Activity,ArrowRight,BookOpen,BrainCircuit,Check,CheckCircle2,ChevronRight,Clock3,Database,FileText,FolderOpen,History,KeyRound,Layers3,Lock,Plus,RefreshCcw,Save,Search,Send,ShieldCheck,Sparkles,Ticket,Upload,UserRound,Users,X} from 'lucide-react'
 
 const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -104,6 +105,7 @@ export default function Operations({page,onNavigate}){
  if(page==='agents')return <AgentsPanel data={data} call={action} refresh={()=>load()}/>
  if(page==='knowledge')return <KnowledgePanel data={data} call={action} refresh={()=>load()} session={session}/>
  if(page==='memory')return <MemoryPanel data={data} call={action} refresh={()=>load()}/>
+ if(page==='megabrain')return <MegaBrain session={session}/>
  if(page==='lab')return <LabPanel data={data} call={action} session={session}/>
  if(page==='architecture')return <div className="ops-stack"><div className="ops-heading"><div><h2>Arquitetura Phoenix ONE</h2><p>Plataforma independente com autenticação e base própria.</p></div><span className="ops-tag good">Infraestrutura ativa</span></div><div className="ops-paper"><h3>Núcleo de inteligência</h3><div className="ops-profile-grid"><div className="ops-source"><strong>Clara e Murilo</strong><p>Prompts oficiais no schema phoenix_one, com edição, versionamento e recuperação contextual.</p></div><div className="ops-source"><strong>Knowledge Hub</strong><p>Documentos e trechos recuperados da biblioteca real, com permissões por agente e revisão.</p></div><div className="ops-source"><strong>Memória supervisionada</strong><p>Revisão humana de resoluções e publicação como conhecimento.</p></div><div className="ops-source"><strong>Gestão do Junior</strong><p>Integração futura exclusiva por API para clientes, 4Zapy e tickets, sem acesso ao CRM LEADS.</p></div></div></div></div>
  if(page==='tickets')return <div className="ops-stack"><div className="ops-heading"><div><h2>Bridge de tickets</h2><p>O sistema do Junior é proprietário dos tickets; o Phoenix ONE não cria uma segunda fila operacional.</p></div><span className="ops-tag warn">Aguardando homologação de rotas</span></div><div className="ops-paper ops-empty"><Ticket size={33}/><h3>Integração operacional pendente</h3><p>Use Integrações para configurar a API do Junior. Quando houver eventos assinados e operações autorizadas, este espaço exibirá o status real dos tickets, sem registros fictícios.</p><Btn onClick={()=>onNavigate('integrations')}>Configurar integração</Btn></div></div>
