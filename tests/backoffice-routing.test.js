@@ -164,3 +164,25 @@ test('mensagem genérica de nova solicitação interrompe retomada do pedido ant
  }
  assert.equal(isStandaloneNewRequest('Certo, quero incluir minha esposa no Odonto'),false)
 })
+
+test('adicionar coberturas a cotação não é movimentação de beneficiários',()=>{
+ const sentences=[
+  'Quero incluir assistência funeral na cotação de seguro de Vida',
+  'Quero incluir cobertura de invalidez na proposta de Vida',
+  'Quero adicionar proteção contra roubo à cotação do plano de seguro',
+  'Quero incluir assistência 24h na cotação do plano de Auto',
+  'Quero incluir minha esposa na cotação do plano de Saúde',
+  'Quero contratar plano de Saúde e incluir dependentes na simulação'
+ ]
+ for(const text of sentences){
+  const decision=detectBackofficeRequest(text)
+  assert.equal(decision,null,text)
+ }
+})
+test('inclusão de beneficiário em plano vigente continua sendo Backoffice',()=>{
+ for(const text of ['Preciso incluir minha filha no plano de Saúde','Quero excluir meu dependente do plano Odonto']){
+  const decision=detectBackofficeRequest(text)
+  assert.ok(decision,text)
+  assert.equal(decision.department,'backoffice')
+ }
+})
