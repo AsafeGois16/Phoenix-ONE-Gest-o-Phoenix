@@ -499,7 +499,7 @@ test('cotação Vida com assistência funeral não volta à Clara por memória a
   const d=JSON.parse(opts.body)
   if(url.includes('phoenix-one-bridge')){
    if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:true})
-   if(d.action==='context')return json({agent:'clara',prompt:'Você é Murilo, SDR comercial.',sources:[]})
+   if(d.action==='context'){assert.equal(d.intent,'sales');assert.equal(d.suggestedAgent,'murilo');return json({agent:'clara',prompt:'Você é Murilo, SDR comercial.',sources:[]})}
    throw Error('bridge inesperado '+d.action)
   }
   if(url.includes('api.openai.com')){
@@ -525,7 +525,7 @@ test('acionamento funeral existente vai para Clara mesmo com Murilo na memória'
   const d=JSON.parse(opts.body)
   if(url.includes('phoenix-one-bridge')){
    if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:true})
-   if(d.action==='context')return json({agent:'murilo',prompt:'Prompt de teste.',sources:[]})
+   if(d.action==='context'){assert.equal(d.intent,'service');assert.equal(d.suggestedAgent,'clara');return json({agent:'murilo',prompt:'Prompt de teste.',sources:[]})}
   }
   if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({
    reply:'Vou orientar o acionamento de assistência funeral pela equipe responsável.',
