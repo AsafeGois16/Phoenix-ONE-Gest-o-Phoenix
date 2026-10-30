@@ -55,7 +55,19 @@ Deno.serve(async req=>{
    )
    return output(200,{accepted:writes.length>0,mode:'shadow',reply_unchanged:true})
   }
-  if(['grant','revoke','control_status','snapshot'].includes(body.action)){
+  if(body.action==='agent_context'){
+   // Mesmo token interno do bridge, nunca uma credencial do cliente.
+   if(!await isBridgeToken(token))return output(401,{error:'unauthorized'})
+   if(!ticket(body.protocolo)||!uuid(body.conversationId)||!enums.agent.includes(body.agent))return output(400,{error:'invalid_request'})
+   // Apenas categorias não sensíveis, recentes e emitidas sob o grant atual.
+   // NENHUMA alteração do agente atual ou verificação de identidade.
+   const rows=await pg.unsafe(
+    "select o.topic,o.subtopic,o.product,o.source_agent as previous_agent,o.confidence from phoenix_one.megabrain_context_observations o join phoenix_one.protocol_agent_state s on s.source_system=o.source_system and s.external_ticket_id=o.external_ticket_id and s.conversation_id=o.conversation_id join phoenix_one.megabrain_protocol_grants g on g.source_system=s.source_system and g.external_ticket_id=s.external_ticket_id and g.conversation_id=s.conversation_id where o.source_system='junior_management' and o.external_ticket_id=$1 and o.conversation_id=$2::uuid and s.stage='with_agent' and s.expires_at>now() and g.enabled=true and g.agent_read_enabled=true and g.revoked_at is null and g.expires_at>now() and o.expires_at>now() and o.observed_at>=g.granted_at-interval '2 seconds' and o.observed_at>=now()-interval '20 minutes' order by o.observed_at desc limit 1",
+    [body.protocolo,body.conversationId]
+   )
+   return output(200,{version:'megabrain-v3',available:rows.length>0,source:'categorical_observation',verified:false,context:rows[0]||null})
+  }
+  if(['grant','revoke','control_status','grant_agent_read','revoke_agent_read','snapshot'].includes(body.action)){
    if(req.headers.get('origin')!==origin)return output(403,{error:'origin_not_allowed'})
    if(token.length<40)return output(401,{error:'unauthorized'})
    const auth=createClient(Deno.env.get('SUPABASE_URL')||'',Deno.env.get('SUPABASE_ANON_KEY')||'',{auth:{persistSession:false,autoRefreshToken:false}})
@@ -67,25 +79,40 @@ Deno.serve(async req=>{
     if(!ticket(body.protocolo))return output(400,{error:'invalid_protocol'})
     if(body.action==='control_status'){
      const rows=await pg.unsafe(
-      "select s.stage,s.expires_at as protocol_expires_at,g.enabled,g.granted_at,g.expires_at as grant_expires_at,g.revoked_at,o.updated_at as last_observation_at from phoenix_one.protocol_agent_state s left join phoenix_one.megabrain_protocol_grants g on g.source_system=s.source_system and g.external_ticket_id=s.external_ticket_id and g.conversation_id=s.conversation_id left join phoenix_one.megabrain_context_observations o on o.source_system=s.source_system and o.external_ticket_id=s.external_ticket_id and o.conversation_id=s.conversation_id where s.source_system='junior_management' and s.external_ticket_id=$1 and s.expires_at>now() limit 1",
+      "select s.stage,s.expires_at as protocol_expires_at,g.enabled,g.agent_read_enabled,g.granted_at,g.expires_at as grant_expires_at,g.revoked_at,o.updated_at as last_observation_at,o.observed_at as observed_at from phoenix_one.protocol_agent_state s left join phoenix_one.megabrain_protocol_grants g on g.source_system=s.source_system and g.external_ticket_id=s.external_ticket_id and g.conversation_id=s.conversation_id left join phoenix_one.megabrain_context_observations o on o.source_system=s.source_system and o.external_ticket_id=s.external_ticket_id and o.conversation_id=s.conversation_id where s.source_system='junior_management' and s.external_ticket_id=$1 and s.expires_at>now() limit 1",
       [body.protocolo]
      )
      if(!rows.length)return output(404,{error:'protocol_not_available'})
      const row=rows[0]
-     return output(200,{version:'megabrain-v21',protocolo:body.protocolo,stage:row.stage,can_authorize:row.stage==='with_agent',active:Boolean(row.enabled&&row.grant_expires_at&&new Date(row.grant_expires_at)>new Date()&&!row.revoked_at&&row.stage==='with_agent'),grant_expires_at:row.grant_expires_at,last_observation_at:row.last_observation_at,mode:'test_only'})
+     const active=Boolean(row.enabled&&row.grant_expires_at&&new Date(row.grant_expires_at)>new Date()&&!row.revoked_at&&row.stage==='with_agent')
+     const freshObservation=Boolean(row.observed_at&&new Date(row.observed_at)>new Date(Date.now()-20*60*1000)&&row.granted_at&&new Date(row.observed_at)>=new Date(new Date(row.granted_at).getTime()-2000))
+     return output(200,{version:'megabrain-v3',protocolo:body.protocolo,stage:row.stage,can_authorize:row.stage==='with_agent',active,read_active:active&&Boolean(row.agent_read_enabled)&&freshObservation,can_authorize_read:active&&freshObservation,grant_expires_at:row.grant_expires_at,last_observation_at:row.last_observation_at,mode:'test_only'})
     }
     if(body.action==='grant'){
      if(body.confirm!=='AUTORIZAR_TESTE')return output(400,{error:'explicit_confirmation_required'})
      const granted=await pg.unsafe(
-      "insert into phoenix_one.megabrain_protocol_grants(source_system,external_ticket_id,conversation_id,enabled,granted_by,granted_at,expires_at,revoked_at) select 'junior_management',s.external_ticket_id,s.conversation_id,true,$2::uuid,now(),least(now()+interval '30 minutes',s.expires_at),null from phoenix_one.protocol_agent_state s where s.source_system='junior_management' and s.external_ticket_id=$1 and s.stage='with_agent' and s.expires_at>now() on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,enabled=true,granted_by=excluded.granted_by,granted_at=excluded.granted_at,expires_at=excluded.expires_at,revoked_at=null,updated_at=now() returning expires_at",
+      "insert into phoenix_one.megabrain_protocol_grants(source_system,external_ticket_id,conversation_id,enabled,agent_read_enabled,granted_by,granted_at,expires_at,revoked_at) select 'junior_management',s.external_ticket_id,s.conversation_id,true,false,$2::uuid,now(),least(now()+interval '30 minutes',s.expires_at),null from phoenix_one.protocol_agent_state s where s.source_system='junior_management' and s.external_ticket_id=$1 and s.stage='with_agent' and s.expires_at>now() on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,enabled=true,agent_read_enabled=false,granted_by=excluded.granted_by,granted_at=excluded.granted_at,expires_at=excluded.expires_at,revoked_at=null,updated_at=now() returning expires_at",
       [body.protocolo,user.id]
      )
      if(!granted.length)return output(409,{error:'protocol_not_eligible'})
      return output(200,{enabled:true,expires_at:granted[0].expires_at,mode:'test_only'})
     }
+    if(body.action==='grant_agent_read'){
+     if(body.confirm!=='AUTORIZAR_LEITURA_IA')return output(400,{error:'explicit_confirmation_required'})
+     const allowed=await pg.unsafe(
+      "update phoenix_one.megabrain_protocol_grants g set agent_read_enabled=true,updated_at=now() from phoenix_one.protocol_agent_state s, phoenix_one.megabrain_context_observations o where g.source_system='junior_management' and g.external_ticket_id=$1 and g.source_system=s.source_system and g.external_ticket_id=s.external_ticket_id and g.conversation_id=s.conversation_id and o.source_system=s.source_system and o.external_ticket_id=s.external_ticket_id and o.conversation_id=s.conversation_id and s.stage='with_agent' and s.expires_at>now() and g.enabled=true and g.revoked_at is null and g.expires_at>now() and o.expires_at>now() and o.observed_at>=g.granted_at-interval '2 seconds' and o.observed_at>=now()-interval '20 minutes' returning g.expires_at",
+      [body.protocolo]
+     )
+     if(!allowed.length)return output(409,{error:'read_not_eligible'})
+     return output(200,{read_enabled:true,expires_at:allowed[0].expires_at})
+    }
+    if(body.action==='revoke_agent_read'){
+     const rows=await pg.unsafe("update phoenix_one.megabrain_protocol_grants set agent_read_enabled=false,updated_at=now() where source_system='junior_management' and external_ticket_id=$1 and agent_read_enabled=true returning external_ticket_id",[body.protocolo])
+     return output(200,{read_enabled:false,revoked:rows.length>0})
+    }
     if(body.action==='revoke'){
      const removed=await pg.unsafe(
-      "update phoenix_one.megabrain_protocol_grants set enabled=false,revoked_at=now(),updated_at=now() where source_system='junior_management' and external_ticket_id=$1 and enabled=true returning external_ticket_id",
+      "update phoenix_one.megabrain_protocol_grants set enabled=false,agent_read_enabled=false,revoked_at=now(),updated_at=now() where source_system='junior_management' and external_ticket_id=$1 and enabled=true returning external_ticket_id",
       [body.protocolo]
      )
      return output(200,{enabled:false,revoked:removed.length>0})

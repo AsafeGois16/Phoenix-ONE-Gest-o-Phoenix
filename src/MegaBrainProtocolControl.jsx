@@ -24,6 +24,7 @@ export default function MegaBrainProtocolControl({session,protocolo}){
   const data=await response.json().catch(()=>null)
   if(!response.ok)throw Error(
    data?.error==='protocol_not_eligible'?'Somente protocolos ativos com agente podem ser autorizados.':
+   data?.error==='read_not_eligible'?'É necessário capturar um contexto recente neste protocolo antes de autorizar a leitura.':
    data?.error==='megabrain_admin_only'?'Esta ação exige acesso administrativo.':
    'Não foi possível concluir a operação. Nenhuma outra função foi alterada.'
   )
@@ -36,6 +37,16 @@ export default function MegaBrainProtocolControl({session,protocolo}){
   finally{setLoading(false)}
  },[request])
  useEffect(()=>{refresh()},[refresh])
+ const changeRead=async(enabled)=>{
+  if(enabled&&!window.confirm('Autorizar Clara e Murilo a consultar SOMENTE categorias inferidas deste protocolo até o vencimento da autorização? Isso não valida identidade nem cobertura. Use apenas um protocolo de homologação.'))return
+  setBusy(true);setError('');setNotice('')
+  try{
+   await request(enabled?'grant_agent_read':'revoke_agent_read',enabled?{confirm:'AUTORIZAR_LEITURA_IA'}:{})
+   await refresh()
+   setNotice(enabled?'Leitura V3 autorizada neste protocolo. Ela expira com a observação e pode ser desativada a qualquer momento.':'Leitura V3 desativada para ambos os agentes neste protocolo.')
+  }catch(e){setError(e.message)}
+  finally{setBusy(false)}
+ }
  const change=async(enabled)=>{
   if(enabled&&!window.confirm('Autorizar a observação SOMENTE deste protocolo por até 30 minutos? Utilize apenas um protocolo de homologação, sem informações reais de clientes.'))return
   setBusy(true);setError('');setNotice('')
@@ -61,6 +72,14 @@ export default function MegaBrainProtocolControl({session,protocolo}){
      {control.active?<><PowerOff size={15}/> Desativar observação deste protocolo</>:<><Power size={15}/> Ativar observação deste protocolo por 30 minutos</>}
     </button>:
     <p className="mbpc-muted">Este protocolo não está mais com um agente ativo. Para segurança, a captura não pode ser iniciada.</p>}
+   {control.active&&<div className="mbpc-reader">
+    <div><strong>MegaBrain V3 — Compartilhar com agentes</strong><p>Clara e Murilo podem recuperar somente assunto, produto e subassunto inferidos. Identidade, apólices e coberturas continuam exigindo validação pelo Junior.</p></div>
+    <span className={'mbpc-pill '+(control.read_active?'on':'off')}>{control.read_active?'Leitura autorizada':'Leitura desligada'}</span>
+    {control.read_active?
+     <button type="button" className="mbpc-action mbpc-stop" disabled={busy||loading} onClick={()=>changeRead(false)}>Desativar leitura para Clara e Murilo</button>:
+     <button type="button" className="mbpc-action mbpc-start" disabled={busy||loading||!control.can_authorize_read} onClick={()=>changeRead(true)}>Ativar leitura para Clara e Murilo</button>}
+    {!control.can_authorize_read&&!control.read_active&&<small>Primeiro registre uma observação recente neste protocolo de teste.</small>}
+   </div>}
    {control.last_observation_at&&<p className="mbpc-muted">Última observação registrada: {formatDate(control.last_observation_at)}</p>}
   </>:null}
   {error&&<p role="alert" className="mbpc-error"><ShieldAlert size={15}/>{error}</p>}
