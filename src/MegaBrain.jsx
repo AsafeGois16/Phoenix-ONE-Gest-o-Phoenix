@@ -1,6 +1,7 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react'
 import {BrainCircuit,RefreshCcw,ShieldCheck,History,ArrowLeftRight,Search,LockKeyhole,Database,Clock3} from 'lucide-react'
 import './megabrain.css'
+import MegaBrainContext from './MegaBrainContext.jsx'
 
 const url=import.meta.env.VITE_SUPABASE_URL
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -50,7 +51,7 @@ export default function MegaBrain({session}){
    <div className="mb-hero-icon"><BrainCircuit size={32}/></div>
    <div className="mb-hero-copy">
     <span className="mb-eyebrow">PHOENIX ONE · INTELIGÊNCIA COMPARTILHADA</span>
-    <h2>MegaBrain <span>V1</span></h2>
+    <h2>MegaBrain <span>V2 · Observação</span></h2>
     <p>Visão unificada do estado dos protocolos entre Clara e Murilo, sem interferir nas respostas, no WhatsApp ou no sistema do Junior.</p>
    </div>
    <div className="mb-hero-badge"><ShieldCheck size={15}/> Somente leitura</div>
@@ -90,6 +91,7 @@ export default function MegaBrain({session}){
      <div><small>Expiração da memória</small><b>{dateLabel(detail.expires_at)}</b></div>
     </div>
     <p>Este painel não confirma a identidade do cliente nem mostra o conteúdo das conversas. O histórico integral permanece sob responsabilidade do Junior.</p>
+    <MegaBrainContext session={session} protocolo={detail.protocolo}/>
    </div>}
    {snapshot&&!error&&<div className="mb-sync"><Clock3 size={14}/> Última consulta: {dateLabel(snapshot.fetched_at)} · até 60 protocolos recentes e não expirados</div>}
   </div>
