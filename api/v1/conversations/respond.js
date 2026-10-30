@@ -5,6 +5,8 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
+import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
+import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
@@ -107,6 +109,9 @@ export default async function handler(req,res){
   if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
   const isClara=payload.agent==='clara',isMurilo=payload.agent==='murilo'
   const seen=Boolean(isClara?saved?.clara_apresentada:isMurilo?saved?.murilo_apresentado:false)
+  // Encaminhamento humano é sempre condicionado ao aceite explícito.
+  // Centralizado aqui para proteger também os fluxos determinísticos.
+  payload=enforceHumanHandoffConsent(payload,body.messages)
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
   if(isClara){
@@ -142,6 +147,12 @@ export default async function handler(req,res){
   console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
   return null
  })
+ // Aceite de transferência pendente em pergunta ANTERIOR já entregue
+ // (não apenas um pedido de transferência proposto pela IA).
+ const confirmed=confirmedOfferHandoff(body.messages)
+ if(confirmed)return replyToJunior(confirmed)
+ const switchDecision=decideMuriloSwitch(body.messages,agent)
+ if(switchDecision)return replyToJunior(switchDecision)
  if(isStandaloneNewRequest(last.text)){
    return replyToJunior({agent:'clara',reply:'Claro! 💙 Como posso ajudar com a sua nova solicitação?',humanHandoff:false,handoff:null})
  }
@@ -205,6 +216,23 @@ export default async function handler(req,res){
     hasExplicitConversationIntent(activeMessages)?(agent==='murilo'?'sales':'service'):'neutral'
   const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:effectiveIntent,suggestedAgent:agent}
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
+  // Cotação do MESMO carro: refazer consulta na gestão só se a identidade
+  // for novamente confirmada para este protocolo; não reutilizar o CPF como
+  // prova, nem copiar apólices/marcas do histórico do outro agente sem validação.
+  const autoReuse=agent==='murilo'&&isSameCarQuote(activeMessages)&&!shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
+  if(autoReuse){
+   const priorDocument=findInboundDocument(activeMessages)
+   if(priorDocument.status==='valid'){
+    const verifiedAuto=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000))
+    if(verifiedAuto.status==='verified'){
+     const summary=summarizeVerifiedAutoForQuote(verifiedAuto.policies)
+     const response=sameCarQuoteReply(summary)
+     if(response)return replyToJunior({agent:'murilo',reply:response,humanHandoff:false,handoff:null})
+    }
+   }
+   // Se a gestão não liberar modelo/ano, nunca inventar esses dados nem
+   // afirmar que a cotação foi iniciada com informações indisponíveis.
+  }
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
   const document=contextNeeded?findInboundDocument(activeMessages):null
   let knowledgeTask=null

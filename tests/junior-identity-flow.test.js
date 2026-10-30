@@ -51,8 +51,9 @@ test('documento recebido gera revisão humana sem contrato v1.1',()=>withMock(as
  }
  const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
  assert.equal(res.code,200);assert.equal(res.body.agent,'clara')
- assert.equal(res.body.humanHandoff,true)
- assert.equal(res.body.handoff.department,'comercial')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/Posso encaminhar/)
  assert.ok(!JSON.stringify(res.body).includes('11144477735'))
  assert.ok(!JSON.stringify(res.body).includes(testCPF))
  assert.deepEqual(calls.map(x=>x.action).sort(),['identity_context','intro_status']) // registro de apresentação sem RAG ou modelo
@@ -147,7 +148,7 @@ test('CNPJ: CEP enviado apenas ao bridge e nova tentativa permitida',()=>withMoc
  assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false);assert.match(res.body.reply,/CEP/)
  assert.ok(called)
 }))
-test('Limite de tentativas gera encaminhamento humano sem dados privados',()=>withMock(async()=>{
+test('Limite de tentativas oferece encaminhamento sem consentimento automático',()=>withMock(async()=>{
  globalThis.fetch=async(url,options)=>{
   const d=JSON.parse(options.body)
   if(d.action==='context')return json({prompt:'Prompt de teste',sources:[]})
@@ -155,7 +156,9 @@ test('Limite de tentativas gera encaminhamento humano sem dados privados',()=>wi
   throw Error('Nao pode consultar OpenAI')
  }
  const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
- assert.equal(res.code,200);assert.equal(res.body.humanHandoff,true)
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/Posso encaminhar/)
  assert.ok(!JSON.stringify(res.body).includes('11144477735'))
 }))
 test('Junior pede validação humana, não nascimento/CEP',()=>withMock(async()=>{
@@ -166,7 +169,8 @@ test('Junior pede validação humana, não nascimento/CEP',()=>withMock(async()=
   throw Error('Nao pode consultar OpenAI')
  }
  const res=response();await handler(request(['Quais seguros eu tenho?',testCPF]),res)
- assert.equal(res.code,200);assert.equal(res.body.humanHandoff,true)
+ assert.equal(res.code,200);assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/Posso encaminhar/)
 }))
 
 
@@ -355,7 +359,7 @@ test('identidade confirmada: listar apenas apólices de Saúde e aguardar seleç
  assert.doesNotMatch(res.body.reply,/Porto Seguro|Odonto/)
  assert.match(res.body.reply,/Qual destes planos de Saúde/)
 }))
-test('seleção após identidade verificada encaminha resumo somente de Saúde',()=>withMock(async()=>{
+test('seleção após identidade verificada pede aceite para encaminhar somente Saúde',()=>withMock(async()=>{
  const set=[{ramo:'Saúde',numero:'AP-1111',seguradora:'Amil'},{ramo:'Odonto',numero:'OD-2222',seguradora:'Porto'},{ramo:'Saúde',numero:'AP-3333',seguradora:'SulAmérica'}]
  globalThis.fetch=async(url,options)=>{
   const d=JSON.parse(options.body)
@@ -368,13 +372,12 @@ test('seleção após identidade verificada encaminha resumo somente de Saúde',
   {direction:'inbound',author:'contact',type:'text',text:'2'})
  const res=response();await handler(input,res)
  assert.equal(res.code,200)
- assert.equal(res.body.humanHandoff,true)
- assert.equal(res.body.handoff.department,'backoffice')
- assert.match(res.body.handoff.summary,/SulAmérica/)
- assert.doesNotMatch(res.body.handoff.summary,/Porto|OD-2222/)
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/Posso encaminhar.*Backoffice/)
  assert.doesNotMatch(res.body.reply,/111\.444\.777-35/)
 }))
-test('sem confirmação da gestão o fluxo encaminha apenas para validação manual',()=>withMock(async()=>{
+test('sem confirmação da gestão oferece validação manual sem transferir automaticamente',()=>withMock(async()=>{
  globalThis.fetch=async(url,options)=>{
   const d=JSON.parse(options.body)
   if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
@@ -383,18 +386,19 @@ test('sem confirmação da gestão o fluxo encaminha apenas para validação man
  }
  const res=response();await handler(request(['Preciso excluir minha filha do plano de saúde',testCPF]),res)
  assert.equal(res.code,200)
- assert.equal(res.body.humanHandoff,true)
- assert.equal(res.body.handoff.department,'backoffice')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
+ assert.match(res.body.reply,/Posso encaminhar.*Backoffice/)
  assert.match(res.body.reply,/não consegui concluir a validação/i)
  assert.doesNotMatch(JSON.stringify(res.body),/11144477735|111\.444\.777-35/)
 }))
-test('Clara encaminha consulta de andamento de movimentação à equipe humana',()=>withMock(async()=>{
+test('Clara pede autorização para encaminhar andamento de movimentação',()=>withMock(async()=>{
  globalThis.fetch=async()=>{throw Error('Não consultar APIs de movimentação não disponíveis')}
  const res=response();await handler(request(['Como está o andamento da minha exclusão?']),res)
  assert.equal(res.code,200)
- assert.equal(res.body.handoff?.department,'backoffice')
- assert.equal(res.body.humanHandoff,true)
- assert.match(res.body.reply,/precisa ser confirmado/i)
+ assert.equal(res.body.handoff,null)
+ assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/Posso encaminhar.*Backoffice/)
 }))
 
 
