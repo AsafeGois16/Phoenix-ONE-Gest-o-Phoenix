@@ -92,6 +92,14 @@ export function dedupeClaraIntroductions(reply,alreadyPresented=false){
  return cleaned.join('\n\n').trim()||'Como posso ajudar?'
 }
 
+/** Remove placeholders técnicos de números mascarados do texto visível ao cliente. */
+export function hideIdentifierPlaceholders(reply){
+ return String(reply??'')
+  .replace(/\s*\|\s*Ap[oó]lice:\s*\[IDENTIFICADOR\]/gi,'')
+  .replace(/Ap[oó]lice\s+\[IDENTIFICADOR\]:/gi,'Coberturas cadastradas:')
+  .replace(/Ap[oó]lice:\s*\[IDENTIFICADOR\]/gi,'Número da apólice não exibido')
+}
+
 export function firstMuriloAppearance(messages,alreadyPresented=false){
  if(alreadyPresented)return false
  const outbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent').map(m=>plain(m.text))
