@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from 'react'
 import {BrainCircuit,ShieldCheck,AlertCircle,RefreshCcw} from 'lucide-react'
 import './megabrain-context.css'
+import MegaBrainProtocolControl from './MegaBrainProtocolControl.jsx'
 
 const url=import.meta.env.VITE_SUPABASE_URL
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -54,6 +55,7 @@ export default function MegaBrainContext({session,protocolo}){
     </div>
     <p className="mbc-muted">Classificação inferida a partir da conversa, não é confirmação de identidade, contrato, procedimento ou execução. Nenhum texto integral ou dado pessoal é armazenado aqui.</p>
    </>}
+  <MegaBrainProtocolControl session={session} protocolo={protocolo}/>
   <div className="mbc-foot"><ShieldCheck size={14}/> Visível apenas a administradores · não influencia as respostas de Clara e Murilo</div>
  </section>
 }
