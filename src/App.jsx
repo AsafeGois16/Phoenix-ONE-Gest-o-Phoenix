@@ -36,10 +36,10 @@ const BASE = {
   audit: []
 }
 const NAV = [
-  {group:'ESPAÇO DE TRABALHO',links:[['dashboard','Visão geral',LayoutDashboard],['agents','Agentes de IA',Bot],['knowledge','Knowledge Hub',BookOpen],['memory','Memória & aprendizado',BrainCircuit],['tickets','Tickets',Ticket]]},
+  {group:'ESPAÇO DE TRABALHO',links:[['dashboard','Visão geral',LayoutDashboard],['agents','Agentes de IA',Bot],['knowledge','Knowledge Hub',BookOpen],['memory','Memória & aprendizado',BrainCircuit],['megabrain','MegaBrain',BrainCircuit],['tickets','Tickets',Ticket]]},
   {group:'INTELIGÊNCIA',links:[['lab','Laboratório RAG',TestTube2],['integrations','Integrações',Network],['architecture','Arquitetura',Layers3]]}
 ]
-const TITLES = {dashboard:['Visão geral','Intelligence workspace'],agents:['Agentes de IA','Personalidade e comportamento'],knowledge:['Knowledge Hub','Biblioteca de conhecimento'],memory:['Memória & aprendizado','Curadoria de experiência operacional'],tickets:['Tickets','Atendimentos e resoluções'],lab:['Laboratório RAG','Recuperação de contexto e testes'],integrations:['Integrações','Conectores e permissões'],architecture:['Arquitetura','Estrutura independente e escalável']}
+const TITLES = {dashboard:['Visão geral','Intelligence workspace'],agents:['Agentes de IA','Personalidade e comportamento'],knowledge:['Knowledge Hub','Biblioteca de conhecimento'],memory:['Memória & aprendizado','Curadoria de experiência operacional'],megabrain:['MegaBrain','Memória de protocolos · Somente leitura'],tickets:['Tickets','Atendimentos e resoluções'],lab:['Laboratório RAG','Recuperação de contexto e testes'],integrations:['Integrações','Conectores e permissões'],architecture:['Arquitetura','Estrutura independente e escalável']}
 const DEFAULT_INTEGRATIONS = [
   {id:'management',name:'Sistema de Gestão Phoenix',detail:'Conector futuro com o sistema do Junior',icon:Database,scope:'Clientes · Contratos · Tickets · Usuários'},
   {id:'whatsapp',name:'4Zapy — no sistema do Junior',detail:'Operado pelo Junior; o Phoenix ONE não acessa o gateway diretamente',icon:MessageCircle,scope:'Somente via API do Junior · Nenhum webhook direto'},
