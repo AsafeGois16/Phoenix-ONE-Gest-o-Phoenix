@@ -164,6 +164,14 @@ Deno.serve(async request=>{
     premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
     capital_segurado:typeof p?.capital_segurado==='number'&&Number.isFinite(p.capital_segurado)&&p.capital_segurado>=0?p.capital_segurado:null,
     status:cleanString(p?.status,45),
+    // Campos opcionais de veículo somente após identity/resolve=verified.
+    // Jamais encaminhar placa, Renavam, chassi ou identificação de terceiros.
+    veiculo:(p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo))?{
+     marca:cleanString(p.veiculo.marca,60),
+     modelo:cleanString(p.veiculo.modelo,60),
+     ano_modelo:(Number.isInteger(p.veiculo.ano_modelo)&&p.veiculo.ano_modelo>=1970&&p.veiculo.ano_modelo<=2100)?p.veiculo.ano_modelo:null,
+     ano_fabricacao:(Number.isInteger(p.veiculo.ano_fabricacao)&&p.veiculo.ano_fabricacao>=1970&&p.veiculo.ano_fabricacao<=2100)?p.veiculo.ano_fabricacao:null
+    }:null,
     coberturas:Array.isArray(p?.coberturas)?p.coberturas.slice(0,30).map(c=>{
      if(typeof c==='string')return {nome:cleanString(c,140),capital_segurado:null,franquia:null}
      if(!c||typeof c!=='object'||Array.isArray(c))return null
