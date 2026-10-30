@@ -6,7 +6,7 @@ import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../serv
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
-import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,isCommercialRequest,ensureClaraIntro,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice']
@@ -45,6 +45,7 @@ const criticalInstructions=[
  'Fase 2 do Junior: o Backoffice é uma fila ativa. Após concluir a triagem de movimentação com verificação do titular e contrato selecionado, encaminhe a essa fila com resumo profissional, sem inventar documentos ou prazos. Em falhas de validação, encaminhe para conferência de identidade e não como movimentação pronta. Você NÃO abre, consulta, altera ou conclui movimentações internas; a gestão do Junior não expõe andamento de solicitações. Se pedirem status interno, explique a limitação e encaminhe ao Backoffice. A rota GET /requirements é apenas PROPOSTA e não está disponível. Não afirme ter consultado regras específicas da operadora enquanto essa API não estiver homologada.',
  'Se humanHandoff=true, forneça handoff com department válido, reason e summary sucintos. O sistema do Junior pausa o agente e efetiva o encaminhamento; não chame ferramentas de transferência diretamente.',
  'Se a consulta documental autorizada já trouxe vencimentos, valores e dados das apólices, responda às perguntas do cliente com esses dados concretos antes de considerar encaminhamento. Não diga que necessita de humano apenas para apresentar detalhes que a API já confirmou. Não invente parcelas ou prometa enviar boletos pela IA.',
+ 'ASSISTÊNCIA AUTO E GUINCHO: uma cobertura ou a quilometragem da assistência registrada na apólice não confirma automaticamente direito ao guincho. Explique a informação cadastrada com precisão e esclareça que condições, elegibilidade, disponibilidade e acionamento precisam ser verificados com a seguradora ou equipe de Auto. Não prometa acionamento. Quando pedirem cobertura exclusiva de Automóvel, não repita apólices de Vida ou outros produtos.',
  'Não prometa que transferiu, encaminhou ou avisou alguém se humanHandoff=false. Se o departamento correto não for identificável, faça uma pergunta breve para esclarecê-lo antes de propor transferência.',
  'REGRA DE CONTINUIDADE: Quando oferecer a opção de encaminhar (por exemplo: "Deseja que eu encaminhe?"), envie humanHandoff=false e handoff=null, permitindo que o cliente responda. Marque humanHandoff=true somente quando o encaminhamento for efetivamente necessário ou solicitado, com resposta afirmativa declarando o encaminhamento. Não pergunte se pode encaminhar e ao mesmo tempo transfira.',
  'Se não há nada a responder, reply pode ser vazio e humanHandoff=false, handoff=null.',
@@ -107,14 +108,17 @@ export default async function handler(req,res){
   const seen=Boolean(isClara?saved?.clara_apresentada:isMurilo?saved?.murilo_apresentado:false)
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
-  if(isClara)reply=ensureClaraIntro(reply,body.messages,seen)
+  if(isClara){
+   reply=ensureClaraIntro(reply,body.messages,seen)
+   reply=dedupeClaraIntroductions(reply,seen||observedAgentIntroductions(body.messages).clara)
+  }
   if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
   // MegaBrain observação OPCIONAL e isolada: desligada por padrão.
   // Não altera a mensagem retornada, os roteamentos nem as operações do Junior.
   if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
    await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
   }
-  return jsonResponse(res,200,{...payload,reply:redact(safeText(reply,1800))})
+  return jsonResponse(res,200,{...payload,reply:hideIdentifierPlaceholders(redact(safeText(reply,1800)))})
  }
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
@@ -260,7 +264,7 @@ export default async function handler(req,res){
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
    if(agent==='clara'&&isVerifiedReadonlyContext(activeMessages)){
      path='verified_overview'
-     const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(activeMessages),maxChars:1770})
+     const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(activeMessages),product:requestedPortfolioProduct(activeMessages),maxChars:1770})
      return replyToJunior({agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
    }
   }

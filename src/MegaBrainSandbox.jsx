@@ -12,9 +12,11 @@ const scenarios={
  inclusao:{name:'Inclusão no plano Saúde',agent:'clara',text:'Quero incluir um dependente no plano de saúde.',reply:'Pode informar o CPF do titular para validação?',humanHandoff:false},
  boleto:{name:'Boleto do Seguro Auto',agent:'clara',text:'Preciso da segunda via do boleto do meu seguro auto.',reply:'Qual é o vencimento que deseja consultar?',humanHandoff:false},
  reembolso:{name:'Reembolso Odontológico',agent:'clara',text:'Quero solicitar reembolso do meu plano odontológico.',reply:'Vou encaminhar para a equipe autorizada.',humanHandoff:true},
+ coberturas:{name:'Coberturas do Seguro Auto',agent:'clara',text:'Quais as coberturas do meu seguro automóvel?',reply:'Vou consultar as coberturas cadastradas na sua apólice.',humanHandoff:false},
+ guincho:{name:'Assistência / guincho',agent:'clara',text:'Eu tenho direito a guincho no meu seguro automóvel?',reply:'A assistência está cadastrada, mas as condições do guincho precisam ser confirmadas. Posso encaminhar sua solicitação?',humanHandoff:false},
  saudacao:{name:'Apenas saudação',agent:'clara',text:'Oi, bom dia!',reply:'Olá! Como posso ajudar?',humanHandoff:false},
 }
-const topicLabels={cotacao:'Cotação',inclusao:'Inclusão',exclusao:'Exclusão',boleto:'Boleto / fatura',reembolso:'Reembolso',sinistro:'Sinistro',rede_credenciada:'Rede credenciada',alteracao_cadastral:'Alteração cadastral',nao_identificado:'Não identificado'}
+const topicLabels={assistencia:'Consulta de assistência',coberturas:'Consulta de coberturas',consulta_apolices:'Consulta de apólices',cotacao:'Cotação',inclusao:'Inclusão',exclusao:'Exclusão',boleto:'Boleto / fatura',reembolso:'Reembolso',sinistro:'Sinistro',rede_credenciada:'Rede credenciada',alteracao_cadastral:'Alteração cadastral',nao_identificado:'Não identificado'}
 const productLabels={vida:'Vida',saude:'Saúde',auto:'Auto',odontologico:'Odontológico',residencial:'Residencial',empresarial:'Empresarial',viagem:'Viagem',nao_identificado:'Não identificado'}
 const stepLabels={validar_titular:'Validar titular',aguardar_cliente:'Aguardar resposta',acompanhar_encaminhamento:'Acompanhar encaminhamento',continuar_atendimento:'Continuar atendimento'}
 const pendingLabels={validacao_pendente:'Validação pendente',resposta_pendente:'Resposta pendente',encaminhamento_proposto:'Encaminhamento proposto',nao_identificada:'Sem pendência identificada'}
@@ -56,6 +58,7 @@ export default function MegaBrainSandbox({onClose}){
    <div className="mbs-result-grid">
     <div><small>Assunto</small><b>{topicLabels[result.topic]||result.topic}</b></div>
     <div><small>Produto</small><b>{productLabels[result.product]||result.product}</b></div>
+    {result.subtopic==='guincho'&&<div><small>Subassunto</small><b>Guincho / reboque</b></div>}
     <div><small>Pendência</small><b>{pendingLabels[result.pending]||result.pending}</b></div>
     <div><small>Próximo passo</small><b>{stepLabels[result.next_step]||result.next_step}</b></div>
    </div>

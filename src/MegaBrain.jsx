@@ -98,7 +98,7 @@ export default function MegaBrain({session}){
      <div><small>Expiração da memória</small><b>{dateLabel(detail.expires_at)}</b></div>
     </div>
     <p>Este painel não confirma a identidade do cliente nem mostra o conteúdo das conversas. O histórico integral permanece sob responsabilidade do Junior.</p>
-    <MegaBrainContext session={session} protocolo={detail.protocolo}/>
+    <MegaBrainContext session={session} protocolo={detail.protocolo} onRefreshProtocol={load}/>
    </div>}
    {snapshot&&!error&&<div className="mb-sync"><Clock3 size={14}/> Última consulta: {dateLabel(snapshot.fetched_at)} · até 60 protocolos recentes e não expirados</div>}
   </div>
