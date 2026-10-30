@@ -492,3 +492,66 @@ test('após retorno, nova movimentação não utiliza o documento anterior',()=>
  assert.match(res.body.reply,/CPF ou CNPJ do titular/)
  assert.equal(calls,1)
 }))
+
+test('cotação Vida com assistência funeral não volta à Clara por memória antiga',()=>withMock(async()=>{
+ let sawModel=false
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')){
+   if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:true})
+   if(d.action==='context')return json({agent:'clara',prompt:'Você é Murilo, SDR comercial.',sources:[]})
+   throw Error('bridge inesperado '+d.action)
+  }
+  if(url.includes('api.openai.com')){
+   sawModel=true
+   return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({
+    reply:'Anotado! Para prosseguir com a cotação, preciso do seu CPF e endereço de correspondência. Pode informar?',
+    humanHandoff:false,handoff:null
+   })}]}]})
+  }
+  throw Error('fetch inesperado')
+ }
+ const res=response()
+ await handler(request(['Quero fazer uma cotação de Seguro de Vida','Indenização por falecimento e assistência funeral familiar']),res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.agent,'murilo')
+ assert.equal(res.body.humanHandoff,false)
+ assert.match(res.body.reply,/valor de proteção/)
+ assert.doesNotMatch(res.body.reply,/CPF|endereço de correspondência/)
+ assert.equal(sawModel,true)
+}))
+test('acionamento funeral existente vai para Clara mesmo com Murilo na memória',()=>withMock(async()=>{
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')){
+   if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:true})
+   if(d.action==='context')return json({agent:'murilo',prompt:'Prompt de teste.',sources:[]})
+  }
+  if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({
+   reply:'Vou orientar o acionamento de assistência funeral pela equipe responsável.',
+   humanHandoff:false,handoff:null
+  })}]}]})
+  throw Error('fetch inesperado')
+ }
+ const res=response()
+ await handler(request(['Quero uma cotação de Vida','Meu familiar faleceu e preciso acionar assistência funeral']),res)
+ assert.equal(res.code,200)
+ assert.equal(res.body.agent,'clara')
+}))
+test('sem identidade verificada, não confirmar identidade por texto da IA',()=>withMock(async()=>{
+ globalThis.fetch=async(url,opts)=>{
+  const d=JSON.parse(opts.body)
+  if(url.includes('phoenix-one-bridge')){
+   if(d.action==='intro_status')return json({clara_apresentada:true,murilo_apresentado:false})
+   if(d.action==='context')return json({prompt:'Prompt geral.',sources:[]})
+  }
+  if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({
+   reply:'Sua identidade foi confirmada. Podemos continuar.',humanHandoff:false,handoff:null
+  })}]}]})
+  throw Error('fetch inesperado')
+ }
+ const res=response();await handler(request(['Quero saber como funciona o seguro de Vida']),res)
+ assert.equal(res.code,200)
+ assert.doesNotMatch(res.body.reply,/identidade foi confirmada/)
+ assert.match(res.body.reply,/validação de identidade.*ainda não foi concluída/)
+}))
