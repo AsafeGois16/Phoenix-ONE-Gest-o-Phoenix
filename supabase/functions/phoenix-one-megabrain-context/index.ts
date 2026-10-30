@@ -45,16 +45,16 @@ Deno.serve(async req=>{
    if(observation.confidence!=='inferido'||observation.source!=='mensagem_cliente'||!Array.isArray(observation.facts)||observation.facts.length>2||observation.facts.some(x=>!enums.facts.includes(x)))return output(400,{error:'invalid_facts'})
    const observed=new Date(observation.observed_at)
    if(Number.isNaN(observed.getTime())||Math.abs(Date.now()-observed.getTime())>180000)return output(400,{error:'stale_observation'})
-   const state=await pg.unsafe("select conversation_id::text as conversation,expires_at,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 and expires_at>now() limit 1",[body.protocolo])
-   // Não assumir identidade nem vincular a um protocolo que não foi verificado.
-   if(!state.length||state[0].conversation.toLowerCase()!==body.conversationId.toLowerCase()||['assigned','resolved'].includes(state[0].stage))return output(409,{error:'protocol_not_observable'})
-   await pg.unsafe(
-    "insert into phoenix_one.megabrain_context_observations(source_system,external_ticket_id,conversation_id,source_agent,topic,product,next_step,pending,facts,observed_at,expires_at) values('junior_management',$1,$2::uuid,$3,$4,$5,$6,$7,$8::text[],$9::timestamptz,least($10::timestamptz,now()+interval '7 days')) on conflict(source_system,external_ticket_id) do update set source_agent=excluded.source_agent,topic=excluded.topic,product=excluded.product,next_step=excluded.next_step,pending=excluded.pending,facts=excluded.facts,observed_at=excluded.observed_at,expires_at=excluded.expires_at,updated_at=now() where phoenix_one.megabrain_context_observations.conversation_id=excluded.conversation_id and phoenix_one.megabrain_context_observations.observed_at<=excluded.observed_at",
-    [body.protocolo,body.conversationId,observation.agent,observation.topic,observation.product,observation.next_step,observation.pending,observation.facts,observed.toISOString(),state[0].expires_at]
+   // FAIL-CLOSED: observar somente após autorização ADMIN ativa para esta conversa.
+   // O INSERT SELECT impede gravação se o protocolo tiver sido encerrado,
+   // transferido, substituído, revogado ou expirado entre chamadas.
+   const writes=await pg.unsafe(
+    "insert into phoenix_one.megabrain_context_observations(source_system,external_ticket_id,conversation_id,source_agent,topic,product,next_step,pending,facts,observed_at,expires_at) select 'junior_management',s.external_ticket_id,s.conversation_id,$3,$4,$5,$6,$7,$8::text[],$9::timestamptz,least(s.expires_at,g.expires_at) from phoenix_one.protocol_agent_state s join phoenix_one.megabrain_protocol_grants g on g.source_system=s.source_system and g.external_ticket_id=s.external_ticket_id and g.conversation_id=s.conversation_id where s.source_system='junior_management' and s.external_ticket_id=$1 and s.conversation_id=$2::uuid and s.stage='with_agent' and s.expires_at>now() and g.enabled=true and g.revoked_at is null and g.expires_at>now() and $9::timestamptz>=g.granted_at-interval '2 seconds' on conflict(source_system,external_ticket_id) do update set source_agent=excluded.source_agent,topic=excluded.topic,product=excluded.product,next_step=excluded.next_step,pending=excluded.pending,facts=excluded.facts,observed_at=excluded.observed_at,expires_at=excluded.expires_at,updated_at=now() where phoenix_one.megabrain_context_observations.conversation_id=excluded.conversation_id and phoenix_one.megabrain_context_observations.observed_at<=excluded.observed_at returning external_ticket_id",
+    [body.protocolo,body.conversationId,observation.agent,observation.topic,observation.product,observation.next_step,observation.pending,observation.facts,observed.toISOString()]
    )
-   return output(200,{accepted:true,mode:'shadow',reply_unchanged:true})
+   return output(200,{accepted:writes.length>0,mode:'shadow',reply_unchanged:true})
   }
-  if(body.action==='snapshot'){
+  if(['grant','revoke','control_status','snapshot'].includes(body.action)){
    if(req.headers.get('origin')!==origin)return output(403,{error:'origin_not_allowed'})
    if(token.length<40)return output(401,{error:'unauthorized'})
    const auth=createClient(Deno.env.get('SUPABASE_URL')||'',Deno.env.get('SUPABASE_ANON_KEY')||'',{auth:{persistSession:false,autoRefreshToken:false}})
@@ -62,6 +62,35 @@ Deno.serve(async req=>{
    if(error||!user)return output(401,{error:'invalid_session'})
    const admins=await pg.unsafe("select role from phoenix_one.admin_users where user_id=$1::uuid",[user.id])
    if(!admins.length||!['owner','admin'].includes(admins[0].role))return output(403,{error:'megabrain_admin_only'})
+   if(body.action!=='snapshot'){
+    if(!ticket(body.protocolo))return output(400,{error:'invalid_protocol'})
+    if(body.action==='control_status'){
+     const rows=await pg.unsafe(
+      "select s.stage,s.expires_at as protocol_expires_at,g.enabled,g.granted_at,g.expires_at as grant_expires_at,g.revoked_at,o.updated_at as last_observation_at from phoenix_one.protocol_agent_state s left join phoenix_one.megabrain_protocol_grants g on g.source_system=s.source_system and g.external_ticket_id=s.external_ticket_id and g.conversation_id=s.conversation_id left join phoenix_one.megabrain_context_observations o on o.source_system=s.source_system and o.external_ticket_id=s.external_ticket_id and o.conversation_id=s.conversation_id where s.source_system='junior_management' and s.external_ticket_id=$1 and s.expires_at>now() limit 1",
+      [body.protocolo]
+     )
+     if(!rows.length)return output(404,{error:'protocol_not_available'})
+     const row=rows[0]
+     return output(200,{version:'megabrain-v21',protocolo:body.protocolo,stage:row.stage,can_authorize:row.stage==='with_agent',active:Boolean(row.enabled&&row.grant_expires_at&&new Date(row.grant_expires_at)>new Date()&&!row.revoked_at&&row.stage==='with_agent'),grant_expires_at:row.grant_expires_at,last_observation_at:row.last_observation_at,mode:'test_only'})
+    }
+    if(body.action==='grant'){
+     if(body.confirm!=='AUTORIZAR_TESTE')return output(400,{error:'explicit_confirmation_required'})
+     const granted=await pg.unsafe(
+      "insert into phoenix_one.megabrain_protocol_grants(source_system,external_ticket_id,conversation_id,enabled,granted_by,granted_at,expires_at,revoked_at) select 'junior_management',s.external_ticket_id,s.conversation_id,true,$2::uuid,now(),least(now()+interval '30 minutes',s.expires_at),null from phoenix_one.protocol_agent_state s where s.source_system='junior_management' and s.external_ticket_id=$1 and s.stage='with_agent' and s.expires_at>now() on conflict(source_system,external_ticket_id) do update set conversation_id=excluded.conversation_id,enabled=true,granted_by=excluded.granted_by,granted_at=excluded.granted_at,expires_at=excluded.expires_at,revoked_at=null,updated_at=now() returning expires_at",
+      [body.protocolo,user.id]
+     )
+     if(!granted.length)return output(409,{error:'protocol_not_eligible'})
+     return output(200,{enabled:true,expires_at:granted[0].expires_at,mode:'test_only'})
+    }
+    if(body.action==='revoke'){
+     const removed=await pg.unsafe(
+      "update phoenix_one.megabrain_protocol_grants set enabled=false,revoked_at=now(),updated_at=now() where source_system='junior_management' and external_ticket_id=$1 and enabled=true returning external_ticket_id",
+      [body.protocolo]
+     )
+     return output(200,{enabled:false,revoked:removed.length>0})
+    }
+   }
+   // snapshot preserves existing response contract.
    const rows=await pg.unsafe(
     "select o.external_ticket_id as protocolo,o.source_agent as agent,o.topic,o.product,o.next_step,o.pending,o.facts,o.confidence,o.source,o.updated_at,o.expires_at from phoenix_one.megabrain_context_observations o join phoenix_one.protocol_agent_state s on s.source_system=o.source_system and s.external_ticket_id=o.external_ticket_id and s.conversation_id=o.conversation_id where o.expires_at>now() and s.expires_at>now() order by o.updated_at desc limit 60"
    )
