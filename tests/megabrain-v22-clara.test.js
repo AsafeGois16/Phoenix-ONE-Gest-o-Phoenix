@@ -41,6 +41,12 @@ test('consulta sobre guincho não é pedido de acionamento',()=>{
  assert.equal(isReadonlyConsultation('Eu tenho direito a guincho?'),true)
  assert.equal(portfolioFocus([msg('Eu tenho direito a guincho?')]),'assistance')
 })
+test('pedido posterior para ver todos os seguros não fica preso ao ramo Auto',()=>{
+ const history=[msg('Quero conhecer as coberturas do meu seguro auto'),msg('Agora quero consultar meus seguros')]
+ assert.equal(requestedPortfolioProduct(history),null)
+ const guincho=[msg('Quero consultar seguro de vida'),msg('Eu tenho direito a guincho?')]
+ assert.equal(requestedPortfolioProduct(guincho),'auto')
+})
 test('resumo de Automóvel não repete apólices de Vida',()=>{
  const history=[msg('Quais seguros eu tenho?'),msg('Me diga as coberturas do meu seguro automóvel')]
  assert.equal(requestedPortfolioProduct(history),'auto')
