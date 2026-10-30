@@ -1,4 +1,5 @@
 import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
+import {shadowObserveMegaBrain} from '../../../server/megabrain-observation.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
@@ -108,6 +109,11 @@ export default async function handler(req,res){
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
   if(isClara)reply=ensureClaraIntro(reply,body.messages,seen)
   if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
+  // MegaBrain observação OPCIONAL e isolada: desligada por padrão.
+  // Não altera a mensagem retornada, os roteamentos nem as operações do Junior.
+  if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
+   await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
+  }
   return jsonResponse(res,200,{...payload,reply:redact(safeText(reply,1800))})
  }
  if(body.mode==='desligado'){
