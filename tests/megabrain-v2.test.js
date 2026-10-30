@@ -37,8 +37,9 @@ test('MegaBrain shadow mode stays off without opt-in flag',async()=>{
 test('MegaBrain server verifies protocol, strict categorical input and staff role',()=>{
  const edge=text('supabase/functions/phoenix-one-megabrain-context/index.ts')
  assert.match(edge,/await isBridgeToken\(token\)/)
- assert.match(edge,/body\.conversationId\.toLowerCase\(\)/)
- assert.match(edge,/protocol_not_observable/)
+ assert.match(edge,/s\.conversation_id=\$2::uuid/)
+ assert.match(edge,/g\.enabled=true/)
+ assert.match(edge,/g\.expires_at>now\(\)/)
  assert.match(edge,/enums\[field\]\.includes\(value\)/)
  assert.match(edge,/!\['owner','admin'\]\.includes/)
  assert.match(edge,/from phoenix_one\.protocol_agent_state/)
