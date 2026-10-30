@@ -29,7 +29,7 @@ const movementKind=text=>{
  if(!t||t.length>4000)return null
  // Incluir COBERTURA na cotação é assunto comercial, não movimentação
  // de beneficiário. Vale para todos os ramos (Vida, Saúde, Auto etc.).
- const isQuote=/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|contratar|contratacao|novo seguro)\b/.test(t)
+ const isQuote=/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta|contratar|contratacao|novo seguro)\b/.test(t)
  const isQuoteScope=/\b(?:cobertura|assistencia|indenizacao|protecao|seguro|plano)\b/.test(t)
  if(isQuote&&isQuoteScope)return null
  if(/\b(?:como funciona|quais documentos|documentacao necessaria|qual o prazo|quanto tempo|tenho uma duvida|gostaria de saber|queria saber|como fazer|pode me explicar)\b/.test(t))return null
