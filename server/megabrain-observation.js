@@ -6,6 +6,9 @@
  */
 const topics=[
  ['cotacao',/\b(cota(?:ção|cao|r|ções|coes)|orçamento|orcamento|proposta|contratar|quero seguro|preço de seguro)\b/i],
+ ['assistencia',/\b(guincho|reboque|assist[eê]ncia(?:\s+auto|\s+24\s*h(?:oras)?)?)\b/i],
+ ['coberturas',/\b(coberturas?|franquias?|capital segurado|o que (?:meu seguro|a ap[oó]lice) cobre)\b/i],
+ ['consulta_apolices',/\b(consultar meus seguros|consultar minhas ap[oó]lices|quais seguros|meus seguros|minhas ap[oó]lices|ver (?:minhas|meus) ap[oó]lices)\b/i],
  ['inclusao',/\b(inclus(?:ão|ao)|incluir|adicionar dependente|cadastrar benefici[aá]rio)\b/i],
  ['exclusao',/\b(exclus(?:ão|ao)|excluir|retirar dependente|cancelar benefici[aá]rio)\b/i],
  ['boleto',/\b(boleto|segunda via|2ª via|fatura|vencimento|parcela)\b/i],
@@ -32,6 +35,7 @@ export function buildMegaBrainObservation({messages,reply='',agent='clara',human
  const recent=texts.slice(-4).reverse()
  const topic=recent.flatMap(t=>topics.filter(([,rx])=>rx.test(t)).map(([name])=>name))[0]||'nao_identificado'
  const product=recent.flatMap(t=>products.filter(([,rx])=>rx.test(t)).map(([name])=>name))[0]||'nao_identificado'
+ const subtopic=recent.some(t=>/\b(?:guincho|reboque)\b/i.test(t))?'guincho':'nao_identificado'
  const hasContext=topic!=='nao_identificado'||product!=='nao_identificado'
  if(!hasContext)return null // saudações não criam resumos artificiais
  const waitingIdentity=/\b(CPF|CNPJ|validar.*identidade|identifica(?:ção|cao) do titular)\b/i.test(reply)
@@ -41,7 +45,7 @@ export function buildMegaBrainObservation({messages,reply='',agent='clara',human
  const facts=[]
  if(topic!=='nao_identificado')facts.push('assunto_identificado')
  if(product!=='nao_identificado')facts.push('produto_mencionado')
- return {agent,topic,product,next_step,pending,facts,confidence:'inferido',source:'mensagem_cliente',observed_at:new Date().toISOString()}
+ return {agent,topic,subtopic,product,next_step,pending,facts,confidence:'inferido',source:'mensagem_cliente',observed_at:new Date().toISOString()}
 }
 /**
  * Captura passiva totalmente opt-in por variável de ambiente.
