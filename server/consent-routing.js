@@ -38,7 +38,9 @@ export function enforceHumanHandoffConsent(payload,messages){
  const label={patrimonio:'Atendimento Auto e Patrimonial',beneficios:'Benefícios',backoffice:'Backoffice',comercial:'Comercial'}[department]||'atendimento'
  const source=String(payload.reply||'')
  const issue=/\b(?:n[aã]o consegui|n[aã]o foi poss[ií]vel|indispon[ií]vel|sem identifica[cç][aã]o|n[aã]o localizei)\b/i.test(source)
- const prefix=issue?'Não consegui concluir essa etapa com segurança. ':'' 
+ const initial=source.split(/(?<=[.!?])\s+/)[0]||''
+ const prefix=issue&&/\b(?:n[aã]o consegui|n[aã]o foi poss[ií]vel|indispon[ií]vel)\b/i.test(initial)?initial.slice(0,180).trim()+' ':''
+
  return {...payload,reply:prefix+'Posso encaminhar você à equipe de '+label+' para continuar o atendimento?',humanHandoff:false,handoff:null,consentPending:true}
 }
 /**
