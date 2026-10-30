@@ -109,6 +109,9 @@ export default async function handler(req,res){
   if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
   const isClara=payload.agent==='clara',isMurilo=payload.agent==='murilo'
   const seen=Boolean(isClara?saved?.clara_apresentada:isMurilo?saved?.murilo_apresentado:false)
+  // Encaminhamento humano é sempre condicionado ao aceite explícito.
+  // Centralizado aqui para proteger também os fluxos determinísticos.
+  payload=enforceHumanHandoffConsent(payload,body.messages)
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
   if(isClara){
@@ -116,9 +119,6 @@ export default async function handler(req,res){
    reply=dedupeClaraIntroductions(reply,seen||observedAgentIntroductions(body.messages).clara)
   }
   if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
-  // Encaminhamento humano é sempre condicionado ao aceite explícito.
-  // Centralizado aqui para proteger também os fluxos determinísticos.
-  payload=enforceHumanHandoffConsent(payload,body.messages)
   // MegaBrain observação OPCIONAL e isolada: desligada por padrão.
   // Não altera a mensagem retornada, os roteamentos nem as operações do Junior.
   if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
