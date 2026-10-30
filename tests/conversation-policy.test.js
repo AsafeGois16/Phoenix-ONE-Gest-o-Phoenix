@@ -197,3 +197,34 @@ test('Clara e Murilo têm memória de apresentações independentes',async()=>{
  assert.equal(ensureMuriloIntro('O imóvel é uma casa ou apartamento?',[], 'Quero cotar seguro residencial',true),'O imóvel é uma casa ou apartamento?')
  assert.equal(omitRepeatedAgentIntroduction('Olá! Sou o Murilo, do time comercial da Phoenix Insurance. Você prefere casa ou apartamento?','murilo',true),'Você prefere casa ou apartamento?')
 })
+
+test('regressão 20261030-0003: mensagem do modelo "Sou Clara" não recebe segunda apresentação',async()=>{
+ const {ensureClaraIntro,observedAgentIntroductions,containsAgentIntroduction}=await import('../server/conversation-policy.js')
+ const model='Olá! Sou Clara, assistente virtual da Phoenix Insurance. Em que posso ajudar você hoje?'
+ const result=ensureClaraIntro(model,[c('Oi')],false)
+ assert.equal(result,model)
+ assert.equal((result.match(/\bSou (?:a )?Clara\b/gi)||[]).length,1)
+ assert.equal(containsAgentIntroduction(model,'clara'),true)
+ const observed=observedAgentIntroductions([a(model)])
+ assert.equal(observed.clara,true)
+})
+test('apresentação sem artigo é lembrada em mensagens futuras, também para Murilo',async()=>{
+ const {ensureClaraIntro,ensureMuriloIntro,firstMuriloAppearance,observedAgentIntroductions}=await import('../server/conversation-policy.js')
+ const history=[a('Olá! Sou Clara, assistente virtual da Phoenix Insurance.')]
+ assert.equal(ensureClaraIntro('Qual é sua solicitação?',history,false),'Qual é sua solicitação?')
+ const mHist=[a('Prazer, sou Murilo, da equipe comercial Phoenix.')]
+ assert.equal(firstMuriloAppearance(mHist,false),false)
+ assert.equal(ensureMuriloIntro('Qual seguro deseja cotar?',mHist,'Quero cotar Vida',false),'Qual seguro deseja cotar?')
+ assert.deepEqual(observedAgentIntroductions([...history,...mHist]),{clara:true,murilo:true})
+})
+test('servidor remove reapresentação gerada em protocolo que já foi apresentado, com e sem artigo',async()=>{
+ const {omitRepeatedAgentIntroduction}=await import('../server/conversation-policy.js')
+ for(const [agent,replies,expected] of [
+  ['clara',['Olá! Sou Clara, assistente virtual da Phoenix Insurance. Como posso ajudar?','Olá! Sou a Clara, da Phoenix Insurance. Como posso ajudar?'],'Como posso ajudar?'],
+  ['murilo',['Olá! Sou Murilo, do comercial da Phoenix Insurance. Qual seguro deseja contratar?','Olá! Sou o Murilo, do comercial da Phoenix Insurance. Qual seguro deseja contratar?'],'Qual seguro deseja contratar?']
+ ]){
+  for(const reply of replies){
+   assert.equal(omitRepeatedAgentIntroduction(reply,agent,true),expected,reply)
+  }
+ }
+})
