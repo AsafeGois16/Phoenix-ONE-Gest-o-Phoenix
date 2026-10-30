@@ -11,7 +11,7 @@ function fold(text) {
 const SERVICE_PATTERNS=[
   /\b(?:2\s*(?:a|via|vida)|segunda|segunda\s*via|segunda\s*vida)\s*(?:via\s*)?(?:do\s*)?(?:boleto|fatura|parcela|pagamento)?\b/,
   /\b(?:boleto|fatura|vencimento|parcela|pagamento|cobranca|debito|nota fiscal|quitacao|inadimplencia|segunda via|2a via|2 via)\b/,
-  /\b(?:carteirinha|reembolso|sinistro|assistencia|emergencia|autorizacao|cirurgia|guia|beneficiario|dependente|exclusao|excluir|inclusao|incluir|movimentacao|cancelamento|cancelar|alteracao|atualizar dados|atualizacao cadastral)\b/,
+  /\b(?:carteirinha|reembolso|sinistro|emergencia|autorizacao|cirurgia|guia|beneficiario|dependente|exclusao|excluir|inclusao|incluir|movimentacao|cancelamento|cancelar|alteracao|atualizar dados|atualizacao cadastral)\b/,
   /\b(?:minha apolice|meu contrato|minha cobertura|meu plano|minha seguradora|meu seguro|seguro que tenho|sou cliente|ja sou cliente|sou segurado|tenho um plano|quais seguros|meus seguros|minhas apolices|quais apolices)\b/,
   /\b(?:nao recebi|nao consigo acessar|preciso de ajuda com|problema no atendimento|acompanhar meu pedido|quero falar com atendente)\b/
 ]
@@ -24,8 +24,18 @@ const SALES_PATTERNS=[
 function intent(text){
  const value=fold(text)
  if(!value)return 'neutral'
- if(SERVICE_PATTERNS.some(p=>p.test(value)))return 'service'
+ // Solicitações operacionais inequívocas prevalecem até em mensagens mistas.
+ const operational=/\b(?:boleto|fatura|parcela|pagamento|reembolso|carteirinha|negativa|autorizacao|cirurgia|emergencia|inadimplencia|segunda via)\b/.test(value)||
+   /\b(?:acionar|acione|preciso acionar|solicitar acionamento|abrir sinistro|sofri|faleceu|veio a falecer|preciso de guincho)\b.{0,90}\b(?:assistencia|sinistro|seguro|funeral|guincho|falecimento)\b/.test(value)||
+   /\b(?:preciso de assistencia|assistencia urgente|socorro agora)\b/.test(value)
+ if(operational)return 'service'
+ // Uma cobertura mencionada em cotação continua sendo assunto do comercial.
+ // Serve para todos os produtos: Vida, Auto, Saúde, Residencial, Viagem etc.
  if(SALES_PATTERNS.some(p=>p.test(value)))return 'sales'
+ if(/\b(?:assistencia|indenizacao|cobertura)\b/.test(value)&&
+    /\b(?:funeral|falecimento|invalidez|24 horas|24h|na cotacao|na proposta)\b/.test(value))
+   return 'neutral'
+ if(SERVICE_PATTERNS.some(p=>p.test(value)))return 'service'
  return 'neutral'
 }
 export function selectConversationAgent(body) {
@@ -48,5 +58,10 @@ export function selectConversationAgent(body) {
 
  // Contato desconhecido/lead e agent_hint "murilo" não são prova de venda.
  return 'clara'
+}
+export function hasExplicitConversationIntent(messages){
+ return (Array.isArray(messages)?messages:[])
+  .filter(m=>m?.direction==='inbound'&&m.author==='contact'&&typeof m.text==='string')
+  .slice(-12).some(m=>intent(m.text)!=='neutral')
 }
 export function classifyConversationIntent(message){return intent(message)}
