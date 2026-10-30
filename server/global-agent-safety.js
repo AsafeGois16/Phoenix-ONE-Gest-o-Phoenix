@@ -29,12 +29,12 @@ export function refineCommercialReply(reply,messages,agent){
    /\b(?:pode|preciso|informe|informar|envie|enviar|passe|qual|mande|compartilhe|solicito|necessario)\b/.test(normalized)
  if(!requestsSensitive)return text
  // O time humano poderá coletar os dados quando necessários, em fluxo seguro.
- return 'Vamos seguir por etapas, sem solicitar documentos ou endereço completo nesta simulação. '+fallbackQuestion(messages)
+ return 'Podemos avançar por etapas, sem antecipar a documentação nesta simulação. '+fallbackQuestion(messages)
 }
 export function refineUnverifiedIdentityClaim(reply,verified=false){
  const text=String(reply||'')
  if(!text||verified)return text
- const positive=/\b(?:sua identidade (?:foi |esta )?(?:confirmada|validada|verificada)|identidade confirmada|identidade validada|seus dados foram validados|dados cadastrais confirmados)\b/i
+ const positive=/\b(?:sua identidade (?:foi |est[aá] )?(?:confirmada|validada|verificada)|identidade confirmada|identidade validada|seus dados foram validados|dados cadastrais confirmados)\b/i
  if(!positive.test(fold(text)))return text
  return text.replace(positive,'Recebi suas informações, mas a validação de identidade pelo sistema ainda não foi concluída')
 }
