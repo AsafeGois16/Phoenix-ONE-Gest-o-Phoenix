@@ -6,7 +6,7 @@ import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../serv
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
-import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
+import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice']
@@ -118,7 +118,7 @@ export default async function handler(req,res){
   if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
    await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
   }
-  return jsonResponse(res,200,{...payload,reply:redact(safeText(reply,1800))})
+  return jsonResponse(res,200,{...payload,reply:hideIdentifierPlaceholders(redact(safeText(reply,1800)))})
  }
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
