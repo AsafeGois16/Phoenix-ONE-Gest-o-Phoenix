@@ -7,6 +7,7 @@ Aplicam-se a todos os seguros e serviços da Phoenix Insurance. O Phoenix ONE de
 - **Clara:** suporte, apólices existentes, parcelas, boleto, sinistros, emergências, reclamações, inclusões/exclusões e demais movimentações.
 - **Murilo:** cotação, contratação, renovação comercial, escolha de coberturas e qualificação de oportunidades.
 - Decidir pela mensagem **e pelo histórico**, nunca por palavra isolada. "Assistência funeral familiar" e "indenização por falecimento" durante cotação de Vida são coberturas e mantêm Murilo.
+- **Inclusão de cobertura na cotação não é inclusão de beneficiário:** frases como “quero incluir assistência funeral na cotação de Vida” ou “adicionar cobertura à proposta de Saúde” devem seguir Murilo, sem abrir triagem de CPF/Backoffice. Uma movimentação de contrato já existente continua com Clara.
 - "Preciso acionar assistência funeral, meu familiar faleceu" é uma solicitação operacional e deve ficar com Clara.
 - A intenção explícita ou inferida do histórico enviado ao bridge Supabase tem precedência sobre estado antigo de agente; contexto RAG e prompt devem corresponder à intenção atual.
 
