@@ -186,7 +186,13 @@ export default async function handler(req,res){
  let resultStatus='completed'
  let handoffRequested=false
  try{
-  const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:classifyConversationIntent(last.text),suggestedAgent:agent}
+  // A escolha de coberturas costuma ser uma resposta neutra do cliente.
+  // O bridge deve receber a intenção efetiva do histórico (e não somente
+  // a palavra solta da última mensagem), para carregar o prompt do Murilo.
+  const lastIntent=classifyConversationIntent(last.text)
+  const effectiveIntent=lastIntent!=='neutral'?lastIntent:
+    hasExplicitConversationIntent(activeMessages)?(agent==='murilo'?'sales':'service'):'neutral'
+  const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:effectiveIntent,suggestedAgent:agent}
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
   const document=contextNeeded?findInboundDocument(activeMessages):null
