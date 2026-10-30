@@ -24,8 +24,18 @@ const SALES_PATTERNS=[
 function intent(text){
  const value=fold(text)
  if(!value)return 'neutral'
- if(SERVICE_PATTERNS.some(p=>p.test(value)))return 'service'
+ // Solicitações operacionais inequívocas prevalecem até em mensagens mistas.
+ const operational=/\b(?:boleto|fatura|parcela|pagamento|reembolso|carteirinha|negativa|autorizacao|cirurgia|emergencia|inadimplencia|segunda via)\b/.test(value)||
+   /\b(?:acionar|acione|preciso acionar|solicitar acionamento|abrir sinistro|sofri|faleceu|veio a falecer|preciso de guincho)\b.{0,90}\b(?:assistencia|sinistro|seguro|funeral|guincho|falecimento)\b/.test(value)||
+   /\b(?:preciso de assistencia|assistencia urgente|socorro agora)\b/.test(value)
+ if(operational)return 'service'
+ // Uma cobertura mencionada em cotação continua sendo assunto do comercial.
+ // Serve para todos os produtos: Vida, Auto, Saúde, Residencial, Viagem etc.
  if(SALES_PATTERNS.some(p=>p.test(value)))return 'sales'
+ if(/\b(?:assistencia|indenizacao|cobertura)\b/.test(value)&&
+    /\b(?:funeral|falecimento|invalidez|24 horas|24h|na cotacao|na proposta)\b/.test(value))
+   return 'neutral'
+ if(SERVICE_PATTERNS.some(p=>p.test(value)))return 'service'
  return 'neutral'
 }
 export function selectConversationAgent(body) {
@@ -48,5 +58,10 @@ export function selectConversationAgent(body) {
 
  // Contato desconhecido/lead e agent_hint "murilo" não são prova de venda.
  return 'clara'
+}
+export function hasExplicitConversationIntent(messages){
+ return (Array.isArray(messages)?messages:[])
+  .filter(m=>m?.direction==='inbound'&&m.author==='contact'&&typeof m.text==='string')
+  .slice(-12).some(m=>intent(m.text)!=='neutral')
 }
 export function classifyConversationIntent(message){return intent(message)}
