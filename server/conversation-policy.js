@@ -168,6 +168,10 @@ export function requestedPortfolioProduct(messages){
  for(const item of inbound){
   const t=plain(item.text)
   if(/\b(?:cpf|cnpj)\b/.test(t)||/^\s*[\d./\s-]{8,25}$/.test(t))continue
+  // Pedido de carteira completa nunca é limitado por uma menção anterior
+  // a Auto, Vida ou outro ramo.
+  if(/\b(?:quais seguros|meus seguros|todos os seguros|todas as apolices|consultar meus seguros|lista completa de seguros)\b/.test(t))return null
+  if(/\b(?:guincho|reboque)\b/.test(t))return 'auto'
   if(/\b(?:seguro|apolice|cobertura|franquia|guincho|reboque|assistencia)\b/.test(t)){
    const detected=insuranceProduct(t)
    if(detected)return detected
