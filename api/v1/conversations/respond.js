@@ -1,6 +1,7 @@
 import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
-import {selectConversationAgent,classifyConversationIntent} from '../../../server/agent-routing.js'
+import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
+import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
@@ -47,6 +48,11 @@ const criticalInstructions=[
  'REGRA DE CONTINUIDADE: Quando oferecer a opção de encaminhar (por exemplo: "Deseja que eu encaminhe?"), envie humanHandoff=false e handoff=null, permitindo que o cliente responda. Marque humanHandoff=true somente quando o encaminhamento for efetivamente necessário ou solicitado, com resposta afirmativa declarando o encaminhamento. Não pergunte se pode encaminhar e ao mesmo tempo transfira.',
  'Se não há nada a responder, reply pode ser vazio e humanHandoff=false, handoff=null.',
  'O sistema pode fornecer continuidade operacional por protocolo: agente anterior, intenção e etapa sem dados pessoais. Não interprete memória operacional como prova de titularidade nem como autorização de dados privados.',
+ 'REGRA GLOBAL PARA TODOS OS PRODUTOS: identifique primeiro a intenção da conversa inteira. Cobertura de assistência funeral, indenização por falecimento, assistência 24 horas, invalidez e outras proteções citadas em uma cotação pertencem ao Murilo; acionamento de assistência, sinistro ou emergência real pertencem à Clara. Uma palavra isolada como assistência NÃO justifica troca de agente.',
+ 'DURANTE COTAÇÃO: Murilo conduz a qualificação progressiva de Vida, Saúde, Odonto, Auto, Frota, Residencial, Empresarial, Viagem, Pet, Bike e demais ramos. Utilize informações já fornecidas e faça uma pergunta principal por mensagem. Evite repetir idade, profissão, nome e objetivos que já estejam no histórico.',
+ 'DADOS PESSOAIS: na simulação inicial não peça CPF, CNPJ, foto de documento, endereço residencial completo nem data de nascimento para autenticação. Quando a etapa contratual de uma proposta exigir dados adicionais, explique a finalidade e encaminhe a um fluxo seguro da equipe; idade aproximada e cidade podem ser suficientes para qualificação preliminar quando pertinentes.',
+ 'VALIDAÇÃO HONESTA: nome, documento ou data de nascimento digitados pelo cliente não confirmam identidade. Só diga identidade validada quando a API do Junior efetivamente retornar status verified para o protocolo. Nunca use o contexto de vendas para consultar apólices privadas sem autorização.',
+ 'TRANSFERÊNCIA CLARA-MURILO: mudança entre agentes depende de alteração real da intenção; escolher coberturas durante cotação mantém Murilo. Atendimento humano só é acionado quando necessário e com resumo, sem assumir que o ticket foi transferido antes de retorno do sistema.',
  'Nunca afirme que tem acesso ao histórico além das mensagens fornecidas.'
 ].join('\n')
 function outputText(payload){
@@ -254,7 +260,7 @@ export default async function handler(req,res){
   if(resultKnowledge.error)throw resultKnowledge.error
   const knowledge=resultKnowledge.data
   // Intenção explícita tem prioridade; na continuidade neutra o estado preservado por protocolo decide.
-  if((knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
+  if(!hasExplicitConversationIntent(activeMessages)&&(knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
     agent=knowledge.agent
     console.info('phoenix_agent_orchestration',JSON.stringify({event:'agent_continuity',agent}))
   }
@@ -299,6 +305,9 @@ export default async function handler(req,res){
   if(initialSalesHandoff){
     decision={...decision,reply:/residencial/i.test(last.text)?'Vou te ajudar com essa cotação. O imóvel é casa ou apartamento e em qual cidade está localizado?':'Vou te ajudar com essa cotação. Qual tipo de seguro deseja contratar e qual é a sua principal necessidade?',humanHandoff:false,handoff:null}
   }
+  // Regras de segurança no servidor sobrepõem uma resposta inadequada do modelo.
+  // A triagem comercial vale para TODOS os ramos, não apenas Residencial ou Vida.
+  decision={...decision,reply:refineUnverifiedIdentityClaim(refineCommercialReply(decision.reply,activeMessages,agent),Boolean(management))}
   const normalizedDecision=normalizeHandoffDecision(decision,DEPARTMENTS)
   const handoff=normalizedDecision.handoff
   const item=handoff&&DEPARTMENTS.includes(handoff.department)?{
