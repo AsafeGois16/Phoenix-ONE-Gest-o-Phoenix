@@ -57,6 +57,7 @@ export function decideMuriloSwitch(messages,selectedAgent){
  const heardClara=messages.some(m=>m?.author==='agent'&&m?.direction==='outbound'&&/\b(?:sou (?:a )?clara|clara, (?:assistente|concierge)|aqui [eé] clara)\b/i.test(fold(m.text)))
  const heardMurilo=messages.some(m=>m?.author==='agent'&&m?.direction==='outbound'&&/\b(?:sou (?:o )?murilo|murilo, do time comercial|aqui [eé] (?:o )?murilo)\b/i.test(fold(m.text)))
  if(!heardClara||heardMurilo)return null
+ if(/\b(?:quero|pode|me passa|me transfere|falar com)\b.{0,75}\bmurilo\b/i.test(fold(text)))return null // pedido explícito já é autorização
  if(offerMurilo(outbound)){
   if(yes.test(fold(text)))return null
   if(no.test(fold(text)))return {agent:'clara',reply:'Sem problemas, continuamos por aqui. Posso esclarecer dúvidas gerais sobre seguros sem encaminhar você para outro agente.',humanHandoff:false,handoff:null}
