@@ -6,7 +6,7 @@
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const recentOutbound=messages=>(Array.isArray(messages)?messages:[]).slice(0,-1).reverse().find(m=>m?.author==='agent'&&m?.direction==='outbound'&&typeof m.text==='string')?.text||''
 const lastText=messages=>String(Array.isArray(messages)?messages.at(-1)?.text||'':'')
-const yes=/^(?:sim|s|claro|claro que sim|pode|pode sim|pode encaminhar|pode transferir|por favor|quero|quero sim|ok|okay|tudo bem|beleza|confirmo|autorizo|pode ser|ta bom|tá bom|com certeza)[.! ]*$/i
+const yes=/^(?:sim|s|sim[,. ]+pode|sim[,. ]+por favor|claro|claro que sim|pode|pode sim|pode encaminhar|pode transferir|por favor|quero|quero sim|ok|okay|tudo bem|beleza|confirmo|autorizo|pode ser|ta bom|tá bom|com certeza)[.! ]*$/i
 const no=/^(?:nao|não|nao obrigado|não obrigada|nao quero|não quero|prefiro nao|prefiro não|agora nao|agora não)[.! ]*$/i
 const offerHuman=msg=>/\b(?:posso|deseja|quer|gostaria|poderia|confirma)\b.{0,140}\b(?:encaminhar|direcionar|transferir|passar|falar com|contato com)\b.{0,120}\b(?:equipe|atendimento|setor|departamento|especialista|colaborador|consultor|humano|backoffice)\b/i.test(fold(msg)) ||
  /\b(?:posso|deseja|quer|gostaria|poderia|confirma)\b.{0,90}\b(?:encaminhar|transferir)\b/i.test(fold(msg))
@@ -36,6 +36,9 @@ export function enforceHumanHandoffConsent(payload,messages){
  if(isHumanHandoffConfirmed(messages))return payload
  const department=payload.handoff.department
  const label={patrimonio:'Atendimento Auto e Patrimonial',beneficios:'Benefícios',backoffice:'Backoffice',comercial:'Comercial'}[department]||'atendimento'
+ if(no.test(fold(lastText(messages)))&&offerHuman(recentOutbound(messages))){
+  return {...payload,reply:'Tudo bem, não farei o encaminhamento. Podemos continuar por aqui. Em que mais posso ajudar?',humanHandoff:false,handoff:null,consentPending:false}
+ }
  const source=String(payload.reply||'')
  const issue=/\b(?:n[aã]o consegui|n[aã]o foi poss[ií]vel|indispon[ií]vel|sem identifica[cç][aã]o|n[aã]o localizei)\b/i.test(source)
  const initial=source.split(/(?<=[.!?])\s+/)[0]||''
