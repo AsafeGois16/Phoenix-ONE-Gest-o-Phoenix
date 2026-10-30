@@ -2,6 +2,7 @@ import React,{useCallback,useEffect,useMemo,useState} from 'react'
 import {BrainCircuit,RefreshCcw,ShieldCheck,History,ArrowLeftRight,Search,LockKeyhole,Database,Clock3} from 'lucide-react'
 import './megabrain.css'
 import MegaBrainContext from './MegaBrainContext.jsx'
+import MegaBrainSandbox from './MegaBrainSandbox.jsx'
 
 const url=import.meta.env.VITE_SUPABASE_URL
 const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
@@ -26,6 +27,7 @@ export default function MegaBrain({session}){
  const [agent,setAgent]=useState('all')
  const [search,setSearch]=useState('')
  const [selected,setSelected]=useState(null)
+ const [testMode,setTestMode]=useState(false)
  const load=useCallback(async()=>{
   if(!session?.access_token||!endpoint){setError('Sessão ou conexão não disponível.');setLoading(false);return}
   setLoading(true);setError('')
@@ -56,6 +58,11 @@ export default function MegaBrain({session}){
    </div>
    <div className="mb-hero-badge"><ShieldCheck size={15}/> Somente leitura</div>
   </section>
+  <div className="mb-test-controls">
+   <div><strong>Homologação do MegaBrain</strong><p>Execute casos fictícios antes de liberar qualquer observação de atendimentos reais.</p></div>
+   <button type="button" className="mb-test-toggle" onClick={()=>setTestMode(x=>!x)} aria-expanded={testMode}>{testMode?'Encerrar modo de teste':'Ativar modo de teste'}</button>
+  </div>
+  {testMode&&<MegaBrainSandbox onClose={()=>setTestMode(false)}/>}
   <div className="mb-metrics">
    <Metric Icon={Database} label="Protocolos válidos" value={snapshot?.counts?.total}/>
    <Metric Icon={BrainCircuit} label="Com agente" value={snapshot?.counts?.with_agent}/>
