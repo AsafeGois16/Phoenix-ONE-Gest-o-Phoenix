@@ -1,5 +1,16 @@
 /** Somente regras de conversação; não persiste dados pessoais. */
 const plain=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+/**
+ * Identificação robusta de apresentações. O modelo pode dizer "Sou Clara"
+ * ou "Sou a Clara"; ambas são apresentação, inclusive quando o texto do
+ * histórico já não está na janela recente. Não depende de pontuação ou caixa.
+ */
+export function containsAgentIntroduction(text,agent){
+ const normalized=plain(text)
+ if(agent==='clara')return /\b(?:sou (?:a )?clara|aqui e (?:a )?clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(normalized)
+ if(agent==='murilo')return /\b(?:sou (?:o )?murilo|aqui e (?:o )?murilo|me chamo murilo|meu nome e murilo|murilo aqui)\b/.test(normalized)
+ return false
+}
 const customerTexts=messages=>(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='inbound'&&m.author==='contact').map(m=>String(m.text||''))
 export function isCommercialRequest(text){
  return /\b(cot(ar|acao)|orcamento|simul(acao|ar)|proposta comercial|quero contratar|quero comprar|quanto custa (?:um|o) seguro)\b/.test(plain(text))
@@ -28,8 +39,7 @@ export function ensureClaraIntro(reply,messages,alreadyPresented=false){
  const history=Array.isArray(messages)?messages:[]
  const hasClaraIntroduction=observedAgentIntroductions(history).clara
  if(alreadyPresented||hasClaraIntroduction)return content
- const normalized=plain(content)
- if(/\b(?:sou a clara|aqui e a clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(normalized))return content
+ if(containsAgentIntroduction(content,'clara'))return content
  const introduction='Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance. 💙\n\n'
  return (introduction+content).slice(0,1800)
 }
@@ -41,8 +51,8 @@ export function ensureClaraIntro(reply,messages,alreadyPresented=false){
 export function observedAgentIntroductions(messages){
  const texts=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string').map(m=>plain(m.text))
  return {
-  clara:texts.some(t=>/\b(?:sou a clara|aqui e a clara|me chamo clara|meu nome e clara|clara aqui)\b/.test(t)),
-  murilo:texts.some(t=>/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|meu nome e murilo|murilo aqui)\b/.test(t))
+  clara:texts.some(t=>containsAgentIntroduction(t,'clara')),
+  murilo:texts.some(t=>containsAgentIntroduction(t,'murilo'))
  }
 }
 /** Remove redundant self-introduction at the start of a generated response,
@@ -53,7 +63,7 @@ export function omitRepeatedAgentIntroduction(reply,agent,alreadyPresented=false
  if(!content||!alreadyPresented)return content
  const named=agent==='clara'?'clara':agent==='murilo'?'murilo':null
  if(!named)return content
- const expression=new RegExp("^(?:ol[aá][!,. ]*|bom dia[!,. ]*|boa tarde[!,. ]*|boa noite[!,. ]*)?(?:sou (?:a|o) "+named+"|aqui [eé] (?:a|o) "+named+"|me chamo "+named+"|meu nome [eé] "+named+")[^.!?\\n]{0,95}[.!?]?\\s*","i")
+ const expression=new RegExp("^(?:ol[aá][!,. ]*|bom dia[!,. ]*|boa tarde[!,. ]*|boa noite[!,. ]*)?(?:sou (?:(?:a|o) )?"+named+"|aqui [eé] (?:(?:a|o) )?"+named+"|me chamo "+named+"|meu nome [eé] "+named+")[^.!?\\n]{0,95}[.!?]?\\s*","i")
  const stripped=content.replace(expression,'').trim()
  return stripped||'Como posso ajudar?'
 }
@@ -61,7 +71,7 @@ export function omitRepeatedAgentIntroduction(reply,agent,alreadyPresented=false
 export function firstMuriloAppearance(messages,alreadyPresented=false){
  if(alreadyPresented)return false
  const outbound=(Array.isArray(messages)?messages:[]).filter(m=>m?.direction==='outbound'&&m.author==='agent').map(m=>plain(m.text))
- return !outbound.some(t=>/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(t))
+ return !outbound.some(t=>containsAgentIntroduction(t,'murilo'))
 }
 /**
  * Primeira cotação residencial: a abertura deve ser progressiva. O endereço
@@ -87,7 +97,7 @@ export function ensureMuriloIntro(reply,messages,customerText='',alreadyPresente
  const first=firstMuriloAppearance(messages,alreadyPresented)
  if(!first)return content
  const candidate=refineMuriloFirstResidentialReply(content,customerText,first)
- if(/\b(?:sou o murilo|aqui e o murilo|me chamo murilo|murilo aqui|meu nome e murilo)\b/.test(plain(candidate)))return candidate
+ if(containsAgentIntroduction(candidate,'murilo'))return candidate
  const sales= /\b(?:cotacao|cotar|contratar|orcamento|seguro)\b/.test(plain(customerText))
  const intro='Olá! Sou o Murilo, do time comercial da Phoenix Insurance. '
  const connector=sales && !/\b(?:vou te ajudar|ajudo voce|vamos comecar)\b/.test(plain(candidate))?'Vou te ajudar com essa cotação. ':''
