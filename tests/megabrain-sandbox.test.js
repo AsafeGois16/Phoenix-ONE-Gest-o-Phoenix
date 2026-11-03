@@ -8,8 +8,8 @@ const run=(text,agent='clara',reply='Como posso ajudar?',humanHandoff=false)=>bu
 
 test('MegaBrain safe test button is part of the existing authenticated panel',()=>{
  const v=read('src/MegaBrain.jsx')
- assert.match(v,/Ativar modo de teste/)
- assert.match(v,/Encerrar modo de teste/)
+ assert.match(v,/Abrir laboratório de QA/)
+ assert.match(v,/Fechar laboratório/)
  assert.match(v,/<MegaBrainSandbox onClose=/)
  assert.ok(v.includes('setTestMode(x=>!x)'))
 })
