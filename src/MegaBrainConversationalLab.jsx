@@ -32,7 +32,7 @@ export default function MegaBrainConversationalLab({session}){
    if(!messages)throw Error('conversation_too_large')
    const result=await fetch('/api/phoenix-answer',{method:'POST',cache:'no-store',headers:{
     Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'
-   },body:JSON.stringify({agent:current.agent,messages})})
+   },body:JSON.stringify({agent:current.agent,messages,qaMode:'v42'})})
    const payload=await result.json().catch(()=>({error:'answer_unavailable'}))
    if(!result.ok||typeof payload.answer!=='string'||!payload.answer.trim())throw Error(payload.error||'answer_unavailable')
    const evaluation=assessConversationQaAnswer({scenarioId:selected.id,turnIndex:rows.length,
