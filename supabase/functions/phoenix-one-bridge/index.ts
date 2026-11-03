@@ -150,7 +150,7 @@ Deno.serve(async request=>{
    let junior
    try{const raw=await response.text();if(raw.length>128000)return reply(200,{status:'unavailable'});junior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
    // Não revelar diferenças internas de documento: status apenas para fluxo do agente.
-   const allowed=new Set(['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches'])
+   const allowed=new Set(['verification_required','verification_expired','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches'])
    let status=junior?.status
    if(response.status===429)status='too_many_attempts'
    if(response.status===404)status='protocol_not_open'
@@ -204,7 +204,12 @@ Deno.serve(async request=>{
       typeof junior.expires_at==='string'&&Date.parse(junior.expires_at)>Date.now()&&Array.isArray(junior.field_scopes)
    if(v4&&!validV4)return reply(200,{status:'unavailable'})
 
-   const policies=conn[0].granted_scopes.includes('policies:read')&&Array.isArray(junior.policies)?junior.policies.slice(0,12).map(p=>({
+   const rawPolicies=Array.isArray(junior.policies)?junior.policies:[]
+   // Defense in depth: quote never leaks a full portfolio if the
+   // management system accidentally ignores its product_code filter.
+   const limitedPolicies=v4&&purpose==='quote'?
+    rawPolicies.filter(p=>productCode?p?.product_code===productCode:p?.numero===policyNumber):rawPolicies
+   const policies=conn[0].granted_scopes.includes('policies:read')?limitedPolicies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
     premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
