@@ -87,7 +87,7 @@ test('Clara RAG: leaves Murilo model answer entirely unchanged',()=>{
 test('Clara RAG: does not claim actions on any generic lab request',()=>{
  const r=guard('Já transferi o seu pedido e enviaremos o boleto.',[u('Preciso falar com atendimento')])
  assert.equal(r.applied,true)
- assert.match(r.answer,/não consigo transferir conversas/)
+ assert.match(r.answer,/nem posso executar consultas, transferências ou solicitações/)
  assert.doesNotMatch(r.answer,/Já transferi|enviaremos/)
 })
 test('Clara RAG: server endpoint and UI disclose the guard without ever returning raw blocked text',()=>{
