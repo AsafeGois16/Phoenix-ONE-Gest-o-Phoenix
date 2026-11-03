@@ -41,25 +41,28 @@ function vehicle(v){
 function fleet(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null
  // Multiple insured vehicles are NEVER automatically narrowed to the first.
- const items=Array.isArray(raw.items)?raw.items.slice(0,50).map(v=>({
-  item_ref:code(v?.item_ref),numero_item:count(v?.numero_item),
+ const sourceItems=Array.isArray(raw.itens)?raw.itens:Array.isArray(raw.items)?raw.items:[]
+ const items=sourceItems.slice(0,50).map(v=>({
+  item_ref:code(v?.item_ref),numero_item:count(v?.item??v?.numero_item),
   marca_modelo:brief(v?.marca_modelo,80),ano_modelo:year(v?.ano_modelo)
  })).filter(nonempty):[]
- const total=count(raw.quantidade_itens_ativos)
+ const total=count(raw.quantidade??raw.quantidade_itens_ativos)
  return total!==null||items.length?{quantidade_itens_ativos:total,items}:null
 }
 function property(raw,scope,purpose){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null
- const d={tipo_ocupacao:brief(raw.tipo_ocupacao),atividade_risco:brief(raw.atividade_risco)}
+ const d={tipo_ocupacao:brief(raw.tipo_ocupacao),atividade_risco:brief(raw.atividade??raw.atividade_risco)}
  if(scope.includes('profile.location')&&['quote','assistance'].includes(purpose)){
   d.cidade_uf=typeof raw.cidade_uf==='string'&&/^[\p{L}\p{M} .'-]{2,65}\/[A-Z]{2}$/u.test(raw.cidade_uf)?raw.cidade_uf:null
   d.cep_prefixo=typeof raw.cep_prefixo==='string'&&/^\d{5}$/.test(raw.cep_prefixo)?raw.cep_prefixo:null
  }
  return nonempty(d)?d:null
 }
-function insured(raw){
+function insured(raw,scopes,purpose){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null
  const d={capital_segurado:numeric(raw.capital_segurado,1e12)}
+ if(purpose==='quote'&&scopes.includes('profile.age_band')&&typeof raw.faixa_etaria==='string'&&
+  /^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(raw.faixa_etaria)&&raw.faixa_etaria.length<=20)d.faixa_etaria=raw.faixa_etaria
  return nonempty(d)?d:null
 }
 function benefits(raw){
@@ -67,8 +70,8 @@ function benefits(raw){
  const d={
   operadora:brief(raw.operadora,75),modalidade:brief(raw.modalidade,75),
   mes_reajuste:month(raw.mes_reajuste),
-  quantidade_vidas:count(raw.quantidade_vidas),
-  plano_titular:brief(raw.plano_titular,75)
+  quantidade_vidas:count(raw.vidas??raw.quantidade_vidas),
+  plano_titular:brief(raw.plano??raw.plano_titular,75)
  }
  return nonempty(d)?d:null
 }
@@ -87,7 +90,7 @@ export function sanitizeV41Risk(policy,scopes,purpose){
  const value=rule.kind==='vehicle'?vehicle(risk.vehicle):
   rule.kind==='fleet'?fleet(risk.fleet):
   rule.kind==='property'?property(risk.property,scopes,purpose):
-  rule.kind==='insured_person'?insured(risk.insured_person):
+  rule.kind==='insured_person'?insured(risk.insured_person,scopes,purpose):
   rule.kind==='benefits'?benefits(risk.benefits):null
  return value?{[rule.kind]:value}:null
 }
@@ -155,7 +158,7 @@ export function replyV41VerifiedQuote(summary,verifiedProfile=null){
  }
  // Only the explicitly scoped, quote-purpose coarse age BAND may be
  // repeated, never date of birth or a calculated exact age.
- const age=verifiedProfile?.faixa_etaria
+ const age=verifiedProfile?.faixa_etaria??r.insured_person?.faixa_etaria
  const band=['vida','ap','saude','odonto'].includes(summary.product)&&typeof age==='string'&&
   /^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(age)?' A faixa etária autorizada é '+age+'.':''
  if(sentence)return 'Claro! Podemos cotar seu '+label+' em outras condições.'+band+' '+sentence
