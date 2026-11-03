@@ -282,8 +282,14 @@ Deno.serve(async request=>{
    const rawPolicies=Array.isArray(junior.policies)?junior.policies:[]
    // Defense in depth: quote never leaks a full portfolio if the
    // management system accidentally ignores its product_code filter.
+   // Junior's ORIGINAL phase-2 JSON returns both "auto" and "frota"
+   // for product_code=auto. Allow the associated fleet only when the
+   // corresponding risk.frota.read permission is explicitly granted.
+   const quoteAllowed=p=>policyNumber?p?.numero===policyNumber:
+    p?.product_code===productCode||
+     (productCode==='auto'&&p?.product_code==='frota'&&scopes.includes('risk.frota.read'))
    const limitedPolicies=v4&&purpose==='quote'?
-    rawPolicies.filter(p=>productCode?p?.product_code===productCode:p?.numero===policyNumber):rawPolicies
+    rawPolicies.filter(quoteAllowed):rawPolicies
    const policies=conn[0].granted_scopes.includes('policies:read')&&(!v4||scopes.includes('policies.read'))?limitedPolicies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
