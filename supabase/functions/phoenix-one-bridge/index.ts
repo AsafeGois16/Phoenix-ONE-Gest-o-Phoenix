@@ -228,17 +228,18 @@ Deno.serve(async request=>{
     let payload=null
     if(kind==='vehicle')payload=safeVehicle(risk)
     if(kind==='fleet'){
-     const items=Array.isArray(raw.items)?raw.items.slice(0,50).map(item=>({
+     const sourceItems=Array.isArray(raw.itens)?raw.itens:Array.isArray(raw.items)?raw.items:[]
+     const items=sourceItems.slice(0,50).map(item=>({
       item_ref:typeof item?.item_ref==='string'&&/^[a-zA-Z0-9_-]{1,28}$/.test(item.item_ref)?item.item_ref:null,
-      numero_item:nItems(item?.numero_item),
+      numero_item:nItems(item?.item??item?.numero_item),
       marca_modelo:limitedLabel(item?.marca_modelo),
       ano_modelo:modelYear(item?.ano_modelo)
      })).filter(i=>Object.values(i).some(v=>v!==null)):[]
-     const total=nItems(raw.quantidade_itens_ativos)
+     const total=nItems(raw.quantidade??raw.quantidade_itens_ativos)
      if(items.length||total!==null)payload={fleet:{quantidade_itens_ativos:total,items}}
     }
     if(kind==='property'){
-     const prop={tipo_ocupacao:limitedLabel(raw.tipo_ocupacao),atividade_risco:limitedLabel(raw.atividade_risco)}
+     const prop={tipo_ocupacao:limitedLabel(raw.tipo_ocupacao),atividade_risco:limitedLabel(raw.atividade??raw.atividade_risco)}
      if(scopes.includes('profile.location')&&['quote','assistance'].includes(purpose)){
       prop.cidade_uf=typeof raw.cidade_uf==='string'&&/^[\p{L}\p{M} .'-]{2,65}\/[A-Z]{2}$/u.test(raw.cidade_uf)?raw.cidade_uf:null
       prop.cep_prefixo=typeof raw.cep_prefixo==='string'&&/^\d{5}$/.test(raw.cep_prefixo)?raw.cep_prefixo:null
@@ -247,13 +248,16 @@ Deno.serve(async request=>{
     }
     if(kind==='insured_person'){
      const insured={capital_segurado:amount(raw.capital_segurado)}
-     if(insured.capital_segurado!==null)payload={insured_person:insured}
+     if(purpose==='quote'&&scopes.includes('profile.age_band')&&typeof raw.faixa_etaria==='string'&&
+       /^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(raw.faixa_etaria)&&raw.faixa_etaria.length<=20)
+      insured.faixa_etaria=raw.faixa_etaria
+     if(Object.values(insured).some(v=>v!==null))payload={insured_person:insured}
     }
     if(kind==='benefits'){
      const benefits={
       operadora:limitedLabel(raw.operadora),modalidade:limitedLabel(raw.modalidade),
       mes_reajuste:Number.isInteger(raw.mes_reajuste)&&raw.mes_reajuste>=1&&raw.mes_reajuste<=12?raw.mes_reajuste:null,
-      quantidade_vidas:nItems(raw.quantidade_vidas),plano_titular:limitedLabel(raw.plano_titular)
+      quantidade_vidas:nItems(raw.vidas??raw.quantidade_vidas),plano_titular:limitedLabel(raw.plano??raw.plano_titular)
      }
      if(Object.values(benefits).some(v=>v!==null))payload={benefits}
     }
