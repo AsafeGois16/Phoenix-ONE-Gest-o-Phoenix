@@ -217,8 +217,11 @@ Deno.serve(async request=>{
     status:cleanString(p?.status,45),
     // Campos opcionais de veículo somente após identity/resolve=verified.
     // Jamais encaminhar placa, Renavam, chassi ou identificação de terceiros.
-    product_code:v4&&allowedProducts.includes(p?.product_code)?p.product_code:null,
-    risk_summary:v4&&canRisk?safeVehicle(p?.risk_summary):null,
+    // Preserve the EXACT V1 response when V4 is not explicitly enabled.
+    ...(v4?{
+     product_code:allowedProducts.includes(p?.product_code)?p.product_code:null,
+     risk_summary:canRisk?safeVehicle(p?.risk_summary):null
+    }:{}),
     veiculo:(p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo))?{
      marca:cleanString(p.veiculo.marca,60),
      modelo:cleanString(p.veiculo.modelo,60),
