@@ -26,7 +26,7 @@ O PDF informa que `verification_ref` é retornado por `/identity/resolve`, mas *
 - a gestão do Junior deverá incluir opcionalmente a referência válida no **corpo server-to-server autenticado** de `POST /api/v1/conversations/respond`, sob a propriedade `verification_ref`, apenas no mesmo protocolo e conversa; **nunca em `messages` ou no WhatsApp**; **OU**
 - acordaremos, em etapa separada, um cofre temporário criptografado e auditável de referências, com revogação imediata por fechamento/reabertura.
 
-Precisamos confirmar a **forma exata de `field_scopes`**, o esquema de `policies[].risk_summary.vehicle`, o escopo de documentos em `quote` e o comportamento de token expirado lendo o arquivo `contrato-fase2.openapi.yaml` do Junior. Os campos usados nos testes são **fixtures fictícios**, não a prova de compatibilidade com o JSON real.
+Recebemos as **impressões em PDF** de `contrato-fase2.openapi.yaml` e `exemplos-resumo-verificado.json` em 03/11/2026. Os nomes de `field_scopes`, o formato de `risk_summary.vehicle`, as datas e a resposta `verification_expired` foram conferidos visualmente e alinhados aos testes. Ainda precisamos dos **arquivos YAML e JSON originais** para validação automatizada do schema e de definição do transporte server-to-server de `verification_ref` para cada nova mensagem. Ver `docs/megabrain-v4-compatibilidade-openapi-20261103.md`.
 
 ## Critérios de aceite conjuntos
 
