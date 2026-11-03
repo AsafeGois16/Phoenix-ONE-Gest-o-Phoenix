@@ -76,7 +76,7 @@ test('UI runs only on explicit user action using current secure RAG lab; no writ
  const parent=read('src/MegaBrain.jsx')
  assert.ok(ui.includes("fetch('/api/phoenix-answer'"))
  assert.ok(ui.includes("Authorization:'Bearer '+session.access_token"))
- assert.ok(ui.includes("body:JSON.stringify({agent:current.agent,messages})"))
+ assert.ok(ui.includes("body:JSON.stringify({agent:current.agent,messages,qaMode:'v42'})"))
  assert.ok(ui.includes('onClick={execute}'))
  assert.ok(ui.includes('Aprovar resposta'))
  assert.ok(ui.includes('Precisa revisão'))
