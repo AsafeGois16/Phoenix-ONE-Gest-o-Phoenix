@@ -126,6 +126,31 @@ export function assessConversationQaAnswer({scenarioId,turnIndex,answer,agent,pr
   notes.push('Murilo pode não ter se apresentado na primeira resposta desta sessão.')
  return {notes,needsReview:notes.length>0,checks:1}
 }
+export const CONVERSATION_QA_ISSUES=Object.freeze([
+ {code:'introduction',label:'Apresentação incorreta ou repetida'},
+ {code:'consent',label:'Não pediu ou não respeitou a autorização'},
+ {code:'handoff',label:'Encaminhamento ou troca de agente incorreta'},
+ {code:'repeated_question',label:'Repetiu pergunta ou ignorou dado informado'},
+ {code:'incorrect_guidance',label:'Orientação incorreta ou incompleta'},
+ {code:'unsupported_claim',label:'Inventou dados, cobertura ou ação realizada'},
+ {code:'privacy',label:'Solicitou ou revelou dados indevidos'},
+ {code:'off_topic',label:'Não compreendeu o pedido ou produto'},
+ {code:'tone',label:'Tom ou linguagem inadequados'},
+ {code:'other',label:'Outro motivo'}
+])
+const reviewLabel=code=>CONVERSATION_QA_ISSUES.find(x=>x.code===code)?.label||'Motivo não informado'
+/** Clean reviewer notes before local TXT export, without exporting chat texts. */
+export function safeQaReviewNote(value){
+ if(typeof value!=='string')return ''
+ return value.slice(0,220)
+  .replace(/[\r\n\t]+/g,' ')
+  .replace(/https?:\/\/\S+/gi,'[link omitido]')
+  .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g,'[email omitido]')
+  .replace(/\b(?:\d[\s.()-]?){6,}\b/g,'[número omitido]')
+  .replace(/[\u0000-\u001f]/g,' ')
+  .trim()
+}
+
 export function conversationQaOverview(rows){
  const results=Array.isArray(rows)?rows.filter(x=>x&&typeof x.answer==='string'):[]
  const reviewed=results.filter(x=>x.review==='approved'||x.review==='revise')
@@ -153,6 +178,11 @@ export function conversationalQaReportText(rows,scenario){
   if(!r?.answer)continue
   lines.push('Turno '+(r.turnIndex+1)+' · '+(r.agent==='murilo'?'Murilo':'Clara')+
    ' · '+(r.review==='approved'?'APROVADO PELA PESSOA':r.review==='revise'?'REVISAR':'PENDENTE DE REVISÃO'))
+  if(r.review==='revise'){
+   lines.push('  Motivo informado pela revisão humana: '+reviewLabel(r.issue))
+   const note=safeQaReviewNote(r.reviewNote)
+   if(note)lines.push('  Observação resumida: '+note)
+  }
   for(const flag of r.flags||[])lines.push('  Alerta: '+flag)
  }
  lines.push('','Este resultado não equivale a homologação de atendimento real, validação de identidade ou prova de qualidade factual das respostas.')

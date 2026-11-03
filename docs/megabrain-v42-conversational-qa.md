@@ -17,8 +17,8 @@ As outras abas continuam:
 2. Escolha um cenário fictício (Clara Saúde, boletos, guincho, privacidade; Murilo residencial, Vida, Frota; passagem simulada ou recusa).
 3. Confira a mensagem preparada e clique **Gerar resposta do próximo turno**. **Cada clique é uma chamada separada** à API OpenAI, podendo gerar custo e latência.
 4. Leia a resposta do modelo e o critério de avaliação. Os alertas heurísticos NÃO significam erro confirmado; ausência de alerta NÃO significa aprovação.
-5. Clique **Aprovar resposta** ou **Precisa revisão** em cada turno. Depois gere o próximo.
-6. Clique **Baixar avaliação TXT** para registrar os status, o agente, o cenário e os alertas. O relatório **não inclui o conteúdo das respostas nem trechos de documentos**.
+5. Clique **Aprovar resposta** ou **Precisa revisão** em cada turno. Ao escolher **Precisa revisão**, selecione obrigatoriamente o **motivo principal** (apresentação, consentimento, transferência, pergunta repetida, orientação incompleta, informação inventada, privacidade, assunto, tom ou outro). Opcionalmente, escreva observação objetiva de até 220 caracteres **sem dados de clientes**.
+6. Clique **Baixar avaliação TXT** para registrar os status, motivos de reprovação, observações curtas e alertas. Não é possível exportar enquanto uma resposta reprovada estiver sem motivo. O relatório **não inclui o conteúdo integral das respostas nem trechos de documentos**.
 
 ## Quais cenários
 Nove conversas, cada uma com três turnos, com **dados estritamente fictícios**:
@@ -51,7 +51,7 @@ A API **/api/phoenix-answer**:
 - Não alterar PHOENIX_ONE_V4_VERIFIED_CONTEXT: continua OFF.
 - Controle de acesso usa o token da sessão existente; o token não é gravado em arquivo, state persistente nem relatório.
 - Verificações de conteúdo são executadas no navegador; dados do teste só ficam na memória do React durante a sessão.
-- O relatório local não exporta respostas geradas, fontes RAG, tokens, documentos ou mensagens.
+- O relatório local não exporta respostas geradas, fontes RAG, tokens, documentos ou mensagens. Exporta a categoria e a observação do revisor somente quando a resposta for marcada para revisão; URLs, e-mails e sequências numéricas longas são reduzidos/omitidos, mas revisão humana permanece necessária para evitar dados sensíveis na observação.
 - A conferência real dos agentes via WhatsApp/Junior, persistência de contexto e proteção de dados autenticados deve acontecer **somente em homologação conjunta**.
 
 ## Arquivos
@@ -59,3 +59,9 @@ A API **/api/phoenix-answer**:
 - src/MegaBrainConversationalLab.jsx + CSS: UI autenticada com execução a pedido e revisão por turno.
 - src/MegaBrainSandbox.jsx e src/MegaBrain.jsx: integração não destrutiva.
 - tests/megabrain-conversational-qa.test.js: cenários, seguranças e testes de não persistência.
+
+## Análise da primeira execução de teste (03/11/2026)
+- Clara · dados sem identidade: 3 respostas aprovadas pela pessoa.
+- Murilo · cotação residencial: 2 aprovadas e 1 marcada para revisão (turno 3).
+- Clara → Murilo · passagem simulada: 0 aprovadas e 3 marcadas para revisão (todos os turnos).
+- **4 reprovações humanas sem alertas heurísticos.** Os TXT anteriores só exibiam status, não motivo ou conteúdo. Esta alteração permite registrar as justificativas, sem modificar prompts de produção. Os relatórios antigos não permitem inferir o conteúdo incorreto e não devem ser considerados diagnósticos específicos.
