@@ -228,17 +228,18 @@ Deno.serve(async request=>{
     let payload=null
     if(kind==='vehicle')payload=safeVehicle(risk)
     if(kind==='fleet'){
-     const items=Array.isArray(raw.items)?raw.items.slice(0,50).map(item=>({
+     const sourceItems=Array.isArray(raw.itens)?raw.itens:Array.isArray(raw.items)?raw.items:[]
+     const items=sourceItems.slice(0,50).map(item=>({
       item_ref:typeof item?.item_ref==='string'&&/^[a-zA-Z0-9_-]{1,28}$/.test(item.item_ref)?item.item_ref:null,
-      numero_item:nItems(item?.numero_item),
+      numero_item:nItems(item?.item??item?.numero_item),
       marca_modelo:limitedLabel(item?.marca_modelo),
       ano_modelo:modelYear(item?.ano_modelo)
-     })).filter(i=>Object.values(i).some(v=>v!==null)):[]
-     const total=nItems(raw.quantidade_itens_ativos)
+     })).filter(i=>Object.values(i).some(v=>v!==null))
+     const total=nItems(raw.quantidade??raw.quantidade_itens_ativos)
      if(items.length||total!==null)payload={fleet:{quantidade_itens_ativos:total,items}}
     }
     if(kind==='property'){
-     const prop={tipo_ocupacao:limitedLabel(raw.tipo_ocupacao),atividade_risco:limitedLabel(raw.atividade_risco)}
+     const prop={tipo_ocupacao:limitedLabel(raw.tipo_ocupacao),atividade_risco:limitedLabel(raw.atividade??raw.atividade_risco)}
      if(scopes.includes('profile.location')&&['quote','assistance'].includes(purpose)){
       prop.cidade_uf=typeof raw.cidade_uf==='string'&&/^[\p{L}\p{M} .'-]{2,65}\/[A-Z]{2}$/u.test(raw.cidade_uf)?raw.cidade_uf:null
       prop.cep_prefixo=typeof raw.cep_prefixo==='string'&&/^\d{5}$/.test(raw.cep_prefixo)?raw.cep_prefixo:null
@@ -247,13 +248,16 @@ Deno.serve(async request=>{
     }
     if(kind==='insured_person'){
      const insured={capital_segurado:amount(raw.capital_segurado)}
-     if(insured.capital_segurado!==null)payload={insured_person:insured}
+     if(purpose==='quote'&&scopes.includes('profile.age_band')&&typeof raw.faixa_etaria==='string'&&
+       /^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(raw.faixa_etaria)&&raw.faixa_etaria.length<=20)
+      insured.faixa_etaria=raw.faixa_etaria
+     if(Object.values(insured).some(v=>v!==null))payload={insured_person:insured}
     }
     if(kind==='benefits'){
      const benefits={
       operadora:limitedLabel(raw.operadora),modalidade:limitedLabel(raw.modalidade),
       mes_reajuste:Number.isInteger(raw.mes_reajuste)&&raw.mes_reajuste>=1&&raw.mes_reajuste<=12?raw.mes_reajuste:null,
-      quantidade_vidas:nItems(raw.quantidade_vidas),plano_titular:limitedLabel(raw.plano_titular)
+      quantidade_vidas:nItems(raw.vidas??raw.quantidade_vidas),plano_titular:limitedLabel(raw.plano??raw.plano_titular)
      }
      if(Object.values(benefits).some(v=>v!==null))payload={benefits}
     }
@@ -278,8 +282,14 @@ Deno.serve(async request=>{
    const rawPolicies=Array.isArray(junior.policies)?junior.policies:[]
    // Defense in depth: quote never leaks a full portfolio if the
    // management system accidentally ignores its product_code filter.
+   // Junior's ORIGINAL phase-2 JSON returns both "auto" and "frota"
+   // for product_code=auto. Allow the associated fleet only when the
+   // corresponding risk.frota.read permission is explicitly granted.
+   const quoteAllowed=p=>policyNumber?p?.numero===policyNumber:
+    p?.product_code===productCode||
+     (productCode==='auto'&&p?.product_code==='frota'&&scopes.includes('risk.frota.read'))
    const limitedPolicies=v4&&purpose==='quote'?
-    rawPolicies.filter(p=>productCode?p?.product_code===productCode:p?.numero===policyNumber):rawPolicies
+    rawPolicies.filter(quoteAllowed):rawPolicies
    const policies=conn[0].granted_scopes.includes('policies:read')&&(!v4||scopes.includes('policies.read'))?limitedPolicies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
