@@ -4,7 +4,6 @@ import {readFileSync} from 'node:fs'
 import {parseVerifiedProfile,safeV4Timestamp,v4VerifiedSummary,sanitizeV4AutoRisk,validProductCode} from '../server/v4-verified-context.js'
 import {summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../server/auto-quote-continuity.js'
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8')
-const date5=value=>value.replace(/\.([0-9]{3})(Z|[+-]\d\d:\d\d)$/,'$&').replace('Z','Z')
 const ts=ms=>new Date(ms).toISOString().replace(/\.(\d{3})Z$/,'.$113Z')
 const now=Date.now()
 const documented='2026-11-03T11:50:04.13873-03:00'
@@ -65,6 +64,8 @@ test('bridge requires actual risk.auto.read scope for risk_summary and prevents 
  assert.ok(source.includes("scopes.includes('profile.basic')"))
  assert.ok(source.includes("scopes.includes('risk.auto.read')"))
  assert.ok(source.includes("canAutoRisk&&p?.product_code==='auto'"))
+ assert.ok(source.includes("(!v4||scopes.includes('policies.read'))"))
+ assert.ok(source.includes("(!v4||scopes.includes('installments.read'))"))
  assert.ok(source.includes("(!v4||canAutoRisk)"))
  assert.ok(source.includes("v.source==='cadastro_gestao'"))
  assert.ok(source.includes("verified_at"))
