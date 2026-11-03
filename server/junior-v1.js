@@ -63,7 +63,7 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
     installments:purpose==='quote'?[]:(Array.isArray(data.installments)?data.installments:[]),
     pending:Array.isArray(data.pending)?data.pending:[]}
   }
-  const allowed=['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
+  const allowed=['verification_required','verification_expired','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
   return {status:allowed.includes(data?.status)?data.status:'unavailable',
    method:data?.verification?.method||null,attemptsLeft:Number.isInteger(data?.verification?.attempts_left)?data.verification.attempts_left:null}
  }catch{return {status:'unavailable'}}
