@@ -67,8 +67,11 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
    const sanitizeCoverage=c=>c&&typeof c==='object'&&!Array.isArray(c)?{
     nome:safeString(c.nome,140),capital_segurado:safeMoney(c.capital_segurado),franquia:safeMoney(c.franquia)
    }:null
+   const allowedForPurpose=policy=>purpose!=='quote'||
+    (numero?policy?.numero===numero:policy?.product_code===productCode||
+      (productCode==='auto'&&policy?.product_code==='frota'&&summary.field_scopes.includes('risk.frota.read')))
    const policies=summary.field_scopes.includes('policies.read')&&Array.isArray(data.policies)?
-    data.policies.slice(0,12).map(policy=>{
+    data.policies.filter(allowedForPurpose).slice(0,12).map(policy=>{
      if(!policy||typeof policy!=='object'||Array.isArray(policy))return null
      const validCode=validProductCode(policy.product_code)?policy.product_code:null
      const risk_summary=sanitizeV41Risk(policy,summary.field_scopes,purpose)
