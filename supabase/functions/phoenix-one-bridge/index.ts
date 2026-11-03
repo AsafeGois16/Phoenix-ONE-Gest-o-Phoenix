@@ -234,7 +234,7 @@ Deno.serve(async request=>{
       numero_item:nItems(item?.item??item?.numero_item),
       marca_modelo:limitedLabel(item?.marca_modelo),
       ano_modelo:modelYear(item?.ano_modelo)
-     })).filter(i=>Object.values(i).some(v=>v!==null)):[]
+     })).filter(i=>Object.values(i).some(v=>v!==null))
      const total=nItems(raw.quantidade??raw.quantidade_itens_ativos)
      if(items.length||total!==null)payload={fleet:{quantidade_itens_ativos:total,items}}
     }
