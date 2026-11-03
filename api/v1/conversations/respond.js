@@ -302,7 +302,7 @@ export default async function handler(req,res){
      }})
    }
    management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[],
-    verified_profile:identity.verified_profile||null}
+    ...(v4Enabled?{verified_profile:identity.verified_profile||null}:{})}
    // Consultas informativas autorizadas são respondidas diretamente a partir da API.
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
    if(agent==='clara'&&isVerifiedReadonlyContext(activeMessages)){
