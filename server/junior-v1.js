@@ -58,7 +58,7 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
   const data=await bridge('identity_context',payload,signal)
   if(data?.status==='verified'){
    if(!v4)return {status:'verified',policies:data.policies||[],installments:data.installments||[],pending:data.pending||[]}
-   const summary=v4VerifiedSummary(data,purpose)
+   const summary=v4VerifiedSummary(data,purpose,productCode)
    if(!summary)return {status:'unavailable'}
    // Defense in depth: Vercel also checks every product scope, even if a
    // future Junior/bridge response accidentally includes additional fields.
