@@ -21,9 +21,9 @@ export function parseVerifiedProfile(raw,scopes,purpose){
  if(!raw||typeof raw!=='object'||Array.isArray(raw)||!Array.isArray(scopes))return null
  // Avoid showing name in contexts for which the service did not release
  // the profile explicitly. The API is authoritative about field_scopes.
- // OpenAPI Fase 2: profile.basic, not verified_profile/profile:read.
- // Keep previous aliases for backward-compatible test fixtures.
- if(!scopes.some(s=>['profile.basic','verified_profile','profile:read'].includes(s)))return null
+ // Real Junior OpenAPI: only profile.basic authorizes treatment name.
+ // Do not accept undocumented aliases as equivalent permission grants.
+ if(!scopes.includes('profile.basic'))return null
  const name=safeName(raw.nome_tratamento)
  const person=safeEnum(raw.tipo_pessoa,['pf','pj','PF','PJ'])
  const relation=safeEnum(raw.relacao_com_contrato,['titular'])
