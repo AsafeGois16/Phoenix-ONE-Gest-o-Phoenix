@@ -47,6 +47,11 @@ test('Heuristic flags risky claims, premature documents and repeated introductio
  assert.ok(info('clara-guincho',0,'Você tem direito ao guincho.').needsReview)
  assert.ok(info('clara-refusal',1,'Vou te encaminhar agora.').needsReview)
  assert.ok(info('clara-to-murilo',2,'Vamos começar.','murilo').needsReview)
+ assert.ok(info('murilo-residencial',1,'Em qual cidade fica o imóvel e é casa ou apartamento?','murilo').needsReview)
+ assert.ok(info('murilo-frota',1,'Quantos veículos fazem parte da frota?','murilo').needsReview)
+ assert.ok(info('murilo-vida',1,'Qual capital segurado você deseja?','murilo').needsReview)
+ assert.ok(info('clara-boleto',2,'Você precisa da segunda via do boleto?','clara',
+  [{agent:'clara',answer:'Você precisa da segunda via do boleto?',user:'Quero o boleto'}]).needsReview)
  assert.ok(info('clara-health',2,'Sou a Clara. Posso ajudar?', 'clara',
   [{agent:'clara',answer:'Olá! Sou a Clara.',user:'Oi'}]).needsReview)
 })
