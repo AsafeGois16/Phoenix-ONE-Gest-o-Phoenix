@@ -3,6 +3,7 @@ import {BrainCircuit,FlaskConical,Play,ShieldCheck,X} from 'lucide-react'
 import {buildMegaBrainObservation} from '../server/megabrain-observation.js'
 import './megabrain-sandbox.css'
 import MegaBrainUniversalLab from './MegaBrainUniversalLab.jsx'
+import MegaBrainConversationalLab from './MegaBrainConversationalLab.jsx'
 
 /**
  * Homologação local e determinística. Não transmite mensagens ou dados.
@@ -23,7 +24,7 @@ const stepLabels={validar_titular:'Validar titular',aguardar_cliente:'Aguardar r
 const pendingLabels={validacao_pendente:'Validação pendente',resposta_pendente:'Resposta pendente',encaminhamento_proposto:'Encaminhamento proposto',nao_identificada:'Sem pendência identificada'}
 const factLabels={assunto_identificado:'Assunto identificado',produto_mencionado:'Produto mencionado'}
 
-export default function MegaBrainSandbox({onClose}){
+export default function MegaBrainSandbox({onClose,session}){
  const [mode,setMode]=useState('universal')
  const [choice,setChoice]=useState('vida')
  const [result,setResult]=useState(undefined)
@@ -42,9 +43,11 @@ export default function MegaBrainSandbox({onClose}){
   <div className="mbs-safety"><ShieldCheck size={17}/> Modo simulado. Nenhum dado será gravado; os agentes e a captura automática permanecem inalterados.</div>
   <div className="mbs-modes" role="tablist" aria-label="Modalidades de laboratório">
    <button type="button" role="tab" aria-selected={mode==='universal'} onClick={()=>setMode('universal')}>Universal V4.1 · QA</button>
+   <button type="button" role="tab" aria-selected={mode==='conversational'} onClick={()=>setMode('conversational')}>Conversacional V4.2 · IA real</button>
    <button type="button" role="tab" aria-selected={mode==='classifier'} onClick={()=>setMode('classifier')}>Classificador V2 · legado</button>
   </div>
   {mode==='universal'&&<MegaBrainUniversalLab/>}
+  {mode==='conversational'&&<MegaBrainConversationalLab session={session}/>}
   {mode==='classifier'&&<>
   <div className="mbs-workspace">
    <div className="mbs-chooser">
