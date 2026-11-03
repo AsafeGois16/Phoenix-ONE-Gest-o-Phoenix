@@ -203,6 +203,72 @@ Deno.serve(async request=>{
       ano_fabricacao:modelYear(v.ano_fabricacao),zero_km:typeof v.zero_km==='boolean'?v.zero_km:null
     }}
    }
+   // V4.1 universal privacy firewall. Only documented product/risk
+   // combinations can cross this bridge. Unsupported products remain policy-
+   // metadata-only until Junior documents a dedicated field scope.
+   const riskScope={
+    auto:['risk.auto.read','vehicle'],moto:['risk.auto.read','vehicle'],
+    frota:['risk.frota.read','fleet'],
+    residencial:['risk.residencial.read','property'],
+    vida:['risk.vida.read','insured_person'],ap:['risk.vida.read','insured_person'],
+    saude:['risk.saude.read','benefits'],odonto:['risk.saude.read','benefits']
+   }
+   const limitedLabel=x=>label(x)
+   const amount=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1e12?x:null
+   const nItems=x=>Number.isInteger(x)&&x>=0&&x<=100000?x:null
+   const safeRisk=p=>{
+    const rule=riskScope[p?.product_code]
+    if(!rule||!scopes.includes(rule[0]))return null
+    const risk=p?.risk_summary
+    if(!risk||typeof risk!=='object'||Array.isArray(risk))return null
+    const kind=rule[1],raw=risk[kind]
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))return null
+    let payload=null
+    if(kind==='vehicle')payload=safeVehicle(risk)
+    if(kind==='fleet'){
+     const items=Array.isArray(raw.items)?raw.items.slice(0,50).map(item=>({
+      item_ref:typeof item?.item_ref==='string'&&/^[a-zA-Z0-9_-]{1,28}$/.test(item.item_ref)?item.item_ref:null,
+      numero_item:nItems(item?.numero_item),
+      marca_modelo:limitedLabel(item?.marca_modelo),
+      ano_modelo:modelYear(item?.ano_modelo)
+     })).filter(i=>Object.values(i).some(v=>v!==null)):[]
+     const total=nItems(raw.quantidade_itens_ativos)
+     if(items.length||total!==null)payload={fleet:{quantidade_itens_ativos:total,items}}
+    }
+    if(kind==='property'){
+     const prop={tipo_ocupacao:limitedLabel(raw.tipo_ocupacao),atividade_risco:limitedLabel(raw.atividade_risco)}
+     if(scopes.includes('profile.location')&&['quote','assistance'].includes(purpose)){
+      prop.cidade_uf=typeof raw.cidade_uf==='string'&&/^[\p{L}\p{M} .'-]{2,65}\/[A-Z]{2}$/u.test(raw.cidade_uf)?raw.cidade_uf:null
+      prop.cep_prefixo=typeof raw.cep_prefixo==='string'&&/^\d{5}$/.test(raw.cep_prefixo)?raw.cep_prefixo:null
+     }
+     if(Object.values(prop).some(v=>v!==null))payload={property:prop}
+    }
+    if(kind==='insured_person'){
+     const insured={capital_segurado:amount(raw.capital_segurado)}
+     if(insured.capital_segurado!==null)payload={insured_person:insured}
+    }
+    if(kind==='benefits'){
+     const benefits={
+      operadora:limitedLabel(raw.operadora),modalidade:limitedLabel(raw.modalidade),
+      mes_reajuste:Number.isInteger(raw.mes_reajuste)&&raw.mes_reajuste>=1&&raw.mes_reajuste<=12?raw.mes_reajuste:null,
+      quantidade_vidas:nItems(raw.quantidade_vidas),plano_titular:limitedLabel(raw.plano_titular)
+     }
+     if(Object.values(benefits).some(v=>v!==null))payload={benefits}
+    }
+    return payload
+   }
+   // Profile location and age band have independent scopes and PURPOSE limits;
+   // age is a coarse band only, NEVER date of birth.
+   if(profile&&v4&&scopes.includes('profile.location')&&['quote','assistance'].includes(purpose)){
+    const city=junior.verified_profile?.cidade_uf
+    if(typeof city==='string'&&/^[\p{L}\p{M} .'-]{2,65}\/[A-Z]{2}$/u.test(city))profile.cidade_uf=city
+   }
+   if(profile&&v4&&scopes.includes('profile.age_band')&&purpose==='quote'&&
+      ['vida','ap','saude','odonto'].includes(productCode)){
+    const band=junior.verified_profile?.faixa_etaria
+    if(typeof band==='string'&&/^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(band)&&band.length<=20)profile.faixa_etaria=band
+   }
+
    const validV4=v4&&typeof junior.verified_at==='string'&&Number.isFinite(Date.parse(junior.verified_at))&&
       typeof junior.expires_at==='string'&&Date.parse(junior.expires_at)>Date.now()&&Array.isArray(junior.field_scopes)
    if(v4&&!validV4)return reply(200,{status:'unavailable'})
@@ -223,9 +289,9 @@ Deno.serve(async request=>{
     // Preserve the EXACT V1 response when V4 is not explicitly enabled.
     ...(v4?{
      product_code:allowedProducts.includes(p?.product_code)?p.product_code:null,
-     risk_summary:canAutoRisk&&p?.product_code==='auto'?safeVehicle(p?.risk_summary):null
+     risk_summary:safeRisk(p)
     }:{}),
-    veiculo:(!v4||canAutoRisk)&&p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo)?{
+    veiculo:(!v4||(canAutoRisk&&['auto','moto'].includes(p?.product_code)))&&p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo)?{
      marca:cleanString(p.veiculo.marca,60),
      modelo:cleanString(p.veiculo.modelo,60),
      ano_modelo:(Number.isInteger(p.veiculo.ano_modelo)&&p.veiculo.ano_modelo>=1970&&p.veiculo.ano_modelo<=2100)?p.veiculo.ano_modelo:null,
