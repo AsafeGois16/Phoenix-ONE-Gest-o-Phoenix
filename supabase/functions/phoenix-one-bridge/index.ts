@@ -213,7 +213,9 @@ Deno.serve(async request=>{
     vida:['risk.vida.read','insured_person'],ap:['risk.vida.read','insured_person'],
     saude:['risk.saude.read','benefits'],odonto:['risk.saude.read','benefits']
    }
-   const limitedLabel=x=>label(x)
+   const limitedLabel=x=>typeof x==='string'&&
+    !/\b(?:cpf|cnpj|renavam|chassi|placa|nascimento|diagnostico|endereco|paciente)\b/i.test(x)&&
+    !/\d{8,}/.test(x)?label(x):null
    const amount=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1e12?x:null
    const nItems=x=>Number.isInteger(x)&&x>=0&&x<=100000?x:null
    const safeRisk=p=>{
