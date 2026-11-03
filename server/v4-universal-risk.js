@@ -133,7 +133,7 @@ export function summarizeV41VerifiedQuote(policies,product){
  const risk=entries[0].risk_summary
  return {status:'found',product,risk:risk&&typeof risk==='object'?risk:null}
 }
-export function replyV41VerifiedQuote(summary){
+export function replyV41VerifiedQuote(summary,verifiedProfile=null){
  if(!summary)return null
  const label=headings[summary.product]||'Seguro'
  if(summary.status==='multiple')return 'Encontrei mais de uma apólice de '+label+' na consulta autorizada. Para não escolher o risco errado, qual contrato você deseja cotar?'
@@ -153,6 +153,11 @@ export function replyV41VerifiedQuote(summary){
   const description=[r.benefits.operadora,r.benefits.modalidade].filter(Boolean).join(' — ')
   if(description)sentence='Encontrei os dados autorizados do seu plano'+(description?': '+description:'')+'. Deseja usá-los como referência na cotação?'
  }
- if(sentence)return 'Claro! Podemos cotar seu '+label+' em outras condições. '+sentence
- return 'Claro! Podemos cotar seu '+label+'. O cadastro autorizado não trouxe todos os detalhes necessários para a cotação. Vou perguntar apenas o que estiver faltando, sem presumir coberturas ou características.'
+ // Only the explicitly scoped, quote-purpose coarse age BAND may be
+ // repeated, never date of birth or a calculated exact age.
+ const age=verifiedProfile?.faixa_etaria
+ const band=['vida','ap','saude','odonto'].includes(summary.product)&&typeof age==='string'&&
+  /^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(age)?' A faixa etária autorizada é '+age+'.':''
+ if(sentence)return 'Claro! Podemos cotar seu '+label+' em outras condições.'+band+' '+sentence
+ return 'Claro! Podemos cotar seu '+label+'.'+band+' O cadastro autorizado não trouxe todos os detalhes necessários para a cotação. Vou perguntar apenas o que estiver faltando, sem presumir coberturas ou características.'
 }
