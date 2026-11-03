@@ -13,6 +13,8 @@ const sensitive=/\b(?:cpf|cnpj|rg|numero do documento|documento de identidade|no
 const request=/\b(?:informe|informar|poderia|pode|preciso|necessito|envie|enviar|encaminhe|forneca|fornecer|me passe|me diga|confirme|confirmar|qual e|qual o|qual a|necessario|para seguir|para prosseguir|para acessar)\b/
 const negative=/\b(?:nao precisa|nao e necessario|nao informe|nao envie|sem informar|sem pedir|nao solicito|evite enviar|nao compartilhe|nao solicitar|sem solicitar)\b/
 const actionClaim=/\b(?:ja (?:registrei|encaminhei|transferi|enviei|consultei|verifiquei|emiti|solicitei)|(?:vou|iremos|vamos) (?:registrar|encaminhar|transferir|enviar|consultar|verificar|emitir|solicitar|abrir|acionar)|(?:solicitacao|exclusao|inclusao|encaminhamento|transferencia) (?:ja foi|foi) (?:registrad[ao]|enviad[ao]|realizad[ao]|efetivad[ao])|(?:foi|esta) (?:registrad[ao]|transferid[ao]))\b/
+const offeredUnavailableAction=/\b(?:posso|podemos|consigo|poderia) (?:registrar|encaminhar|transferir|enviar|emitir|abrir)\b/
+const negatedUnavailableAction=/\b(?:nao posso|nao podemos|nao consigo|nao tenho como) (?:registrar|encaminhar|transferir|enviar|emitir|abrir)\b/
 const accountClaim=/\b(?:posso|consigo|vou|irei|podemos) (?:consultar|verificar|acessar|localizar|conferir|checar)\b.{0,90}\b(?:boleto|parcela|apolice|cadastro|valor|vencimento|status|seguro|contrato|informac(?:ao|oes))\b/
 const promisedContact=/\b(?:a equipe|o backoffice|o financeiro|nossos especialistas|um especialista)\b.{0,75}\b(?:entrara em contato|entrarao em contato|vai ligar|vao ligar|retornara|retornarao|dara retorno|darao retorno|vai iniciar o processo|pode iniciar o processo)\b/
 const documentSpecific=/\b(?:leve|tenha|mantenha|separe|providencie|apresente)\b.{0,95}\b(?:rg|cpf|cnpj|documentos pessoais|comprovante de endereco|documentacao)\b/
@@ -51,6 +53,7 @@ export function guardClaraLabAnswer({agent,messages,answer}){
  const reasons=[]
  if(sensitiveRequests(original))reasons.push('pedido_de_dados')
  if(actionClaim.test(norm))reasons.push('acao_operacional_nao_disponivel')
+ if(offeredUnavailableAction.test(norm)&&!negatedUnavailableAction.test(norm))reasons.push('oferta_de_acao_indisponivel')
  if(accountClaim.test(norm))reasons.push('consulta_nao_disponivel')
  if(promisedContact.test(norm))reasons.push('retorno_ou_inicio_nao_confirmado')
  if(documentSpecific.test(norm)||unverifiedStart.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
