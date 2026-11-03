@@ -180,10 +180,10 @@ Deno.serve(async request=>{
      (!junior.verification||junior.verification.status==='verified')
    if(!verifiedBinding)return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
    const scopes=v4&&Array.isArray(junior.field_scopes)?junior.field_scopes.filter(x=>typeof x==='string'&&x.length<=70).slice(0,40):[]
-   const canProfile=scopes.includes('profile.basic')||scopes.includes('verified_profile')||scopes.includes('profile:read')
+   const canProfile=scopes.includes('profile.basic')
    // Junior's actual OpenAPI grants product-specific scopes. In phase 1,
    // release only Auto risk data after risk.auto.read, never by a generic flag.
-   const canAutoRisk=scopes.includes('risk.auto.read')||scopes.includes('risk_summary')||scopes.includes('risk:read')
+   const canAutoRisk=scopes.includes('risk.auto.read')
    const safeName=x=>typeof x==='string'&&/^[\p{L}\p{M}][\p{L}\p{M} .'’\\-]{0,69}$/u.test(x.trim())?x.trim():null
    const profile=canProfile&&junior.verified_profile?.relacao_com_contrato==='titular'&&safeName(junior.verified_profile?.nome_tratamento)?{
     nome_tratamento:safeName(junior.verified_profile.nome_tratamento),
