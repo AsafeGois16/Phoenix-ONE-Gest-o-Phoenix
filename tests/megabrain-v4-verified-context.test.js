@@ -95,7 +95,7 @@ test('V4 uses only server-side authenticated Junior return and preserves old rou
  assert.match(bridge,/verifiedBinding/)
  assert.match(bridge,/purpose==='quote'/)
  assert.match(bridge,/field_scopes/)
- assert.match(bridge,/risk_summary:v4&&canRisk/)
+ assert.match(bridge,/risk_summary:canRisk\?safeVehicle\(p\?\.risk_summary\):null/)
  assert.match(route,/const trustedRef=v4Enabled&&validVerificationRef\(body.verification_ref\)/)
  assert.match(route,/verifiedGreeting\(identity.verified_profile\)/)
  assert.doesNotMatch(read('server/megabrain-observation.js'),/verification_ref/)
