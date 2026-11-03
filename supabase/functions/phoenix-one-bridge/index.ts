@@ -101,7 +101,7 @@ Deno.serve(async request=>{
    const doc=typeof data.document==='string'?data.document:'',typ=data.documentType
    // New contract is explicitly OFF until joint homologation.
    const v4=data.v4===true&&Deno.env.get('PHOENIX_ONE_V4_VERIFIED_CONTEXT')==='true'
-   const ref=v4&&typeof data.verificationRef==='string'&&/^[A-Za-z0-9_-]{48}$/.test(data.verificationRef)?data.verificationRef:null
+   const ref=v4&&typeof data.verificationRef==='string'&&/^[a-f0-9]{48}$/i.test(data.verificationRef)?data.verificationRef:null
    if(!ref&&!((typ==='cpf'&&/^\d{11}$/.test(doc))||(typ==='cnpj'&&/^\d{14}$/.test(doc))))return reply(400,{error:'invalid_document_format'})
    if(ref&&(doc||data.proof))return reply(400,{error:'ambiguous_verification_request'})
    const allowedPurposes=['service','quote','assistance','policies_and_installments']
@@ -212,7 +212,7 @@ Deno.serve(async request=>{
    // management system accidentally ignores its product_code filter.
    const limitedPolicies=v4&&purpose==='quote'?
     rawPolicies.filter(p=>productCode?p?.product_code===productCode:p?.numero===policyNumber):rawPolicies
-   const policies=conn[0].granted_scopes.includes('policies:read')?limitedPolicies.slice(0,12).map(p=>({
+   const policies=conn[0].granted_scopes.includes('policies:read')&&(!v4||scopes.includes('policies.read'))?limitedPolicies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
     premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
@@ -238,7 +238,7 @@ Deno.serve(async request=>{
      return {nome:cleanString(c.nome,140),capital_segurado:validMoney(c.capital_segurado),franquia:validMoney(c.franquia)}
     }).filter(c=>c&&c.nome):[]
    })):[]
-   const installments=purpose!=='quote'&&conn[0].granted_scopes.includes('installments:read')&&Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
+   const installments=purpose!=='quote'&&conn[0].granted_scopes.includes('installments:read')&&(!v4||scopes.includes('installments.read'))&&Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),vencimento:cleanString(i?.vencimento,30),
     valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
    })):[]
@@ -252,7 +252,7 @@ Deno.serve(async request=>{
    // V4 is opt-in; never send the opaque ref to an LLM or WhatsApp.
    const v4Context=v4?{
     verified_profile:profile,
-    verification_ref:typeof junior.verification_ref==='string'&&/^[A-Za-z0-9_-]{48}$/.test(junior.verification_ref)?junior.verification_ref:null,
+    verification_ref:typeof junior.verification_ref==='string'&&/^[a-f0-9]{48}$/i.test(junior.verification_ref)?junior.verification_ref:null,
     verified_at:junior.verified_at,
     expires_at:junior.expires_at,
     field_scopes:scopes,
