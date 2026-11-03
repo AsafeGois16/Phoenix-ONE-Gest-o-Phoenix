@@ -1,6 +1,6 @@
 import React,{useState} from 'react'
 import {Bot,CheckCircle2,Download,MessageSquareText,Play,RotateCcw,ShieldCheck,TriangleAlert,XCircle} from 'lucide-react'
-import {CONVERSATION_QA_SCENARIOS,assessConversationQaAnswer,conversationQaMessages,conversationQaOverview,conversationalQaReportText} from '../server/megabrain-conversation-qa.js'
+import {CONVERSATION_QA_SCENARIOS,CONVERSATION_QA_ISSUES,assessConversationQaAnswer,conversationQaMessages,conversationQaOverview,conversationalQaReportText} from '../server/megabrain-conversation-qa.js'
 import './megabrain-conversation-qa.css'
 
 const ERRORS={unauthorized:'Sessão expirada. Entre novamente no Phoenix ONE.',service_not_configured:'Laboratório RAG indisponível. Confira a configuração da API OpenAI.',model_timeout:'A geração demorou demais. Execute novamente este turno.',openai_rate_limited:'Limite de uso da API OpenAI atingido.',invalid_messages:'A conversa excedeu os limites do laboratório.',conversation_too_large:'O histórico ficou longo demais. Reinicie o cenário.',origin_not_allowed:'O teste por IA requer o endereço oficial do Phoenix ONE.',agent_prompt_not_available:'Prompt do agente não disponível no laboratório.',answer_unavailable:'Não foi possível consultar o modelo agora.',openai_error:'O provedor não concluiu o teste.'}
@@ -42,11 +42,19 @@ export default function MegaBrainConversationalLab({session}){
   }catch(e){setError(ERRORS[e.message]||'Falha ao gerar a resposta. Nenhum turno foi aprovado automaticamente.')}finally{setBusy(false)}
  }
  const review=(idx,value)=>{
-  setRows(current=>current.map((r,i)=>i===idx?{...r,review:value}:r))
+  setRows(current=>current.map((r,i)=>i===idx?{...r,review:value,
+   issue:value==='revise'?(r.issue||''):null,reviewNote:value==='revise'?(r.reviewNote||''):''}:r))
   setNotice('')
  }
+ const updateReviewField=(idx,key,value)=>{
+  setRows(current=>current.map((r,i)=>i===idx?{...r,[key]:value}:r))
+  setNotice('')
+ }
+ const missingReason=rows.some(r=>r.review==='revise'&&!CONVERSATION_QA_ISSUES.some(x=>x.code===r.issue))
  const exportReport=()=>{
   if(!rows.length)return
+  if(missingReason){setError('Escolha um motivo para cada resposta marcada como Precisa revisão antes de exportar.');return}
+  setError('')
   downloadText(conversationalQaReportText(rows,selected))
   setNotice('Relatório de avaliação gerado. Ele não inclui mensagens nem dados pessoais.')
  }
@@ -90,6 +98,21 @@ export default function MegaBrainConversationalLab({session}){
       <button type="button" aria-pressed={turn.review==='revise'} className={turn.review==='revise'?'selected bad':''}
        onClick={()=>review(i,'revise')}><XCircle size={14}/> Precisa revisão</button>
      </div>
+     {turn.review==='revise'&&<div className="mcq-reason">
+      <label htmlFor={'mcq-issue-'+i}>Por que esta resposta precisa de revisão?
+       <select id={'mcq-issue-'+i} value={turn.issue||''}
+        onChange={e=>updateReviewField(i,'issue',e.target.value)}>
+        <option value="">Selecione o principal problema</option>
+        {CONVERSATION_QA_ISSUES.map(option=><option key={option.code} value={option.code}>{option.label}</option>)}
+       </select>
+      </label>
+      <label htmlFor={'mcq-note-'+i}>Observação objetiva (opcional, sem dados pessoais)
+       <textarea id={'mcq-note-'+i} rows={2} maxLength={220} value={turn.reviewNote||''}
+        placeholder="Ex.: Clara encaminhou sem confirmar se o cliente autorizava"
+        onChange={e=>updateReviewField(i,'reviewNote',e.target.value)}/>
+      </label>
+      <p>O relatório incluirá apenas o motivo e esta observação resumida, nunca o texto completo da resposta.</p>
+     </div>}
     </div>
    </article>)}
    {current&&<div className="mcq-next">
@@ -104,11 +127,12 @@ export default function MegaBrainConversationalLab({session}){
    {current&&<button type="button" className="mbl-run" disabled={!ready||busy} onClick={execute}>
     <Play size={15}/> {busy?'Gerando resposta de IA…':'Gerar resposta do próximo turno'}
    </button>}
-   <button type="button" className="mcq-secondary" disabled={!rows.length||busy} onClick={exportReport}><Download size={15}/> Baixar avaliação TXT</button>
+   <button type="button" className="mcq-secondary" disabled={!rows.length||busy||missingReason} onClick={exportReport}><Download size={15}/> Baixar avaliação TXT</button>
   </div>
+  {missingReason&&<p className="mcq-error" role="status">Para exportar, selecione o motivo de cada resposta marcada como Precisa revisão.</p>}
   {!ready&&<p className="mcq-error" role="alert">Para executar respostas reais, entre com uma sessão válida de administrador do Phoenix ONE.</p>}
   {error&&<p className="mcq-error" role="alert">{error}</p>}
   {notice&&<p className="mcq-success" role="status">{notice}</p>}
-  <p className="mcq-footer">Os alertas são sinais por padrões de texto, não uma nota objetiva de correção factual. A validação de dados verificados, handoff real, coberturas, protocolos e integração do Junior continua pendente. O arquivo TXT exporta apenas títulos, status e alertas; não inclui respostas nem conteúdo das bases.</p>
+  <p className="mcq-footer">Os alertas são sinais por padrões de texto, não uma nota objetiva de correção factual. A validação de dados verificados, handoff real, coberturas, protocolos e integração do Junior continua pendente. O arquivo TXT exporta título, status, motivo de reprovação e observação curta; não inclui respostas nem conteúdo das bases.</p>
  </div>
 }
