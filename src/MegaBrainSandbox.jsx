@@ -2,6 +2,7 @@ import React,{useState} from 'react'
 import {BrainCircuit,FlaskConical,Play,ShieldCheck,X} from 'lucide-react'
 import {buildMegaBrainObservation} from '../server/megabrain-observation.js'
 import './megabrain-sandbox.css'
+import MegaBrainUniversalLab from './MegaBrainUniversalLab.jsx'
 
 /**
  * Homologação local e determinística. Não transmite mensagens ou dados.
@@ -23,6 +24,7 @@ const pendingLabels={validacao_pendente:'Validação pendente',resposta_pendente
 const factLabels={assunto_identificado:'Assunto identificado',produto_mencionado:'Produto mencionado'}
 
 export default function MegaBrainSandbox({onClose}){
+ const [mode,setMode]=useState('universal')
  const [choice,setChoice]=useState('vida')
  const [result,setResult]=useState(undefined)
  const scenario=scenarios[choice]
@@ -38,6 +40,12 @@ export default function MegaBrainSandbox({onClose}){
    <button type="button" className="mbs-close" onClick={onClose} aria-label="Fechar laboratório"><X size={17}/></button>
   </div>
   <div className="mbs-safety"><ShieldCheck size={17}/> Modo simulado. Nenhum dado será gravado; os agentes e a captura automática permanecem inalterados.</div>
+  <div className="mbs-modes" role="tablist" aria-label="Modalidades de laboratório">
+   <button type="button" role="tab" aria-selected={mode==='universal'} onClick={()=>setMode('universal')}>Universal V4.1 · QA</button>
+   <button type="button" role="tab" aria-selected={mode==='classifier'} onClick={()=>setMode('classifier')}>Classificador V2 · legado</button>
+  </div>
+  {mode==='universal'&&<MegaBrainUniversalLab/>}
+  {mode==='classifier'&&<>
   <div className="mbs-workspace">
    <div className="mbs-chooser">
     <label htmlFor="mbs-scenario">Cenário fictício para testar</label>
@@ -65,5 +73,6 @@ export default function MegaBrainSandbox({onClose}){
    <div className="mbs-facts"><small>Marcadores de contexto</small><p>{result.facts.map(f=>factLabels[f]||f).join(' · ')||'Nenhum'}</p></div>
   </div>}
   <p className="mbs-footnote">Este laboratório usa o classificador do MegaBrain V2 em modo local. Não testa a persistência no Supabase nem ativa a observação de mensagens reais. Para isso, será necessário homologar o controle de captura por protocolo.</p>
+  </>}
  </section>
 }
