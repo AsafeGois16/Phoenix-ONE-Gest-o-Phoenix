@@ -23,6 +23,19 @@ test('Clara RAG: blocks repeated request for CPF in later turn',()=>{
  assert.ok(r.reason.includes('pedido_de_dados'))
  assert.match(r.answer,/não consigo consultar parcelas nem enviar documentos/)
 })
+test('Clara RAG: does not offer to register or transfer from a tool-less lab',()=>{
+ const res=guard('Posso encaminhar seu pedido de exclusão à equipe de Backoffice, tudo bem?',[
+  u('Preciso excluir um dependente do plano odontológico')])
+ assert.equal(res.applied,true)
+ assert.ok(res.reason.includes('oferta_de_acao_indisponivel'))
+ assert.match(res.answer,/não consigo registrar ou encaminhar pedidos/)
+})
+test('Clara RAG: does not flag a truthful lack-of-tools explanation',()=>{
+ const msg='Não posso encaminhar solicitações neste ambiente de teste; o Backoffice orienta por canal oficial.'
+ const res=guard(msg,[u('Quero excluir um dependente')])
+ assert.equal(res.applied,false)
+ assert.equal(res.answer,msg)
+})
 test('Clara RAG: no fictional inclusion requires spouse full name or identity',()=>{
  const r=guard('Poderia confirmar o nome do plano ou da empresa e o nome completo da sua esposa?',[
   u('Olá, gostaria de incluir minha esposa no plano de saúde da empresa.')])
