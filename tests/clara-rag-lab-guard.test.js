@@ -36,6 +36,20 @@ test('Clara RAG: does not flag a truthful lack-of-tools explanation',()=>{
  assert.equal(res.applied,false)
  assert.equal(res.answer,msg)
 })
+test('Clara RAG: blocks a combined promise to orient AND forward request',()=>{
+ const result=guard('Posso orientar sobre o procedimento e encaminhar seu pedido ao Backoffice.',[
+  u('Quero incluir minha esposa no plano empresarial')])
+ assert.equal(result.applied,true)
+ assert.ok(result.reason.includes('oferta_de_acao_indisponivel'))
+ assert.match(result.answer,/Neste ambiente de teste não consigo registrar ou encaminhar/)
+})
+test('Clara RAG: does not promise that the team will contact the client',()=>{
+ const result=guard('A equipe do Backoffice vai entrar em contato com você e orientar os próximos passos.',[
+  u('Quero incluir dependente em saúde'),u('Orienta os próximos passos')])
+ assert.equal(result.applied,true)
+ assert.ok(result.reason.includes('retorno_ou_inicio_nao_confirmado'))
+ assert.doesNotMatch(result.answer,/vai entrar em contato/)
+})
 test('Clara RAG: no fictional inclusion requires spouse full name or identity',()=>{
  const r=guard('Poderia confirmar o nome do plano ou da empresa e o nome completo da sua esposa?',[
   u('Olá, gostaria de incluir minha esposa no plano de saúde da empresa.')])
