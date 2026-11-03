@@ -45,7 +45,7 @@ function fleet(raw){
  const items=sourceItems.slice(0,50).map(v=>({
   item_ref:code(v?.item_ref),numero_item:count(v?.item??v?.numero_item),
   marca_modelo:brief(v?.marca_modelo,80),ano_modelo:year(v?.ano_modelo)
- })).filter(nonempty):[]
+ })).filter(nonempty)
  const total=count(raw.quantidade??raw.quantidade_itens_ativos)
  return total!==null||items.length?{quantidade_itens_ativos:total,items}:null
 }
