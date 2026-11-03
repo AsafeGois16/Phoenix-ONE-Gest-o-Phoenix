@@ -62,15 +62,40 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
    if(!summary)return {status:'unavailable'}
    // Defense in depth: Vercel also checks every product scope, even if a
    // future Junior/bridge response accidentally includes additional fields.
-   const policies=Array.isArray(data.policies)?data.policies.slice(0,12).map(policy=>{
-    if(!policy||typeof policy!=='object'||Array.isArray(policy))return null
-    const validCode=validProductCode(policy.product_code)?policy.product_code:null
-    const risk_summary=sanitizeV41Risk(policy,summary.field_scopes,purpose)
-    return {...policy,...(validCode?{product_code:validCode}:{}),risk_summary}
-   }).filter(Boolean):[]
-   return {...summary,policies,
-    installments:purpose==='quote'?[]:(Array.isArray(data.installments)?data.installments:[]),
-    pending:Array.isArray(data.pending)?data.pending:[]}
+   const safeString=(x,max)=>typeof x==='string'&&x.length<=max&&!/[\r\n\0-\x1f]/.test(x)?x:null
+   const safeMoney=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=1e12?x:null
+   const sanitizeCoverage=c=>c&&typeof c==='object'&&!Array.isArray(c)?{
+    nome:safeString(c.nome,140),capital_segurado:safeMoney(c.capital_segurado),franquia:safeMoney(c.franquia)
+   }:null
+   const policies=summary.field_scopes.includes('policies.read')&&Array.isArray(data.policies)?
+    data.policies.slice(0,12).map(policy=>{
+     if(!policy||typeof policy!=='object'||Array.isArray(policy))return null
+     const validCode=validProductCode(policy.product_code)?policy.product_code:null
+     const risk_summary=sanitizeV41Risk(policy,summary.field_scopes,purpose)
+     const vehicle=validCode&&['auto','moto'].includes(validCode)?
+      sanitizeV41Risk({product_code:validCode,risk_summary:{vehicle:policy.veiculo}},
+       summary.field_scopes,purpose)?.vehicle||null:null
+     return {
+      numero:safeString(policy.numero,60),ramo:safeString(policy.ramo,60),
+      seguradora:safeString(policy.seguradora,90),fim_vigencia:safeString(policy.fim_vigencia,30),
+      linha:safeString(policy.linha,60),premio_total:safeMoney(policy.premio_total),
+      premio_mensal:safeMoney(policy.premio_mensal),
+      capital_segurado:safeMoney(policy.capital_segurado),status:safeString(policy.status,45),
+      product_code:validCode,risk_summary,veiculo:vehicle,
+      coberturas:Array.isArray(policy.coberturas)?policy.coberturas.slice(0,30)
+       .map(sanitizeCoverage).filter(c=>c?.nome):[]
+     }
+    }).filter(Boolean):[]
+   const installments=purpose!=='quote'&&summary.field_scopes.includes('installments.read')&&
+    Array.isArray(data.installments)?data.installments.slice(0,12).map(i=>({
+      apolice:safeString(i?.apolice,60),ramo:safeString(i?.ramo,50),
+      vencimento:safeString(i?.vencimento,30),valor:safeMoney(i?.valor),vencida:i?.vencida===true
+    })):[]
+   return {...summary,policies,installments,
+    pending:Array.isArray(data.pending)?data.pending.slice(0,8).map(p=>({
+     description:safeString(p?.description,200),status:safeString(p?.status,45),
+     due_date:safeString(p?.due_date,30)
+    })).filter(p=>p.description):[]}
   }
   const allowed=['verification_required','verification_expired','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
   return {status:allowed.includes(data?.status)?data.status:'unavailable',
