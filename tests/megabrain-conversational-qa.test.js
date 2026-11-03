@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-import {CONVERSATION_QA_SCENARIOS,conversationQaMessages,assessConversationQaAnswer,conversationQaOverview,conversationalQaReportText} from '../server/megabrain-conversation-qa.js'
+import {CONVERSATION_QA_SCENARIOS,CONVERSATION_QA_ISSUES,safeQaReviewNote,conversationQaMessages,assessConversationQaAnswer,conversationQaOverview,conversationalQaReportText} from '../server/megabrain-conversation-qa.js'
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8')
 test('Nine QA scripts include Clara, Murilo, privacy, handoffs, quotes and multiple turns',()=>{
  assert.ok(CONVERSATION_QA_SCENARIOS.length>=9)
@@ -86,4 +86,43 @@ test('UI runs only on explicit user action using current secure RAG lab; no writ
  for(const s of [ui,read('server/megabrain-conversation-qa.js')]){
   assert.doesNotMatch(s,/localStorage|sessionStorage|supabase\.from\s*\(|phoenix-one-bridge|\/api\/v1\/conversations\/respond|navigator\.sendBeacon/)
  }
+})
+
+
+test('Reprovação humana registra categoria e observação sem texto integral da IA',()=>{
+ const scenario=CONVERSATION_QA_SCENARIOS.find(x=>x.id==='clara-to-murilo')
+ const rows=[
+  {turnIndex:0,agent:'clara',answer:'Resposta confidencial omitida.',
+   review:'revise',issue:'consent',reviewNote:'Clara não solicitou autorização antes de encaminhar.',flags:[]},
+  {turnIndex:1,agent:'clara',answer:'Outro texto omitido.',
+   review:'revise',issue:'handoff',reviewNote:'Clara afirmou que transferiu sem confirmação.',flags:[]}
+ ]
+ const txt=conversationalQaReportText(rows,scenario)
+ assert.match(txt,/Não pediu ou não respeitou a autorização/)
+ assert.match(txt,/Encaminhamento ou troca de agente incorreta/)
+ assert.match(txt,/Clara não solicitou autorização/)
+ assert.doesNotMatch(txt,/Resposta confidencial omitida|Outro texto omitido/)
+ assert.equal(conversationQaOverview(rows).revise,2)
+ assert.ok(CONVERSATION_QA_ISSUES.length>=8)
+})
+test('Relatório anonimiza e limita observações, sem incluir emails, URLs ou números longos',()=>{
+ const note=safeQaReviewNote('Clara pediu confirmação por teste@example.com e https://sistema.exemplo/a com CPF 123.456.789-00')
+ assert.doesNotMatch(note,/teste@example\.com|https:\/\/sistema|123\.456\.789-00/)
+ assert.match(note,/\[email omitido\]/)
+ assert.match(note,/\[link omitido\]/)
+ assert.ok(safeQaReviewNote('z'.repeat(500)).length<=220)
+})
+test('Não aceita categorias inventadas como motivos válidos para relatório',()=>{
+ const s=CONVERSATION_QA_SCENARIOS[0]
+ const txt=conversationalQaReportText([{turnIndex:0,agent:'clara',answer:'Resposta',
+   review:'revise',issue:'autorizacao_inventada',reviewNote:''}],s)
+ assert.match(txt,/Motivo não informado/)
+})
+test('Interface solicita o motivo da reprovação antes da exportação',()=>{
+ const ui=read('src/MegaBrainConversationalLab.jsx')
+ assert.ok(ui.includes('CONVERSATION_QA_ISSUES.map'))
+ assert.ok(ui.includes('missingReason'))
+ assert.ok(ui.includes('disabled={!rows.length||busy||missingReason}'))
+ assert.ok(ui.includes('Observação objetiva (opcional, sem dados pessoais)'))
+ assert.ok(ui.includes("review:value"))
 })
