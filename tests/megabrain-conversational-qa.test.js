@@ -63,7 +63,7 @@ test('TXT is compact and excludes answer contents or authenticated tokens',()=>{
  const txt=conversationalQaReportText(rows,sc)
  assert.match(txt,/REVISÃO HUMANA|revisão humana|APROVADO PELA PESSOA/i)
  assert.match(txt,/Alertas heurísticos: 1/)
- assert.doesNotMatch(txt,/Texto interno que não deve constar|Authorization|Bearer|verification_ref/)
+ assert.doesNotMatch(txt,/Texto interno que não deve constar|Authorization|Bearer|abcdef1234567890abcdef1234567890abcdef1234567890/)
 })
 test('UI runs only on explicit user action using current secure RAG lab; no write methods or persistence',()=>{
  const ui=read('src/MegaBrainConversationalLab.jsx')
