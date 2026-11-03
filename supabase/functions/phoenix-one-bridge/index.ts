@@ -105,7 +105,7 @@ Deno.serve(async request=>{
    if(!ref&&!((typ==='cpf'&&/^\d{11}$/.test(doc))||(typ==='cnpj'&&/^\d{14}$/.test(doc))))return reply(400,{error:'invalid_document_format'})
    if(ref&&(doc||data.proof))return reply(400,{error:'ambiguous_verification_request'})
    const allowedPurposes=['service','quote','assistance','policies_and_installments']
-   const allowedProducts=['auto','moto','frota','residencial','empresarial','vida','ap','saude','odonto','vida_grupo','previdencia','viagem','pet','bike','fianca','garantia','rc']
+   const allowedProducts=['auto','moto','frota','residencial','empresarial','vida','ap','saude','odonto','vida_grupo','previdencia','viagem','pet','bike','fianca','garantia','rc','outros']
    const purpose=v4?data.purpose:'policies_and_installments'
    if(v4&&!allowedPurposes.includes(purpose))return reply(400,{error:'invalid_purpose'})
    const productCode=v4&&allowedProducts.includes(data.productCode)?data.productCode:null
@@ -180,12 +180,15 @@ Deno.serve(async request=>{
      (!junior.verification||junior.verification.status==='verified')
    if(!verifiedBinding)return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
    const scopes=v4&&Array.isArray(junior.field_scopes)?junior.field_scopes.filter(x=>typeof x==='string'&&x.length<=70).slice(0,40):[]
-   const canProfile=scopes.includes('verified_profile')||scopes.includes('profile:read')
-   const canRisk=scopes.includes('risk_summary')||scopes.includes('risk:read')
+   const canProfile=scopes.includes('profile.basic')||scopes.includes('verified_profile')||scopes.includes('profile:read')
+   // Junior's actual OpenAPI grants product-specific scopes. In phase 1,
+   // release only Auto risk data after risk.auto.read, never by a generic flag.
+   const canAutoRisk=scopes.includes('risk.auto.read')||scopes.includes('risk_summary')||scopes.includes('risk:read')
    const safeName=x=>typeof x==='string'&&/^[\p{L}\p{M}][\p{L}\p{M} .'’\\-]{0,69}$/u.test(x.trim())?x.trim():null
    const profile=canProfile&&junior.verified_profile?.relacao_com_contrato==='titular'&&safeName(junior.verified_profile?.nome_tratamento)?{
     nome_tratamento:safeName(junior.verified_profile.nome_tratamento),
     tipo_pessoa:['pf','pj','PF','PJ'].includes(junior.verified_profile.tipo_pessoa)?junior.verified_profile.tipo_pessoa.toLowerCase():null,
+    perfil_atualizado_em:typeof junior.verified_profile.perfil_atualizado_em==='string'&&Number.isFinite(Date.parse(junior.verified_profile.perfil_atualizado_em))?junior.verified_profile.perfil_atualizado_em:null,
     relacao_com_contrato:'titular'
    }:null
    const label=x=>typeof x==='string'&&/^[\p{L}\p{M}\p{N} .\/()\\-]{1,80}$/u.test(x.trim())?x.trim():null
@@ -220,9 +223,9 @@ Deno.serve(async request=>{
     // Preserve the EXACT V1 response when V4 is not explicitly enabled.
     ...(v4?{
      product_code:allowedProducts.includes(p?.product_code)?p.product_code:null,
-     risk_summary:canRisk?safeVehicle(p?.risk_summary):null
+     risk_summary:canAutoRisk&&p?.product_code==='auto'?safeVehicle(p?.risk_summary):null
     }:{}),
-    veiculo:(p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo))?{
+    veiculo:(!v4||canAutoRisk)&&p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo)?{
      marca:cleanString(p.veiculo.marca,60),
      modelo:cleanString(p.veiculo.modelo,60),
      ano_modelo:(Number.isInteger(p.veiculo.ano_modelo)&&p.veiculo.ano_modelo>=1970&&p.veiculo.ano_modelo<=2100)?p.veiculo.ano_modelo:null,
@@ -253,7 +256,11 @@ Deno.serve(async request=>{
     verified_at:junior.verified_at,
     expires_at:junior.expires_at,
     field_scopes:scopes,
-    data_freshness:junior.data_freshness&&typeof junior.data_freshness==='object'?Object.fromEntries(Object.entries(junior.data_freshness).filter(([k,v])=>['profile','policies','risk_summary','benefits'].includes(k)&&typeof v==='string'&&Number.isFinite(Date.parse(v))).slice(0,4)):null
+    data_freshness:junior.data_freshness&&typeof junior.data_freshness==='object'&&!Array.isArray(junior.data_freshness)?
+     Object.fromEntries(Object.entries(junior.data_freshness).filter(([k,v])=>
+      ['profile','policies','risk_summary','benefits'].includes(k)&&v&&typeof v==='object'&&!Array.isArray(v)&&
+      v.source==='cadastro_gestao'&&typeof v.updated_at==='string'&&Number.isFinite(Date.parse(v.updated_at)))
+      .slice(0,4).map(([k,v])=>[k,{source:'cadastro_gestao',updated_at:v.updated_at}])):null
    }:{}
    return reply(200,{status:'verified',policies,installments,pending,...v4Context})
   }
