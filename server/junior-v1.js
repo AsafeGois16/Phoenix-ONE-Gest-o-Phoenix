@@ -1,5 +1,6 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto'
 import {validVerificationRef,validV4Purpose,validProductCode,v4VerifiedSummary} from './v4-verified-context.js'
+import {sanitizeV41Risk} from './v4-universal-risk.js'
 
 export const origins={phoenix:'https://phoenix-one-ai.vercel.app'}
 export function secureMatch(a,b){
@@ -59,7 +60,15 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
    if(!v4)return {status:'verified',policies:data.policies||[],installments:data.installments||[],pending:data.pending||[]}
    const summary=v4VerifiedSummary(data,purpose)
    if(!summary)return {status:'unavailable'}
-   return {...summary,policies:Array.isArray(data.policies)?data.policies:[],
+   // Defense in depth: Vercel also checks every product scope, even if a
+   // future Junior/bridge response accidentally includes additional fields.
+   const policies=Array.isArray(data.policies)?data.policies.slice(0,12).map(policy=>{
+    if(!policy||typeof policy!=='object'||Array.isArray(policy))return null
+    const validCode=validProductCode(policy.product_code)?policy.product_code:null
+    const risk_summary=sanitizeV41Risk(policy,summary.field_scopes,purpose)
+    return {...policy,...(validCode?{product_code:validCode}:{}),risk_summary}
+   }).filter(Boolean):[]
+   return {...summary,policies,
     installments:purpose==='quote'?[]:(Array.isArray(data.installments)?data.installments:[]),
     pending:Array.isArray(data.pending)?data.pending:[]}
   }
