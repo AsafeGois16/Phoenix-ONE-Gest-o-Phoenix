@@ -62,7 +62,7 @@ export default function MegaBrain({session}){
    <div><strong>Laboratório Universal V4.1</strong><p>Execute roteiros fictícios de Clara e Murilo, avalie consentimentos, continuidade e dados autorizados por seguro. Nenhum atendimento real é alterado.</p></div>
    <button type="button" className="mb-test-toggle" onClick={()=>setTestMode(x=>!x)} aria-expanded={testMode}>{testMode?'Fechar laboratório':'Abrir laboratório de QA'}</button>
   </div>
-  {testMode&&<MegaBrainSandbox onClose={()=>setTestMode(false)}/>}
+  {testMode&&<MegaBrainSandbox session={session} onClose={()=>setTestMode(false)}/>}
   <div className="mb-metrics">
    <Metric Icon={Database} label="Protocolos válidos" value={snapshot?.counts?.total}/>
    <Metric Icon={BrainCircuit} label="Com agente" value={snapshot?.counts?.with_agent}/>
