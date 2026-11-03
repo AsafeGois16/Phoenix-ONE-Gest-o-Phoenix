@@ -134,3 +134,27 @@ test('Bridge only releases risk scoped to product and V4 remains default-off',()
  assert.ok(route.includes("verifiedProduct.status==='verified'"))
  assert.ok(route.includes("purpose:'quote',productCode:requestedV41Product"))
 })
+
+test('profile age and city are released only for authorized purpose and product',async()=>{
+ const {parseVerifiedProfile}=await import('../server/v4-verified-context.js')
+ const raw={nome_tratamento:'Marina',tipo_pessoa:'pf',relacao_com_contrato:'titular',
+  cidade_uf:'Guarulhos/SP',faixa_etaria:'30-39',data_nascimento:'1987-01-02',cpf:'11122233344'}
+ const scopes=['profile.basic','profile.location','profile.age_band']
+ const quote=parseVerifiedProfile(raw,scopes,'quote','vida')
+ assert.equal(quote.faixa_etaria,'30-39')
+ assert.equal(quote.cidade_uf,'Guarulhos/SP')
+ assert.doesNotMatch(JSON.stringify(quote),/1987-01-02|11122233344/)
+ const service=parseVerifiedProfile(raw,scopes,'service','vida')
+ assert.equal(service.faixa_etaria,undefined)
+ assert.equal(service.cidade_uf,undefined)
+ const home=parseVerifiedProfile(raw,scopes,'quote','residencial')
+ assert.equal(home.faixa_etaria,undefined)
+ assert.equal(home.cidade_uf,'Guarulhos/SP')
+ const unauthorized=parseVerifiedProfile(raw,['profile.basic'],'quote','vida')
+ assert.equal(unauthorized.faixa_etaria,undefined)
+ assert.equal(unauthorized.cidade_uf,undefined)
+ const personMessage=replyV41VerifiedQuote(
+   summarizeV41VerifiedQuote([mk('vida',{insured_person:{capital_segurado:100000}})],'vida'),quote)
+ assert.match(personMessage,/faixa etária autorizada é 30-39/)
+ assert.doesNotMatch(personMessage,/1987|idade exata/)
+})
