@@ -255,7 +255,7 @@ export default async function handler(req,res){
     })
     if(verifiedProduct.status==='verified'){
      const summary=summarizeV41VerifiedQuote(verifiedProduct.policies,requestedV41Product)
-     const suggested=replyV41VerifiedQuote(summary)
+     const suggested=replyV41VerifiedQuote(summary,verifiedProduct.verified_profile)
      if(suggested)return replyToJunior({
       agent:'murilo',reply:verifiedGreeting(verifiedProduct.verified_profile)+suggested,
       humanHandoff:false,handoff:null
