@@ -31,7 +31,7 @@ async function scenario(messages,requestOptions,mock){
  }finally{globalThis.fetch=before;for(const [k,v] of Object.entries(previous)){if(v===undefined)delete process.env[k];else process.env[k]=v}}
 }
 const payload=(policies)=>({
- status:'verified',field_scopes:['verified_profile','risk_summary'],
+ status:'verified',field_scopes:['profile.basic','policies.read','risk.auto.read','profile.location'],
  verified_profile:{nome_tratamento:'Maria',tipo_pessoa:'pf',relacao_com_contrato:'titular'},
  verified_at:verifiedAt,expires_at:expiry,verification_ref:reference,policies,
  installments:[],pending:[]
