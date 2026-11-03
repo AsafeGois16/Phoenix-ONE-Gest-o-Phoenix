@@ -65,3 +65,20 @@ A API **/api/phoenix-answer**:
 - Murilo · cotação residencial: 2 aprovadas e 1 marcada para revisão (turno 3).
 - Clara → Murilo · passagem simulada: 0 aprovadas e 3 marcadas para revisão (todos os turnos).
 - **4 reprovações humanas sem alertas heurísticos.** Os TXT anteriores só exibiam status, não motivo ou conteúdo. Esta alteração permite registrar as justificativas, sem modificar prompts de produção. Os relatórios antigos não permitem inferir o conteúdo incorreto e não devem ser considerados diagnósticos específicos.
+
+## Regressões a partir da segunda avaliação humana — 03/11/2026
+
+Foram recebidos dois TXT revisados, com **6 respostas avaliadas**:
+
+- **Clara → Murilo (3 respostas):** primeira Clara reprovada porque entrou na qualificação comercial sem perguntar se podia passar ao Murilo; segunda Clara reprovada porque pediu dados em vez de reconhecer o aceite e solicitar a passagem; terceira Murilo aprovada. Nenhum alerta heurístico apareceu nos relatórios antigos.
+- **Murilo residencial (3 respostas):** primeiro e terceiro turnos aprovados; segundo reprovado porque não reconheceu explicitamente a informação previamente fornecida: apartamento em Guarulhos. Nenhum alerta heurístico antigo foi disparado.
+
+### Ajustes experimentais, restritos ao laboratório
+
+1. Um complemento de instruções gerado em `server/lab-conversation-coaching.js` é acrescentado ao prompt **somente** quando a UI do V4.2 envia `qaMode='v42'` ao endpoint autenticado `api/phoenix-answer.js`. O endpoint padrão do laboratório RAG, os prompts publicados e o endpoint de clientes `api/v1/conversations/respond.js` **não são alterados por esse complemento**.
+2. Na cotação explícita, Clara recebe orientação para oferecer passagem ao Murilo, sem iniciar perguntas de marca, modelo, placa e ano. Depois de autorização explícita ao Murilo, Clara deve reconhecer o aceite e dizer que **solicitará** a passagem — não afirmar execução operacional.
+3. Murilo recebe orientação para aproveitar dados já fornecidos em mensagem fictícia de cotação residencial (tipo de imóvel + cidade); na simulação recebida, apartamento e Guarulhos. Não repetir perguntas nem afirmar que consultou cadastro.
+4. `assessConversationQaAnswer` agora **alerta** caso a Clara não peça autorização, peça dados de cotação indevidamente depois do aceite, deixe de reconhecer a passagem ou caso Murilo ignore apartamento/Guarulhos no segundo turno. Um alerta é sinal, **não correção automática**, e ainda exige avaliação humana.
+5. Arquivo `tests/megabrain-v42-feedback-regressions.test.js` reproduz os casos reprovados, testa respostas esperadas e comprova que nenhuma chamada real à gestão ou WhatsApp foi acrescentada.
+
+**Importante:** os TXT contêm motivos resumidos, não transcrições completas das respostas. O ajuste é baseado nessas avaliações humanas e precisa ser retestado com respostas geradas pelo modelo. O comportamento de **transferência real Clara → Murilo** continua dependente do Junior e não é simulado como ação concluída.

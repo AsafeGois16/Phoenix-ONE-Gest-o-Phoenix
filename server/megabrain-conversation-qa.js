@@ -122,6 +122,25 @@ export function assessConversationQaAnswer({scenarioId,turnIndex,answer,agent,pr
  if(scenarioId==='clara-refusal'&&turnIndex===1&&
    /\b(?:vou (?:te )?transferir|vou (?:te )?encaminhar|passarei voce|ja encaminhei)\b/i.test(norm))
   notes.push('Possível desrespeito à recusa explícita do cliente.')
+ // Reporter feedback 03/11: the old heuristic missed Clara doing SDR
+ // qualification before consent and Murilo ignoring known type/city.
+ // These checks only WARN; do not turn heuristics into auto-approval.
+ if(scenarioId==='clara-to-murilo'&&agent==='clara'&&turnIndex===0){
+  const offer=/\b(?:posso|quer|deseja|gostaria|autoriza)\b.{0,120}\b(?:encaminh|passar|direcion|transfer)\w*.{0,80}\bmurilo\b/.test(norm)
+    ||/\b(?:posso|quer|deseja|gostaria|autoriza)\b.{0,100}\bmurilo\b/.test(norm)
+  if(!offer)notes.push('Clara não solicitou autorização explícita para encaminhar ao Murilo.')
+  if(/\b(?:qual (?:a |e )?marca|qual (?:o |e )?modelo|qual (?:o |e )?ano|qual (?:e )?a placa|me informe (?:a )?placa)\b/.test(norm))
+   notes.push('Clara pode ter iniciado a qualificação comercial antes da passagem ao SDR.')
+ }
+ if(scenarioId==='clara-to-murilo'&&agent==='clara'&&turnIndex===1){
+  if(!/\bmurilo\b/.test(norm)||!/\b(?:encaminh|passar|direcion|solicitar|seguir|continuar)\w*\b/.test(norm))
+   notes.push('Clara não reconheceu o aceite e o próximo passo com Murilo.')
+  if(/\b(?:qual (?:a |e )?marca|qual (?:o |e )?modelo|qual (?:o |e )?ano|placa|chassi|cpf|cnpj|data de nascimento|endereco completo)\b/.test(norm))
+   notes.push('Clara pediu dados de qualificação ou identificação depois do aceite para Murilo.')
+ }
+ if(scenarioId==='murilo-residencial'&&agent==='murilo'&&turnIndex===1&&
+   (!/\bapartamento\b/.test(norm)||!/\bguarulhos\b/.test(norm)))
+  notes.push('Murilo não reconheceu explicitamente que o cliente informou apartamento em Guarulhos.')
  if(scenarioId==='clara-to-murilo'&&turnIndex===2&&agent==='murilo'&&!containsAgentIntroduction(text,'murilo'))
   notes.push('Murilo pode não ter se apresentado na primeira resposta desta sessão.')
  return {notes,needsReview:notes.length>0,checks:1}
