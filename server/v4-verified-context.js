@@ -17,7 +17,7 @@ const safeName=value=>typeof value==='string'&&SAFE_NAME.test(value.trim())?valu
 const safeEnum=(value,allowed)=>allowed.includes(value)?value:null
 export const safeV4Timestamp=value=>typeof value==='string'&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?(?:Z|[+-]\d\d:\d\d)$/.test(value)&&Number.isFinite(Date.parse(value))?value:null
 
-export function parseVerifiedProfile(raw,scopes,purpose){
+export function parseVerifiedProfile(raw,scopes,purpose,productCode=null){
  if(!raw||typeof raw!=='object'||Array.isArray(raw)||!Array.isArray(scopes))return null
  // Avoid showing name in contexts for which the service did not release
  // the profile explicitly. The API is authoritative about field_scopes.
@@ -28,12 +28,20 @@ export function parseVerifiedProfile(raw,scopes,purpose){
  const person=safeEnum(raw.tipo_pessoa,['pf','pj','PF','PJ'])
  const relation=safeEnum(raw.relacao_com_contrato,['titular'])
  if(relation!=='titular')return null
- return name?{
+ if(!name)return null
+ const profile={
   nome_tratamento:name,
   tipo_pessoa:person?.toLowerCase()||null,
   relacao_com_contrato:relation,
   perfil_atualizado_em:safeV4Timestamp(raw.perfil_atualizado_em)
- }:null
+ }
+ // Junior's exact field_scopes and declared purpose are BOTH required.
+ if(scopes.includes('profile.location')&&['quote','assistance'].includes(purpose)&&
+    typeof raw.cidade_uf==='string'&&/^[\p{L}\p{M} .'-]{2,65}\/[A-Z]{2}$/u.test(raw.cidade_uf))profile.cidade_uf=raw.cidade_uf
+ if(scopes.includes('profile.age_band')&&purpose==='quote'&&
+   ['vida','ap','saude','odonto'].includes(productCode)&&typeof raw.faixa_etaria==='string'&&
+   /^\d{1,2}\s*(?:a|-)\s*\d{1,2}(?:\s*anos)?$/.test(raw.faixa_etaria)&&raw.faixa_etaria.length<=20)profile.faixa_etaria=raw.faixa_etaria
+ return profile
 }
 export function sanitizeV4AutoRisk(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null
@@ -52,13 +60,13 @@ export function sanitizeV4AutoRisk(raw){
  }
  return Object.values(vehicle).some(x=>x!==null)?{vehicle}:null
 }
-export function v4VerifiedSummary(raw,purpose='service'){
+export function v4VerifiedSummary(raw,purpose='service',productCode=null){
  if(!raw||raw.status!=='verified'||!validV4Purpose(purpose))return null
  const expires=raw.expires_at,verified=raw.verified_at
  // Ref-based continuation requires protocol-bound explicit verification.
  if(!safeV4Timestamp(expires)||Date.parse(expires)<=Date.now()||!safeV4Timestamp(verified))return null
  const scopes=Array.isArray(raw.field_scopes)?raw.field_scopes.filter(x=>typeof x==='string'&&x.length<=70).slice(0,40):[]
- const profile=parseVerifiedProfile(raw.verified_profile,scopes,purpose)
+ const profile=parseVerifiedProfile(raw.verified_profile,scopes,purpose,productCode)
  // Junior returns groups as { source: 'cadastro_gestao', updated_at: ISO },
  // never as plain timestamp strings. Whitelist exact keys and values.
  const dataFreshness=raw.data_freshness&&typeof raw.data_freshness==='object'&&!Array.isArray(raw.data_freshness)?

@@ -7,6 +7,7 @@ import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../serv
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
+import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
 import {validVerificationRef,verifiedGreeting} from '../../../server/v4-verified-context.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
@@ -241,6 +242,26 @@ export default async function handler(req,res){
    }
    // If ref is unavailable/expired or Junior omits vehicle, the existing
    // safe quotation triage remains; never infer a vehicle from phone.
+  }
+  // V4.1 universal quotation preparation. This never reads MegaBrain
+  // observations as verification, and never selects an arbitrary insured
+  // item. The Junior must confirm the reference for this SAME protocol.
+  const requestedV41Product=v4Enabled&&agent==='murilo'?detectV41QuoteProduct(activeMessages):null
+  if(requestedV41Product&&requestedV41Product!=='auto'){
+   const priorDocument=findInboundDocument(activeMessages)
+   if(trustedRef||priorDocument.status==='valid'){
+    const verifiedProduct=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),{
+     v4:true,verificationRef:trustedRef,purpose:'quote',productCode:requestedV41Product
+    })
+    if(verifiedProduct.status==='verified'){
+     const summary=summarizeV41VerifiedQuote(verifiedProduct.policies,requestedV41Product)
+     const suggested=replyV41VerifiedQuote(summary,verifiedProduct.verified_profile)
+     if(suggested)return replyToJunior({
+      agent:'murilo',reply:verifiedGreeting(verifiedProduct.verified_profile)+suggested,
+      humanHandoff:false,handoff:null
+     })
+    }
+   }
   }
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
   const document=contextNeeded?findInboundDocument(activeMessages):null
