@@ -59,8 +59,8 @@ export default function MegaBrain({session}){
    <div className="mb-hero-badge"><ShieldCheck size={15}/> Somente leitura</div>
   </section>
   <div className="mb-test-controls">
-   <div><strong>Homologação do MegaBrain</strong><p>Execute casos fictícios antes de liberar qualquer observação de atendimentos reais.</p></div>
-   <button type="button" className="mb-test-toggle" onClick={()=>setTestMode(x=>!x)} aria-expanded={testMode}>{testMode?'Encerrar modo de teste':'Ativar modo de teste'}</button>
+   <div><strong>Laboratório Universal V4.1</strong><p>Execute roteiros fictícios de Clara e Murilo, avalie consentimentos, continuidade e dados autorizados por seguro. Nenhum atendimento real é alterado.</p></div>
+   <button type="button" className="mb-test-toggle" onClick={()=>setTestMode(x=>!x)} aria-expanded={testMode}>{testMode?'Fechar laboratório':'Abrir laboratório de QA'}</button>
   </div>
   {testMode&&<MegaBrainSandbox onClose={()=>setTestMode(false)}/>}
   <div className="mb-metrics">
