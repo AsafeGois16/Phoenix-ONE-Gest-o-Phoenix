@@ -9,7 +9,7 @@
  */
 export const V4_PURPOSES=['service','quote','assistance','policies_and_installments']
 export const V4_PRODUCTS=['auto','moto','frota','residencial','empresarial','vida','ap','saude','odonto','vida_grupo','previdencia','viagem','pet','bike','fianca','garantia','rc','outros']
-export const validVerificationRef=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{48}$/.test(value)
+export const validVerificationRef=value=>typeof value==='string'&&/^[a-f0-9]{48}$/i.test(value)
 export const validV4Purpose=value=>V4_PURPOSES.includes(value)
 export const validProductCode=value=>V4_PRODUCTS.includes(value)
 const SAFE_NAME=/^[\p{L}\p{M}][\p{L}\p{M} .'\u2019-]{0,69}$/u
