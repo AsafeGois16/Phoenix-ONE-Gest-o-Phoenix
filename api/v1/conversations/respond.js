@@ -173,7 +173,7 @@ export default async function handler(req,res){
    if(document.status==='invalid'||document.status==='multiple')return respond({agent:'clara',
      reply:document.status==='multiple'?'Para sua segurança, informe apenas um CPF ou CNPJ do titular do plano.':'O documento informado não passou na validação de formato. Pode conferir e enviar novamente o CPF ou CNPJ do titular?',
      humanHandoff:false,handoff:null})
-   const proof=trustedRef?null:extractVerificationProof(activeMessages,document.type)
+   const proof=extractVerificationProof(activeMessages,document.type)
    let verification
    try{
      verification=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
