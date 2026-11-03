@@ -90,6 +90,25 @@ export function assessConversationQaAnswer({scenarioId,turnIndex,answer,agent,pr
  const others=previous.filter(x=>x.agent===agent&&x.answer)
  const priorIntro=others.some(x=>containsAgentIntroduction(x.answer,agent))
  if(priorIntro&&containsAgentIntroduction(text,agent))notes.push('Possível apresentação repetida de '+(agent==='clara'?'Clara':'Murilo')+'.')
+ // These are highly specific cases where the fictional customer already
+ // answered a question. They are warnings only, never automatic rejections.
+ if(scenarioId==='murilo-residencial'&&turnIndex===1&&
+   /\b(?:qual (?:e |eh )?(?:a )?cidade|em qual cidade|casa ou apartamento|tipo de imovel)\b/.test(norm))
+  notes.push('Possível pergunta repetida: o cliente já informou apartamento e cidade.')
+ if(scenarioId==='murilo-frota'&&turnIndex===1&&
+   /\b(?:quantos? veiculos|qual (?:e |eh )?(?:a )?quantidade de veiculos)\b/.test(norm))
+  notes.push('Possível pergunta repetida: o cliente já informou três veículos utilitários.')
+ if(scenarioId==='murilo-vida'&&turnIndex===1&&
+   /\b(?:qual (?:e |eh )?(?:o )?capital|quanto (?:deseja|quer) (?:de )?capital)\b/.test(norm))
+  notes.push('Possível pergunta repetida: o cliente já informou capital de referência.')
+ // Exact repeated questions are also review signals, without attempting
+ // to judge whether repeating for confirmation would be reasonable.
+ const currentQuestions=(text.match(/[^.!?\n]{6,150}\?/g)||[]).map(normalized).map(x=>x.replace(/\W+/g,' ').trim())
+ const oldQuestions=others.flatMap(x=>(String(x.answer).match(/[^.!?\n]{6,150}\?/g)||[])
+   .map(normalized).map(q=>q.replace(/\W+/g,' ').trim()))
+ if(currentQuestions.some(q=>q.length>=18&&oldQuestions.includes(q)))
+  notes.push('Possível repetição de uma pergunta já feita pelo agente.')
+
  if(norm.match(/\b(?:ja transferi|ja encaminhei|transferencia realizada|ja enviei o boleto|boleto enviado|ja abri (?:o )?ticket|exclusao realizada|inclusao realizada)\b/))
   notes.push('Possível alegação de ação operacional concluída sem integração.')
  if(/\b(?:consultei sua ap[oó]lice|verifiquei sua ap[oó]lice|localizei seu contrato|seu plano consta ativo|sua parcela (?:est[aá]|venceu))\b/i.test(text))
