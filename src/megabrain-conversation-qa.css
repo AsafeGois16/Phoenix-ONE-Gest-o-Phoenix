@@ -49,3 +49,9 @@
 .mcq-success{background:#effaf3;color:#22714b;border:1px solid #cdebd8}
 .mcq-footer{font-size:10px;color:#7b90a6;line-height:1.75;margin:0}
 @media(max-width:620px){.mcq-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.mcq-selection label,.mcq-selection select,.mcq-actions .mbl-run,.mcq-actions .mcq-secondary{width:100%}.mcq-turn{padding:11px}}
+
+.mcq-reason{display:flex;flex-direction:column;gap:10px;margin-top:12px;padding:12px;border-radius:9px;background:#fffaf2;border:1px solid #f1ddbe}
+.mcq-reason label{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:800;color:#70532e}
+.mcq-reason select,.mcq-reason textarea{width:100%;border:1px solid #decaa7;border-radius:8px;padding:10px 11px;background:#fff;color:#435e76;font-family:inherit;font-size:11px;box-sizing:border-box}
+.mcq-reason textarea{resize:vertical;line-height:1.6}
+.mcq-reason>p{font-size:10px;color:#8a7555;line-height:1.6;margin:0}
