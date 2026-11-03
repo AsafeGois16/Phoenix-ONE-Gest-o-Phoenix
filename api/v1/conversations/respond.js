@@ -7,6 +7,7 @@ import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../serv
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
+import {validVerificationRef,verifiedGreeting} from '../../../server/v4-verified-context.js'
 import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
@@ -73,6 +74,9 @@ function checkPayload(body){
  if(!body||typeof body!=='object'||!uuidValid(body.conversation_id)||!/^\d{8}-\d{4}$/.test(body.protocolo||''))return false
  if(!['sugestao','automatico','desligado'].includes(body.mode)||!Array.isArray(body.messages)||body.messages.length<1||body.messages.length>20)return false
  if(body.agent_hint!==undefined&&!validAgent(body.agent_hint))return false
+ // Optional authenticated Junior-to-Phoenix proof reference, never a
+ // customer chat field. Legacy callers remain unchanged while feature is OFF.
+ if(process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'&&body.verification_ref!==undefined&&!validVerificationRef(body.verification_ref))return false
  if(!body.contact||!['cliente','lead','desconhecido'].includes(body.contact.kind))return false
  return !body.messages.some(m=>!m||!['inbound','outbound'].includes(m.direction)||!['contact','agent','staff'].includes(m.author)||!['texto','text'].includes(m.type)||typeof m.text!=='string'||m.text.length>4000)
 }
@@ -219,19 +223,24 @@ export default async function handler(req,res){
   // Cotação do MESMO carro: refazer consulta na gestão só se a identidade
   // for novamente confirmada para este protocolo; não reutilizar o CPF como
   // prova, nem copiar apólices/marcas do histórico do outro agente sem validação.
+  const v4Enabled=process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'
+  // No ref is ever taken from chat history or the model. The management
+  // system may attach this to its authenticated server-side response request.
+  const trustedRef=v4Enabled&&validVerificationRef(body.verification_ref)?body.verification_ref:null
   const autoReuse=agent==='murilo'&&isSameCarQuote(activeMessages)&&!shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
   if(autoReuse){
    const priorDocument=findInboundDocument(activeMessages)
-   if(priorDocument.status==='valid'){
-    const verifiedAuto=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000))
+   if(priorDocument.status==='valid'||trustedRef){
+    const verifiedAuto=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),
+      v4Enabled?{v4:true,verificationRef:trustedRef,purpose:'quote',productCode:'auto'}:{})
     if(verifiedAuto.status==='verified'){
      const summary=summarizeVerifiedAutoForQuote(verifiedAuto.policies)
      const response=sameCarQuoteReply(summary)
-     if(response)return replyToJunior({agent:'murilo',reply:response,humanHandoff:false,handoff:null})
+     if(response)return replyToJunior({agent:'murilo',reply:verifiedGreeting(verifiedAuto.verified_profile)+response,humanHandoff:false,handoff:null})
     }
    }
-   // Se a gestão não liberar modelo/ano, nunca inventar esses dados nem
-   // afirmar que a cotação foi iniciada com informações indisponíveis.
+   // If ref is unavailable/expired or Junior omits vehicle, the existing
+   // safe quotation triage remains; never infer a vehicle from phone.
   }
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
   const document=contextNeeded?findInboundDocument(activeMessages):null
@@ -239,12 +248,12 @@ export default async function handler(req,res){
   let management=null
   if(contextNeeded){
    path='personal_lookup'
-   if(document.status==='missing')return replyToJunior({
+   if(document.status==='missing'&&!trustedRef)return replyToJunior({
      agent,
      reply:'Para localizar seus seguros, apólices ou parcelas com segurança, pode informar o CPF ou CNPJ do titular? Usarei o número somente para consultar o sistema de gestão. A liberação das informações pode exigir uma verificação adicional de identidade.',
      humanHandoff:false,handoff:null
    })
-   if(document.status==='invalid'||document.status==='multiple')return replyToJunior({
+   if(!trustedRef&&(document.status==='invalid'||document.status==='multiple'))return replyToJunior({
      agent,
      reply:document.status==='multiple'?'Recebi mais de um documento. Pode me informar apenas o CPF ou CNPJ do titular do seguro?':'Pode conferir o CPF ou CNPJ do titular e me enviar novamente? O número não passou na validação de formato.',
      humanHandoff:false,handoff:null
@@ -259,8 +268,12 @@ export default async function handler(req,res){
        .catch(error=>({error}))
    }
    const identityStarted=performance.now()
-   const identity=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,controller.signal)
+   const identity=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,controller.signal,
+    v4Enabled?{v4:true,verificationRef:trustedRef,purpose:'service'}:{})
    timing.identityMs=Math.round(performance.now()-identityStarted)
+   if(trustedRef&&['verification_required','verification_expired'].includes(identity.status)){
+    return replyToJunior({agent,reply:'A confirmação de identidade anterior expirou ou não está disponível neste protocolo. Para sua segurança, pode informar novamente o CPF ou CNPJ do titular para iniciar uma nova validação?',humanHandoff:false,handoff:null})
+   }
    if(identity.status==='verification_required' && ['birth_date','cep'].includes(identity.method) && (identity.attemptsLeft===null||identity.attemptsLeft>0)){
      const remaining=identity.attemptsLeft===null?'':' Restam '+identity.attemptsLeft+' tentativa(s) de verificação.'
      const retry=proof?'Não consegui confirmar essa informação. ':''
@@ -288,13 +301,14 @@ export default async function handler(req,res){
        department,reason,summary:'Consulta de seguros/parcelas sem validação documental concluída. A equipe deve validar identidade e vínculo; não divulgar dados contratuais.'
      }})
    }
-   management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[]}
+   management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[],
+    ...(v4Enabled?{verified_profile:identity.verified_profile||null}:{})}
    // Consultas informativas autorizadas são respondidas diretamente a partir da API.
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
    if(agent==='clara'&&isVerifiedReadonlyContext(activeMessages)){
      path='verified_overview'
      const overview=formatVerifiedPortfolio(management,{focus:portfolioFocus(activeMessages),product:requestedPortfolioProduct(activeMessages),maxChars:1770})
-     return replyToJunior({agent,reply:(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?').slice(0,1800),humanHandoff:false,handoff:null})
+     return replyToJunior({agent,reply:(verifiedGreeting(identity.verified_profile)+(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?')).slice(0,1800),humanHandoff:false,handoff:null})
    }
   }
   if(!process.env.OPENAI_API_KEY)return jsonResponse(res,503,{error:'openai_not_configured'})

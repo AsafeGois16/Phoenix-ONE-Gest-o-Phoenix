@@ -1,4 +1,5 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto'
+import {validVerificationRef,validV4Purpose,validProductCode,v4VerifiedSummary} from './v4-verified-context.js'
 
 export const origins={phoenix:'https://phoenix-one-ai.vercel.app'}
 export function secureMatch(a,b){
@@ -35,18 +36,34 @@ export function redact(s){
  .replace(/\b(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}\b/g,'[CONTATO]')
  .replace(/\b\d{8,}\b/g,'[IDENTIFICADOR]')
 }
-export async function juniorIdentityContext(conversationId,protocolo,document,proof,signal){
+export async function juniorIdentityContext(conversationId,protocolo,document,proof,signal,options={}){
  if(!uuidValid(conversationId)||!/^\d{8}-\d{4}$/.test(protocolo))return {status:'unavailable'}
  try{
-  if(!document||document.status!=='valid')return {status:'unavailable'}
-  const payload={conversationId,protocolo,documentType:document.type,document:document.number}
-  if(proof&&Object.keys(proof).length===1){
+  const v4=process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'&&options.v4===true
+  const ref=v4&&validVerificationRef(options.verificationRef)?options.verificationRef:null
+  if(!ref&&(!document||document.status!=='valid'))return {status:'unavailable'}
+  const purpose=v4?(validV4Purpose(options.purpose)?options.purpose:null):'policies_and_installments'
+  if(v4&&!purpose)return {status:'unavailable'}
+  const productCode=v4&&validProductCode(options.productCode)?options.productCode:null
+  const numero=v4&&typeof options.numero==='string'&&/^[\p{L}\p{N} .\/()-]{1,60}$/u.test(options.numero)?options.numero:null
+  if(v4&&purpose==='quote'&&!productCode&&!numero)return {status:'unavailable'}
+  const payload={conversationId,protocolo,
+   ...(ref?{verificationRef:ref}:{documentType:document.type,document:document.number}),
+   ...(v4?{v4:true,purpose,...(productCode?{productCode}:{}),...(numero?{numero}:{})}:{})}
+  if(!ref&&proof&&Object.keys(proof).length===1){
    if(document.type==='cpf'&&typeof proof.birth_date==='string')payload.proof={birth_date:proof.birth_date}
    if(document.type==='cnpj'&&typeof proof.cep==='string')payload.proof={cep:proof.cep}
   }
   const data=await bridge('identity_context',payload,signal)
-  if(data?.status==='verified')return {status:'verified',policies:data.policies||[],installments:data.installments||[],pending:data.pending||[]}
-  const allowed=['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
+  if(data?.status==='verified'){
+   if(!v4)return {status:'verified',policies:data.policies||[],installments:data.installments||[],pending:data.pending||[]}
+   const summary=v4VerifiedSummary(data,purpose)
+   if(!summary)return {status:'unavailable'}
+   return {...summary,policies:Array.isArray(data.policies)?data.policies:[],
+    installments:purpose==='quote'?[]:(Array.isArray(data.installments)?data.installments:[]),
+    pending:Array.isArray(data.pending)?data.pending:[]}
+  }
+  const allowed=['verification_required','verification_expired','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches','unavailable']
   return {status:allowed.includes(data?.status)?data.status:'unavailable',
    method:data?.verification?.method||null,attemptsLeft:Number.isInteger(data?.verification?.attempts_left)?data.verification.attempts_left:null}
  }catch{return {status:'unavailable'}}

@@ -99,7 +99,19 @@ Deno.serve(async request=>{
    const conversationId=data.conversationId,protocolo=data.protocolo
    if(!uuid(conversationId)||typeof protocolo!=='string'||!/^\d{8}-\d{4}$/.test(protocolo))return reply(400,{error:'invalid_identity_request'})
    const doc=typeof data.document==='string'?data.document:'',typ=data.documentType
-   if(!((typ==='cpf'&&/^\d{11}$/.test(doc))||(typ==='cnpj'&&/^\d{14}$/.test(doc))))return reply(400,{error:'invalid_document_format'})
+   // New contract is explicitly OFF until joint homologation.
+   const v4=data.v4===true&&Deno.env.get('PHOENIX_ONE_V4_VERIFIED_CONTEXT')==='true'
+   const ref=v4&&typeof data.verificationRef==='string'&&/^[A-Za-z0-9_-]{48}$/.test(data.verificationRef)?data.verificationRef:null
+   if(!ref&&!((typ==='cpf'&&/^\d{11}$/.test(doc))||(typ==='cnpj'&&/^\d{14}$/.test(doc))))return reply(400,{error:'invalid_document_format'})
+   if(ref&&(doc||data.proof))return reply(400,{error:'ambiguous_verification_request'})
+   const allowedPurposes=['service','quote','assistance','policies_and_installments']
+   const allowedProducts=['auto','moto','frota','residencial','empresarial','vida','ap','saude','odonto','vida_grupo','previdencia','viagem','pet','bike','fianca','garantia','rc']
+   const purpose=v4?data.purpose:'policies_and_installments'
+   if(v4&&!allowedPurposes.includes(purpose))return reply(400,{error:'invalid_purpose'})
+   const productCode=v4&&allowedProducts.includes(data.productCode)?data.productCode:null
+   const policyNumber=v4&&typeof data.numero==='string'&&/^[\p{L}\p{N} .\/()-]{1,60}$/u.test(data.numero)?data.numero:null
+   if(v4&&purpose==='quote'&&!productCode&&!policyNumber)return reply(400,{error:'product_filter_required'})
+
    const proof=data.proof
    let verifiedProof=null
    if(proof!==undefined&&proof!==null){
@@ -129,13 +141,16 @@ Deno.serve(async request=>{
    try{
     response=await fetch(target,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5500),
       headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},
-      body:JSON.stringify({conversation_id:conversationId,protocolo,document_type:typ,document:doc,purpose:'policies_and_installments',...(verifiedProof?{proof:verifiedProof}:{})})
+      body:JSON.stringify({conversation_id:conversationId,protocolo,
+       ...(ref?{verification_ref:ref}:{document_type:typ,document:doc}),
+       purpose,...(productCode?{product_code:productCode}:{}),...(policyNumber?{numero:policyNumber}:{}),
+       ...(!ref&&verifiedProof?{proof:verifiedProof}:{})})
     })
    }catch{return reply(200,{status:'unavailable'})}
    let junior
    try{const raw=await response.text();if(raw.length>128000)return reply(200,{status:'unavailable'});junior=JSON.parse(raw)}catch{return reply(200,{status:'unavailable'})}
    // Não revelar diferenças internas de documento: status apenas para fluxo do agente.
-   const allowed=new Set(['verification_required','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches'])
+   const allowed=new Set(['verification_required','verification_expired','verification_failed','not_found','invalid_document','too_many_attempts','protocol_not_open','multiple_matches'])
    let status=junior?.status
    if(response.status===429)status='too_many_attempts'
    if(response.status===404)status='protocol_not_open'
@@ -152,13 +167,49 @@ Deno.serve(async request=>{
    }
    // Status verificado deve vir da API autenticada do Junior e estar ligado ao documento solicitado.
    // O backend da gestão assume a confirmação, aplica os limites e liga a verificação ao protocolo.
-   if(junior.document_last4!==doc.slice(-4)||
-     (junior.conversation_id&&junior.conversation_id!==conversationId)||
-     (junior.protocolo&&junior.protocolo!==protocolo)||
-     (junior.document_type&&junior.document_type!==typ)||
-     (junior.verification&&junior.verification.status!=='verified'))
-     return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
-   const policies=conn[0].granted_scopes.includes('policies:read')&&Array.isArray(junior.policies)?junior.policies.slice(0,12).map(p=>({
+   const verifiedBinding=ref?
+     // Token replay is accepted ONLY for the exact conversation and protocol,
+     // with a future expiration and a verified status from Junior.
+     junior.conversation_id===conversationId&&junior.protocolo===protocolo&&
+     typeof junior.expires_at==='string'&&Number.isFinite(Date.parse(junior.expires_at))&&Date.parse(junior.expires_at)>Date.now()&&
+     (!junior.verification||junior.verification.status==='verified'):
+     junior.document_last4===doc.slice(-4)&&
+     (!junior.conversation_id||junior.conversation_id===conversationId)&&
+     (!junior.protocolo||junior.protocolo===protocolo)&&
+     (!junior.document_type||junior.document_type===typ)&&
+     (!junior.verification||junior.verification.status==='verified')
+   if(!verifiedBinding)return reply(200,{status:'verification_required',verification:{method:'human',attempts_left:0}})
+   const scopes=v4&&Array.isArray(junior.field_scopes)?junior.field_scopes.filter(x=>typeof x==='string'&&x.length<=70).slice(0,40):[]
+   const canProfile=scopes.includes('verified_profile')||scopes.includes('profile:read')
+   const canRisk=scopes.includes('risk_summary')||scopes.includes('risk:read')
+   const safeName=x=>typeof x==='string'&&/^[\p{L}\p{M}][\p{L}\p{M} .'’\\-]{0,69}$/u.test(x.trim())?x.trim():null
+   const profile=canProfile&&junior.verified_profile?.relacao_com_contrato==='titular'&&safeName(junior.verified_profile?.nome_tratamento)?{
+    nome_tratamento:safeName(junior.verified_profile.nome_tratamento),
+    tipo_pessoa:['pf','pj','PF','PJ'].includes(junior.verified_profile.tipo_pessoa)?junior.verified_profile.tipo_pessoa.toLowerCase():null,
+    relacao_com_contrato:'titular'
+   }:null
+   const label=x=>typeof x==='string'&&/^[\p{L}\p{M}\p{N} .\/()\\-]{1,80}$/u.test(x.trim())?x.trim():null
+   const modelYear=x=>Number.isInteger(x)&&x>=1970&&x<=new Date().getFullYear()+2?x:null
+   const safeVehicle=raw=>{
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))return null
+    const v=raw.vehicle
+    if(!v||typeof v!=='object'||Array.isArray(v))return null
+    return {vehicle:{
+      marca:label(v.marca),modelo:label(v.modelo),marca_modelo:label(v.marca_modelo),
+      versao:label(v.versao),ano_modelo:modelYear(v.ano_modelo),
+      ano_fabricacao:modelYear(v.ano_fabricacao),zero_km:typeof v.zero_km==='boolean'?v.zero_km:null
+    }}
+   }
+   const validV4=v4&&typeof junior.verified_at==='string'&&Number.isFinite(Date.parse(junior.verified_at))&&
+      typeof junior.expires_at==='string'&&Date.parse(junior.expires_at)>Date.now()&&Array.isArray(junior.field_scopes)
+   if(v4&&!validV4)return reply(200,{status:'unavailable'})
+
+   const rawPolicies=Array.isArray(junior.policies)?junior.policies:[]
+   // Defense in depth: quote never leaks a full portfolio if the
+   // management system accidentally ignores its product_code filter.
+   const limitedPolicies=v4&&purpose==='quote'?
+    rawPolicies.filter(p=>productCode?p?.product_code===productCode:p?.numero===policyNumber):rawPolicies
+   const policies=conn[0].granted_scopes.includes('policies:read')?limitedPolicies.slice(0,12).map(p=>({
     numero:cleanString(p?.numero,60),ramo:cleanString(p?.ramo,60),seguradora:cleanString(p?.seguradora,90),fim_vigencia:cleanString(p?.fim_vigencia,30),linha:cleanString(p?.linha,60),
     premio_total:typeof p?.premio_total==='number'&&Number.isFinite(p.premio_total)&&p.premio_total>=0?p.premio_total:null,
     premio_mensal:typeof p?.premio_mensal==='number'&&Number.isFinite(p.premio_mensal)&&p.premio_mensal>=0?p.premio_mensal:null,
@@ -166,6 +217,11 @@ Deno.serve(async request=>{
     status:cleanString(p?.status,45),
     // Campos opcionais de veículo somente após identity/resolve=verified.
     // Jamais encaminhar placa, Renavam, chassi ou identificação de terceiros.
+    // Preserve the EXACT V1 response when V4 is not explicitly enabled.
+    ...(v4?{
+     product_code:allowedProducts.includes(p?.product_code)?p.product_code:null,
+     risk_summary:canRisk?safeVehicle(p?.risk_summary):null
+    }:{}),
     veiculo:(p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo))?{
      marca:cleanString(p.veiculo.marca,60),
      modelo:cleanString(p.veiculo.modelo,60),
@@ -179,7 +235,7 @@ Deno.serve(async request=>{
      return {nome:cleanString(c.nome,140),capital_segurado:validMoney(c.capital_segurado),franquia:validMoney(c.franquia)}
     }).filter(c=>c&&c.nome):[]
    })):[]
-   const installments=conn[0].granted_scopes.includes('installments:read')&&Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
+   const installments=purpose!=='quote'&&conn[0].granted_scopes.includes('installments:read')&&Array.isArray(junior.installments)?junior.installments.slice(0,12).map(i=>({
     apolice:cleanString(i?.apolice,60),ramo:cleanString(i?.ramo,50),vencimento:cleanString(i?.vencimento,30),
     valor:typeof i?.valor==='number'&&Number.isFinite(i.valor)?i.valor:null,vencida:i?.vencida===true
    })):[]
@@ -190,7 +246,16 @@ Deno.serve(async request=>{
     status:cleanString(p?.situacao??p?.status,45),
     due_date:cleanString(p?.prazo??p?.due_date,30)
    })).filter(p=>p.description):[]
-   return reply(200,{status:'verified',policies,installments,pending})
+   // V4 is opt-in; never send the opaque ref to an LLM or WhatsApp.
+   const v4Context=v4?{
+    verified_profile:profile,
+    verification_ref:typeof junior.verification_ref==='string'&&/^[A-Za-z0-9_-]{48}$/.test(junior.verification_ref)?junior.verification_ref:null,
+    verified_at:junior.verified_at,
+    expires_at:junior.expires_at,
+    field_scopes:scopes,
+    data_freshness:junior.data_freshness&&typeof junior.data_freshness==='object'?Object.fromEntries(Object.entries(junior.data_freshness).filter(([k,v])=>['profile','policies','risk_summary','benefits'].includes(k)&&typeof v==='string'&&Number.isFinite(Date.parse(v))).slice(0,4)):null
+   }:{}
+   return reply(200,{status:'verified',policies,installments,pending,...v4Context})
   }
   if(data.action==='event'){
    const v=data.event

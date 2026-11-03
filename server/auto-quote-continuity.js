@@ -15,8 +15,13 @@ export function summarizeVerifiedAutoForQuote(policies){
  const auto=(Array.isArray(policies)?policies:[]).filter(p=>/\b(?:autom[oó]vel|auto|ve[ií]culo|carro|moto)\b/i.test([p?.ramo,p?.linha].join(' ')))
  if(!auto.length)return {status:'no_auto'}
  if(auto.length>1)return {status:'multiple_auto'}
- const p=auto[0],v=p?.veiculo&&typeof p.veiculo==='object'?p.veiculo:{}
- const brand=safe(v.marca),model=safe(v.modelo),modelYear=year(v.ano_modelo)
+ // V4 puts the authenticated risk vehicle inside risk_summary.vehicle.
+ // Legacy verified policies keep their existing optional veiculo field.
+ const p=auto[0],rv=p?.risk_summary?.vehicle
+ const v=rv&&typeof rv==='object'&&!Array.isArray(rv)?rv:
+  p?.veiculo&&typeof p.veiculo==='object'&&!Array.isArray(p.veiculo)?p.veiculo:{}
+ const fallback=safe(v.marca_modelo)
+ const brand=safe(v.marca)||(!safe(v.modelo)?fallback:null),model=safe(v.modelo),modelYear=year(v.ano_modelo)
  const manufactureYear=year(v.ano_fabricacao)
  return {status:'found',brand,model,modelYear,manufactureYear,insurer:safe(p.seguradora)}
 }
