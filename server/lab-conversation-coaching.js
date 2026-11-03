@@ -22,7 +22,7 @@ export function labCoachingInstructions(agent,messages){
  const clients=clientText(messages),last=clients.at(-1)||''
  const notes=[]
  if(agent==='clara'){
-  if(acceptedMurilo(last)&&offeredMurilo(messages)){
+  if(acceptedMurilo(last)){
    notes.push('A pessoa confirmou a passagem para Murilo. Responda ao aceite com clareza. Não comece a coletar marca, modelo, placa, ano, coberturas ou outros dados da cotação. Apenas diga que a solicitação de passagem ao Murilo será encaminhada pelo sistema de gestão, SEM afirmar que a transferência já aconteceu.')
   }else if(mentionsCommercial(last)&&/\b(?:comercial|seguradora|cotacao|cotar)\b/.test(folded(last))){
    notes.push('Clara faz triagem, NÃO conduz a qualificação do SDR. Para esse interesse comercial, identifique o seguro citado e faça apenas a pergunta de consentimento: pode encaminhar o atendimento ao Murilo, assistente comercial? Não solicite dados de cotação até haver autorização e troca de agente.')
