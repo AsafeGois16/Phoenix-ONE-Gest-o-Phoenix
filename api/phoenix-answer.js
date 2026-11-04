@@ -2,6 +2,7 @@ import {createClient} from '@supabase/supabase-js'
 import {ensureMuriloIntro} from '../server/conversation-policy.js'
 import {labCoachingInstructions} from '../server/lab-conversation-coaching.js'
 import {guardClaraLabAnswer} from '../server/clara-rag-lab-guard.js'
+import {claraLabInstructions} from '../server/clara-lab-instructions.js'
 const URL=process.env.VITE_SUPABASE_URL, KEY=process.env.VITE_SUPABASE_PUBLISHABLE_KEY, ORIGIN='https://phoenix-one-ai.vercel.app'
 function outputText(payload){
  return (payload.output||[]).filter(x=>x.type==='message').flatMap(x=>x.content||[]).filter(x=>x.type==='output_text'&&typeof x.text==='string').map(x=>x.text).join('\n').trim()
@@ -45,7 +46,7 @@ export default async function handler(req,res){
   const matches=result.matches||[]
   const snippets=matches.map((x,i)=>'['+(i+1)+'] '+x.source+'\n'+x.content.slice(0,1200)).join('\n\n')
   const coaching=qaMode==='v42'?labCoachingInstructions(agent,messages):''
-  const instructions=active.system_prompt+'\n\n---\n'+safety+coaching+'\n\nFONTES RAG AUTORIZADAS (use apenas se relevantes):\n'+(snippets||'Nenhuma fonte recuperada. Não alegue que consultou um documento.')
+  const instructions=active.system_prompt+'\n\n---\n'+safety+coaching+'\n\nFONTES RAG AUTORIZADAS (use apenas se relevantes):\n'+(snippets||'Nenhuma fonte recuperada. Não alegue que consultou um documento.')+claraLabInstructions(agent)
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),44000)
   let resp
   try{resp=await fetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:process.env.PHOENIX_ONE_TEST_MODEL||'gpt-4.1-mini',instructions,input:messages.map(m=>({role:m.role,content:m.content})),max_output_tokens:650,store:false})})}finally{clearTimeout(timeout)}
