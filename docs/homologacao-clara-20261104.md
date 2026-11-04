@@ -150,3 +150,28 @@ Após revisão dos TXT do Laboratório RAG com prompt **V11**, foram aplicadas *
 **Aprovação ainda pendente de nova geração real de IA** com os mesmos cinco turnos. Critério: 5/5 respostas adequadas sem intervenção do filtro nem coleta de dados, duas conversas separadas, com TXT exportado.
 
 **Sem alterações no prompt mestre V11 no Supabase, Murilo, sistema do Junior, bridge live, WhatsApp ou flags.**
+
+
+## Homologação conversacional aprovada — reteste final em 04/11/2026
+
+**Situação:** APROVADA **somente para os dois cenários conversacionais do Laboratório RAG**, com prompt `v11`. Isso **não significa homologação operacional no sistema do Junior/WhatsApp**, que permanece pendente.
+
+**Evidências fornecidas pelo revisor:** dois TXT exportados pelo Laboratório RAG:
+- `phoenix-one-rag-clara-2026-11-04T14-58-25-026Z.txt` (Saúde — inclusão da esposa, 3 turnos de resposta);
+- `phoenix-one-rag-clara-2026-11-04T14-59-08-601Z.txt` (Auto — segunda via de boleto, 2 turnos de resposta).
+
+**Resultado da revisão humana do texto visível: 5 de 5 respostas aprovadas.**
+
+| Turno | Resultado | Evidência de aceite |
+| --- | --- | --- |
+| Saúde / inclusão da esposa | APROVADO | Direciona ao Backoffice, que confirma condições e documentos da operadora, sem registrar inclusão. |
+| Saúde / documentação incompleta | APROVADO | Orienta procurar Backoffice desde já e informa que a possibilidade de formalizar com documentação incompleta depende da análise competente; não presume impedimento ou início garantido. |
+| Saúde / registrar agora | APROVADO | Informa honestamente não conseguir registrar solicitações no laboratório; direciona formalização para Backoffice. |
+| Auto / segunda via | APROVADO | Indica Financeiro para via oficial; não afirma consultar valores, enviar boleto ou realizar transferência. |
+| Auto / CPF | APROVADO | Responde que CPF não é necessário no laboratório e direciona ao Financeiro sem falar em coleta futura hipotética. |
+
+**Qualidade adicional:** não foram observados pedidos indevidos de dados, prazos inventados, reintroduções repetidas, perguntas de encerramento recorrentes ou avisos de proteção nos dois TXT. A ausência de aviso no TXT não comprova retrospectivamente conteúdo interno da resposta original do modelo; a avaliação refere-se às respostas exibidas e ao formato exportado.
+
+**Decisão:** homologação **conversacional** dos cenários de inclusão Saúde e segunda via Auto da Clara V11 APROVADA em 04/11/2026. Permanecem **pendentes**: autorização de identidade verificada por protocolo, consulta real de carteira/boletos, preservação de contexto, passagem Clara–Murilo, transferências confirmadas, logs operacionais e testes ponta a ponta com Junior e WhatsApp.
+
+**Preservação:** este registro altera somente documentação de homologação; não modifica prompt mestre V11, Murilo, API operacional, banco, bridge live ou flags de integração.
