@@ -138,3 +138,15 @@ Os testes determinísticos de regressão e a compilação devem ser verificados 
 **Correção pretendida B2:** "Neste laboratório não é necessário informar seu CPF. Para a segunda via do boleto, procure o Financeiro pelos canais oficiais da Phoenix." Sem hipótese de coleta futura.
 
 Esta atualização registra evidências e **não modifica código, prompt, flags, banco nem bridge operacional**.
+
+## Correções pontuais após reteste TXT — 04/11/2026
+
+Após revisão dos TXT do Laboratório RAG com prompt **V11**, foram aplicadas **somente às instruções e à guarda de saída da Clara no laboratório** as seguintes correções:
+
+- **Saúde/documentos:** deixar explícito que a falta de documentos NÃO é a razão da impossibilidade técnica do próprio laboratório de registrar a inclusão. O Backoffice pode orientar requisitos desde já; a possibilidade de formalizar depende da análise e das exigências da operadora. A frase observada ("Enquanto estiver com a documentação incompleta, não é possível iniciar formalmente a inclusão aqui neste canal") foi acrescentada aos cenários de regressão.
+- **Auto/CPF:** responder apenas que CPF não é necessário **no laboratório** e indicar o Financeiro; não mencionar hipótese de o Financeiro vir a solicitar dados posteriormente. A frase observada sobre solicitar "dados necessários no canal seguro" foi incluída na regressão.
+- A guarda do laboratório passou a identificar a associação documental indevida e a hipótese de coleta no turno sobre CPF. Se ocorrer intervenção, o painel/TXT avisam; **não contar como aprovação do modelo** apenas porque a resposta substituta é segura.
+
+**Aprovação ainda pendente de nova geração real de IA** com os mesmos cinco turnos. Critério: 5/5 respostas adequadas sem intervenção do filtro nem coleta de dados, duas conversas separadas, com TXT exportado.
+
+**Sem alterações no prompt mestre V11 no Supabase, Murilo, sistema do Junior, bridge live, WhatsApp ou flags.**
