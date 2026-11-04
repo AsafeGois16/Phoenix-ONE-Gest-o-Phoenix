@@ -102,3 +102,19 @@ O prompt mestre segue V11; mudanças limitadas ao laboratório.
 4. **Observabilidade:** se o laboratório disponibilizar `labGuard.applied` e categorias, registrar a evidência na próxima execução. Não supor ausência de bloqueio a partir de screenshots parciais.
 
 **Próxima condição de aceite:** aplicar ajustes apenas no laboratório, sem editar prompt mestre V11 nem bridge/flags/Junior; repetir exatamente as cinco mensagens (duas conversas isoladas), registrar versão, avisos de filtro, avaliação humana, e aprovar somente se 5/5 atenderem aos critérios sem falsas promessas e sem intervenção indevida. A integração operacional permanece não homologada.
+
+## Exportação TXT no Laboratório RAG + correções mínimas (04/11/2026)
+
+A implementação adiciona ao **Laboratório RAG conectado** o botão **Gerar TXT da conversa**, habilitado após pelo menos uma resposta. O arquivo é gerado no navegador e contém todas as mensagens exibidas da conversa em ordem cronológica, incluindo as versões de prompt retornadas nas respostas novas e avisos da proteção. Não consulta banco, fontes RAG, histórico operacional, tokens ou sistema do Junior. Contém o texto literal visível: usar apenas dados fictícios e revisar antes de compartilhar.
+
+O histórico da tela não é mais truncado a cada nova mensagem. **Somente a requisição para a IA** continua limitada às últimas seis mensagens anteriores e à nova pergunta, conforme o contrato da API. O TXT mostra a conversa completa mesmo quando a API recebe uma janela curta de contexto.
+
+Ajustes restritos à **Clara no laboratório**, sem edição do prompt mestre V11:
+- Não garantir início formal de inclusão quando há documentos incompletos; indicar que o Backoffice pode orientar desde já, mas deve conferir exigências antes de confirmar o processo.
+- Reforçar resposta direta quando perguntam se precisam fornecer CPF, sem hipóteses de coleta futura.
+- Retirar perguntas triviais e repetitivas de encerramento (somente quando a resposta já contém uma frase de orientação), mantendo perguntas úteis de triagem.
+- Detectar no filtro local promessas como "você pode iniciar a solicitação mesmo sem todos os documentos".
+
+Os testes determinísticos de regressão e a compilação devem ser verificados no deploy antes da promoção. Após publicar, repetir a geração real das cinco respostas para homologação **conversacional**, pois testes de código não garantem o resultado do modelo.
+
+**Escopo inalterado:** prompts mestres no Supabase, Murilo, bridge operacional, flags de integração, WhatsApp e sistema do Junior.
