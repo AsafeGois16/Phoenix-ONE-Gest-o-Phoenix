@@ -18,7 +18,8 @@ const offeredDoubleAction=/\b(?:posso|podemos|consigo) (?:orientar|ajudar)\b.{0,
 const accountClaim=/\b(?:posso|consigo|vou|irei|podemos) (?:consultar|verificar|acessar|localizar|conferir|checar)\b.{0,90}\b(?:boleto|parcela|apolice|cadastro|valor|vencimento|status|seguro|contrato|informac(?:ao|oes))\b/
 const promisedContact=/\b(?:a equipe|o backoffice|o financeiro|nossos especialistas|um especialista)\b.{0,75}\b(?:entrara em contato|entrarao em contato|vai entrar em contato|vao entrar em contato|vai ligar|vao ligar|retornara|retornarao|dara retorno|darao retorno|vai iniciar o processo|pode iniciar o processo)\b/
 const documentSpecific=/\b(?:leve|tenha|mantenha|separe|providencie|apresente)\b.{0,95}\b(?:rg|cpf|cnpj|documentos pessoais|comprovante de endereco|documentacao)\b/
-const unverifiedStart=/\b(?:iniciar|comecar|abrir|dar entrada)\b.{0,50}\b(?:processo|pedido|inclusao|movimentacao)\b.{0,65}\b(?:sem documentos|documentos incompletos|faltando documentos)\b/
+const unverifiedStart=/\b(?:pode|podemos|consegue|conseguimos|e possivel)\b.{0,30}\b(?:iniciar|comecar|abrir|registrar|dar entrada|dar andamento)\b.{0,70}\b(?:solicitacao|processo|pedido|inclusao|movimentacao)\b.{0,90}\b(?:mesmo sem|sem)\b.{0,45}\b(?:documentos?|documentacao)\b/
+const unverifiedStartReverse=/\b(?:mesmo sem|sem)\b.{0,40}\b(?:documentos?|documentacao)\b.{0,110}\b(?:pode|podemos|e possivel|consegue)\b.{0,35}\b(?:iniciar|abrir|registrar|dar entrada|dar andamento)\b/
 const unverifiedDocumentBarrier=/\b(?:sem (?:todos os |toda a |os )?(?:documentos|documentacao)|enquanto nao tiver (?:todos os |toda a )?(?:documentos|documentacao))\b[^.!?;]{0,130}\b(?:nao (?:consegue|pode|podera)|impossivel|impedid[oa])\b[^.!?;]{0,65}\b(?:andamento|iniciar|iniciad[oa]|concluir|concluid[oa]|inclusao|processo)\b/
 const timingInvented=/\b(?:com urgencia para este mes|ainda neste mes|ate o fim deste mes|em ate \d+ dias|exclusao imediata)\b/
 function affirmativeMatch(pattern,text){
@@ -36,6 +37,15 @@ function sensitiveRequests(text){
   const t=clean(part)
   return sensitive.test(t)&&request.test(t)&&!negative.test(t)
  })
+}
+function removeGenericClosing(text){
+ const original=String(text||'').trim()
+ // Remoção de cortesia trivial no fim; perguntas úteis de triagem são preservadas.
+ const parts=original.match(/^([\s\S]*[.!])\s+([^.!?\n]{8,110}\?)$/)
+ if(!parts)return original
+ const last=clean(parts[2]).trim()
+ const generic=/^(?:posso (?:te )?ajudar (?:com|em) (?:(?:mais )?(?:alguma|algum|outra|outro) (?:informacao|informacoes|orientacao|coisa|duvida|duvidas)|algo mais)\?|deseja que eu explique como proceder\?)$/
+ return generic.test(last)?parts[1].trim():original
 }
 function intent(messages){
  const all=clean(userMessages(messages).join(' ')),last=clean(userMessages(messages).at(-1)||'')
@@ -64,8 +74,8 @@ export function guardClaraLabAnswer({agent,messages,answer}){
  if(affirmativeMatch(offeredUnavailableAction,norm)||affirmativeMatch(offeredDoubleAction,norm))reasons.push('oferta_de_acao_indisponivel')
  if(affirmativeMatch(accountClaim,norm))reasons.push('consulta_nao_disponivel')
  if(promisedContact.test(norm))reasons.push('retorno_ou_inicio_nao_confirmado')
- if(documentSpecific.test(norm)||unverifiedStart.test(norm)||unverifiedDocumentBarrier.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
+ if(documentSpecific.test(norm)||unverifiedStart.test(norm)||unverifiedStartReverse.test(norm)||unverifiedDocumentBarrier.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
  if(timingInvented.test(norm))reasons.push('prazo_nao_confirmado')
- if(!reasons.length)return {answer:original,applied:false,reason:null}
+ if(!reasons.length)return {answer:removeGenericClosing(original),applied:false,reason:null}
  return {answer:SAFE[intent(messages)],applied:true,reason:reasons}
 }
