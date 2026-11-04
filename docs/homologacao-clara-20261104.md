@@ -79,3 +79,26 @@ O prompt mestre segue V11; mudanças limitadas ao laboratório.
 - Nenhuma alteração no prompt mestre V11, ponte de produção, flags ou integração Junior foi realizada por este registro.
 
 **Resultado nesta atualização:** A = 0/3 respostas reais executadas; B = 0/2 respostas reais executadas; aprovação = **PENDENTE**.
+
+## Evidência conversacional humana — capturas recebidas em 04/11/2026 (atualização posterior)
+
+**Esta seção substitui o estado "A = 0/3; B = 0/2" acima para fins de acompanhamento.** Foram fornecidas quatro capturas de tela que exibem as cinco mensagens da Clara respondendo aos dois roteiros exatos em laboratório RAG. Evidência de geração de respostas: **5/5 turnos visíveis**; revisão manual de conteúdo: **3 aceitáveis com ressalvas, 2 requerem ajuste**. Isso **não** equivale a homologação aprovada. As imagens não informam de maneira inequívoca o valor técnico de `labGuard.applied` nem mostram todas as informações de versão da chamada: **não marcar filtro como "não acionado" sem evidência específica**.
+
+### Revisão dos turnos
+
+| Cenário / turno | Estado do conteúdo | Evidência e critério |
+| --- | --- | --- |
+| A1 — inclusão esposa | Aceitável com ressalva | Indica Backoffice e documentos da operadora; não coleta documento nem afirma registro. Termina oferecendo explicar algo que o usuário já deseja saber. |
+| A2 — documentação incompleta | **Reprovar / ajustar** | Afirma "Você pode iniciar a solicitação mesmo sem todos os documentos". Sem requisitos reais da operadora confirmados, não cabe garantir início do processo. Deve orientar contato imediato com Backoffice para checar pendências e possibilidade de prosseguimento **sem prometer início nem impedir orientação**. Final repetitivo. |
+| A3 — registrar agora | Aceitável com ressalva | Diz não ter como registrar movimentações nesse ambiente e indica canal oficial/Backoffice. Final repetitivo. |
+| B1 — segunda via Auto | Aceitável com ressalva | Indica Financeiro e deixa claro que não consulta valores nem envia boletos neste laboratório. Final repetitivo. |
+| B2 — CPF | **Revisar / ajustar** | Responde que CPF não é necessário no laboratório e mantém contexto do Financeiro. Contudo introduz hipótese de o setor solicitar dados no canal seguro, o que não era necessário à pergunta, e repete encerramento. Preferível resposta direta sem explicações hipotéticas de coleta. |
+
+### Problemas de laboratório a considerar para correção mínima
+
+1. **Promessa indevida de início:** rever instrução do laboratório e heurística do filtro de saídas para o caso "pode iniciar a solicitação ... sem todos os documentos" (a heurística atual pode não cobrir o substantivo "solicitação"). Não bloquear orientação neutra de que Backoffice pode esclarecer requisitos mesmo antes de receber documentação completa.
+2. **CPF:** preservar uma negativa direta "Não precisa informar seu CPF neste laboratório. Para a segunda via do boleto, procure o Financeiro pelos canais oficiais da Phoenix.", sem mencionar possíveis futuras exigências.
+3. **Naturalidade:** evitar perguntas de fechamento repetidas e ofertas desnecessárias de orientação quando a resposta já forneceu o próximo passo. Preservar a apresentação única.
+4. **Observabilidade:** se o laboratório disponibilizar `labGuard.applied` e categorias, registrar a evidência na próxima execução. Não supor ausência de bloqueio a partir de screenshots parciais.
+
+**Próxima condição de aceite:** aplicar ajustes apenas no laboratório, sem editar prompt mestre V11 nem bridge/flags/Junior; repetir exatamente as cinco mensagens (duas conversas isoladas), registrar versão, avisos de filtro, avaliação humana, e aprovar somente se 5/5 atenderem aos critérios sem falsas promessas e sem intervenção indevida. A integração operacional permanece não homologada.
