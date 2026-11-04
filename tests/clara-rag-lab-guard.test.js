@@ -125,7 +125,7 @@ test('Clara RAG: server endpoint and UI disclose the guard without ever returnin
  assert.ok(api.includes("answer:protectedAnswer.answer"))
  assert.ok(api.includes("labGuard:{applied:protectedAnswer.applied"))
  assert.ok(ui.includes('labGuardApplied:res.labGuard?.applied===true'))
- assert.ok(ui.includes('Proteção do laboratório aplicada'))
+ assert.ok(ui.includes('labGuardFeedback(m.labGuardReasons)'))
  assert.doesNotMatch(source('api/v1/conversations/respond.js'),/guardClaraLabAnswer/)
  assert.doesNotMatch(source('server/clara-rag-lab-guard.js'),/fetch\(|localStorage|supabase|env\./)
 })
