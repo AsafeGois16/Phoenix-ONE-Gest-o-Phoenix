@@ -12,10 +12,10 @@ test('exporta conversa inteira em ordem com agente e versão do prompt',()=>{
  assert.match(txt,/Laboratório RAG/i)
  assert.match(txt,/Gerado em: 2026-11-04T14:00:00.000Z/)
  assert.match(txt,/Agente: Clara/)
- assert.match(txt,/01 \\| Você\\nPergunta 1/)
- assert.match(txt,/16 \\| Clara \\| prompt v11\\nResposta 8/)
+ assert.match(txt,/01 \| Você\nPergunta 1/)
+ assert.match(txt,/16 \| Clara \| prompt v11\nResposta 8/)
  assert.ok(txt.indexOf('Pergunta 1')<txt.indexOf('Resposta 8'))
- assert.equal((txt.match(/\\| prompt v11/g)||[]).length,8)
+ assert.equal((txt.match(/\| prompt v11/g)||[]).length,8)
 })
 test('inclui aviso de proteção sem exportar respostas bloqueadas',()=>{
  const txt=ragConversationTxt({agent:'clara',messages:[
@@ -25,7 +25,7 @@ test('inclui aviso de proteção sem exportar respostas bloqueadas',()=>{
  assert.match(txt,/Proteção do laboratório aplicada/)
  assert.match(txt,/possível pedido de dados pessoais/)
  assert.doesNotMatch(txt,/Bearer|verification_ref|sources|access_token/)
- assert.match(txt,/sem integração com Junior\\/WhatsApp/)
+ assert.match(txt,/sem integração com Junior\/WhatsApp/)
 })
 test('exportação de Murilo preserva agente correto e tolera histórico vazio',()=>{
  assert.match(ragConversationTxt({agent:'murilo',messages:[{role:'user',content:'Olá'}]}),/Agente: Murilo/)
