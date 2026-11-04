@@ -118,3 +118,23 @@ Ajustes restritos à **Clara no laboratório**, sem edição do prompt mestre V1
 Os testes determinísticos de regressão e a compilação devem ser verificados no deploy antes da promoção. Após publicar, repetir a geração real das cinco respostas para homologação **conversacional**, pois testes de código não garantem o resultado do modelo.
 
 **Escopo inalterado:** prompts mestres no Supabase, Murilo, bridge operacional, flags de integração, WhatsApp e sistema do Junior.
+
+## Reteste conversacional pós-exportação TXT — 04/11/2026
+
+**Evidência recebida:** dois TXT exportados pelo Laboratório RAG em 04/11/2026, horários UTC 13:51:58 e 13:52:45, agente Clara, `prompt v11`. Cenário Saúde 3 respostas e cenário Auto 2 respostas. As exportações incluem texto visível e não apontam intervenção do filtro (`labGuard`), mas não expõem respostas originais bloqueadas.
+
+| Cenário | Turno | Avaliação humana | Justificativa |
+|---|---|---|---|
+| Saúde inclusão esposa | 1 | **Aprovado** | Backoffice indicado, sem dados privados nem afirmação de registro. |
+| Saúde documentação faltante | 2 | **Revisar** | "Enquanto estiver com a documentação incompleta, não é possível iniciar formalmente a inclusão aqui neste canal." É verdade que o laboratório não registra, mas a formulação associa a limitação à documentação incompleta, sugerindo regra não confirmada da operadora. Corrigir para separar atendimento/orientação imediata de possibilidade de formalização sob análise. |
+| Saúde registrar agora | 3 | **Aprovado** | Informa que não registra solicitações neste ambiente; indica canal oficial. |
+| Auto segunda via | 1 | **Aprovado** | Direciona ao Financeiro sem consulta ou envio fictício. |
+| Auto precisa CPF? | 2 | **Revisar** | Responde que CPF não é necessário no laboratório, porém adiciona hipótese de futura coleta pelo Financeiro, contrariando o critério de resposta direta sem hipótese de coleta. |
+
+**Resultado:** 5 respostas reais observadas, **3/5 aprovadas, 2/5 requerem ajuste**. A repetição de encerramentos de cortesia deixou de aparecer nestas respostas, e o botão exportou conversas e versão V11. **Homologação conversacional ainda não aprovada**; repetir os dois roteiros após ajuste pontual, sem tocar prompt mestre V11, Murilo ou integração Junior.
+
+**Correção pretendida A2:** "O Backoffice poderá orientar quais documentos faltam e como proceder. A possibilidade de formalizar a inclusão depende das exigências e da análise da operadora." Evitar vincular a impossibilidade do laboratório aos documentos incompletos.
+
+**Correção pretendida B2:** "Neste laboratório não é necessário informar seu CPF. Para a segunda via do boleto, procure o Financeiro pelos canais oficiais da Phoenix." Sem hipótese de coleta futura.
+
+Esta atualização registra evidências e **não modifica código, prompt, flags, banco nem bridge operacional**.
