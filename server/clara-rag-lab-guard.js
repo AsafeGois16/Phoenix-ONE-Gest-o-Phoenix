@@ -11,7 +11,7 @@ const userMessages=messages=>(Array.isArray(messages)?messages:[])
  .filter(x=>x&&x.role==='user'&&typeof x.content==='string').map(x=>x.content)
 const sensitive=/\b(?:cpf|cnpj|rg|numero do documento|documento de identidade|nome completo|e-?mail|data de nascimento|cep|comprovante de endereco|documentos pessoais|identificador do colaborador|identificacao do dependente)\b/i
 const request=/\b(?:informe|informar|poderia|pode|preciso|necessito|envie|enviar|encaminhe|forneca|fornecer|me passe|me diga|confirme|confirmar|qual e|qual o|qual a|necessario|para seguir|para prosseguir|para acessar)\b/
-const negative=/\b(?:nao precisa|nao e necessario|nao informe|nao envie|sem informar|sem pedir|nao solicito|evite enviar|nao compartilhe|nao solicitar|sem solicitar)\b/
+const negative=/\b(?:nao precis[ao]|nao precisamos|nao necessito|nao e necessario|nao informe|nao envie|sem informar|sem pedir|nao solicito|evite enviar|nao compartilhe|nao solicitar|sem solicitar)\b/
 const actionClaim=/\b(?:ja (?:registrei|encaminhei|transferi|enviei|consultei|verifiquei|emiti|solicitei)|(?:vou|iremos|vamos) (?:registrar|encaminhar|transferir|enviar|consultar|verificar|emitir|solicitar|abrir|acionar)|(?:solicitacao|exclusao|inclusao|encaminhamento|transferencia) (?:ja foi|foi) (?:registrad[ao]|enviad[ao]|realizad[ao]|efetivad[ao])|(?:foi|esta) (?:registrad[ao]|transferid[ao]))\b/
 const offeredUnavailableAction=/\b(?:posso|podemos|consigo|poderia) (?:registrar|encaminhar|transferir|enviar|emitir|abrir|solicitar)\b/
 const offeredDoubleAction=/\b(?:posso|podemos|consigo) (?:orientar|ajudar)\b.{0,80}\be (?:encaminhar|registrar|enviar|solicitar)\b/
@@ -19,6 +19,7 @@ const accountClaim=/\b(?:posso|consigo|vou|irei|podemos) (?:consultar|verificar|
 const promisedContact=/\b(?:a equipe|o backoffice|o financeiro|nossos especialistas|um especialista)\b.{0,75}\b(?:entrara em contato|entrarao em contato|vai entrar em contato|vao entrar em contato|vai ligar|vao ligar|retornara|retornarao|dara retorno|darao retorno|vai iniciar o processo|pode iniciar o processo)\b/
 const documentSpecific=/\b(?:leve|tenha|mantenha|separe|providencie|apresente)\b.{0,95}\b(?:rg|cpf|cnpj|documentos pessoais|comprovante de endereco|documentacao)\b/
 const unverifiedStart=/\b(?:iniciar|comecar|abrir|dar entrada)\b.{0,50}\b(?:processo|pedido|inclusao|movimentacao)\b.{0,65}\b(?:sem documentos|documentos incompletos|faltando documentos)\b/
+const unverifiedDocumentBarrier=/\b(?:sem (?:todos os |toda a |os )?(?:documentos|documentacao)|enquanto nao tiver (?:todos os |toda a )?(?:documentos|documentacao))\b[^.!?;]{0,130}\b(?:nao (?:consegue|pode|podera)|impossivel|impedid[oa])\b[^.!?;]{0,65}\b(?:andamento|iniciar|iniciad[oa]|concluir|concluid[oa]|inclusao|processo)\b/
 const timingInvented=/\b(?:com urgencia para este mes|ainda neste mes|ate o fim deste mes|em ate \d+ dias|exclusao imediata)\b/
 function affirmativeMatch(pattern,text){
  // Negation belongs to the matched verb, never to the entire answer.
@@ -30,7 +31,7 @@ function affirmativeMatch(pattern,text){
 function sensitiveRequests(text){
  // Match each clause separately to avoid flagging "não envie CPF" warnings.
  // This is a warning heuristic; a blocked model response is replaced entirely.
- const clauses=String(text||'').split(/[\n.!?;]+/)
+ const clauses=clean(text).split(/[\n.!?;,]+|\b(?:mas|porem|contudo)\b|\be (?=(?:informe|envie|forneca|confirme|me passe|me diga)\b)/)
  return clauses.some(part=>{
   const t=clean(part)
   return sensitive.test(t)&&request.test(t)&&!negative.test(t)
@@ -63,7 +64,7 @@ export function guardClaraLabAnswer({agent,messages,answer}){
  if(affirmativeMatch(offeredUnavailableAction,norm)||affirmativeMatch(offeredDoubleAction,norm))reasons.push('oferta_de_acao_indisponivel')
  if(affirmativeMatch(accountClaim,norm))reasons.push('consulta_nao_disponivel')
  if(promisedContact.test(norm))reasons.push('retorno_ou_inicio_nao_confirmado')
- if(documentSpecific.test(norm)||unverifiedStart.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
+ if(documentSpecific.test(norm)||unverifiedStart.test(norm)||unverifiedDocumentBarrier.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
  if(timingInvented.test(norm))reasons.push('prazo_nao_confirmado')
  if(!reasons.length)return {answer:original,applied:false,reason:null}
  return {answer:SAFE[intent(messages)],applied:true,reason:reasons}
