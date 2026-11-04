@@ -175,3 +175,23 @@ Após revisão dos TXT do Laboratório RAG com prompt **V11**, foram aplicadas *
 **Decisão:** homologação **conversacional** dos cenários de inclusão Saúde e segunda via Auto da Clara V11 APROVADA em 04/11/2026. Permanecem **pendentes**: autorização de identidade verificada por protocolo, consulta real de carteira/boletos, preservação de contexto, passagem Clara–Murilo, transferências confirmadas, logs operacionais e testes ponta a ponta com Junior e WhatsApp.
 
 **Preservação:** este registro altera somente documentação de homologação; não modifica prompt mestre V11, Murilo, API operacional, banco, bridge live ou flags de integração.
+
+
+## Publicação do prompt mestre Clara V12 — 04/11/2026
+
+Após aprovação conversacional dos 5 turnos em laboratório com prompt **V11**, foi verificado o **prompt mestre efetivamente ativo** no schema privado `phoenix_one.agent_versions` do projeto Supabase Phoenix ONE. O original V11 já contemplava os setores, fluxo de CPF/CNPJ e princípios de segurança, mas não enfatizava três critérios finalizados no laboratório.
+
+Em 04/11/2026, foi publicada **Clara V12**, com um **adendo de escopo mínimo ao final do texto integral da V11**:
+
+1. Backoffice pode orientar antes de toda a documentação estar disponível; nem garantir início, nem presumir impedimento da formalização sem exigência comprovada da operadora. Distinguir limitação técnica do laboratório da exigência da operadora.
+2. Responder pergunta de CPF diretamente em laboratório, sem hipótese de coleta futura; preservar no atendimento integrado a identificação CPF/CNPJ *quando necessária* exclusivamente pelo backend autorizado de Junior, com verificação de identidade e escopo. Não transmitir documento ao LLM.
+3. Evitar perguntas repetitivas de cortesia ao final de respostas completas; preservar triagem útil e apresentação única.
+
+**Verificação no banco:**
+- V11 arquivada (`active=false`), V12 ativa (`active=true`), exatamente uma versão ativa da Clara;
+- 35.650 caracteres originais preservados **sem alteração** como prefixo da V12 (38.195 caracteres no total), mesmo tom;
+- Murilo continua **V5**, sem alterações;
+- Clara permanece em status **testing**, sem ativação de WhatsApp/Junior.
+- V12 foi publicada diretamente na tabela privada de prompts com versionamento e evento de auditoria; **não houve deploy de código nem atualização de flags ou integrações**.
+
+**Atenção sobre homologação:** o resultado **5/5 homologado anteriormente refere-se às respostas geradas com prompt V11 + regras do laboratório**. A V12 agora incorpora os ajustes no prompt mestre, mas ainda exige ao menos um teste rápido com resposta da IA real nessa versão antes de declarar V12 validada. Os testes operacionais com Junior/WhatsApp continuam pendentes.
