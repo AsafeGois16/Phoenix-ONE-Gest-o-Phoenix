@@ -29,3 +29,32 @@ test('preserva o comportamento do Murilo',()=>{
  assert.equal(guard({agent:'murilo',messages:[],answer}).answer,answer)
  assert.equal(guard({agent:'murilo',messages:[],answer}).applied,false)
 })
+
+for(const answer of [
+ 'Você pode iniciar a solicitação mesmo sem todos os documentos, mas o Backoffice confirmará o restante.',
+ 'É possível dar entrada na inclusão mesmo sem toda a documentação.',
+ 'Mesmo sem todos os documentos, você pode iniciar a inclusão.'
+])test('intercepta promessa não verificada de início: '+answer,()=>{
+ const result=check(answer)
+ assert.equal(result.applied,true)
+ assert.ok(result.reason.includes('documentos_ou_inicio_nao_confirmados'))
+})
+for(const [original,expected] of [
+ ['O Backoffice verifica os requisitos da operadora. Posso ajudar com mais alguma informação?','O Backoffice verifica os requisitos da operadora.'],
+ ['Neste ambiente não consigo registrar a inclusão. Posso ajudar com algo mais?','Neste ambiente não consigo registrar a inclusão.'],
+ ['O Financeiro pode orientar sobre a segunda via. Posso ajudar em mais alguma coisa?','O Financeiro pode orientar sobre a segunda via.'],
+ ['O Financeiro trata da segunda via do boleto. Posso ajudar com mais alguma orientação?','O Financeiro trata da segunda via do boleto.'],
+ ['Procure o Backoffice para conferir os requisitos. Deseja que eu explique como proceder?','Procure o Backoffice para conferir os requisitos.']
+])test('remove encerramento repetitivo sem alterar orientação: '+original,()=>{
+ const r=check(original)
+ assert.equal(r.applied,false)
+ assert.equal(r.answer,expected)
+})
+test('preserva pergunta necessária de triagem',()=>{
+ const answer='O Backoffice acompanha a inclusão. O plano é Saúde ou Odonto?'
+ assert.deepEqual(check(answer),{answer,applied:false,reason:null})
+})
+test('não remove encerramento do Murilo',()=>{
+ const answer='Posso ajudar com mais alguma informação?'
+ assert.deepEqual(guard({agent:'murilo',messages:[],answer}),{answer,applied:false,reason:null})
+})
