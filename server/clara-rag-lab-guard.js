@@ -21,6 +21,10 @@ const documentSpecific=/\b(?:leve|tenha|mantenha|separe|providencie|apresente)\b
 const unverifiedStart=/\b(?:pode|podemos|consegue|conseguimos|e possivel)\b.{0,30}\b(?:iniciar|comecar|abrir|registrar|dar entrada|dar andamento)\b.{0,70}\b(?:solicitacao|processo|pedido|inclusao|movimentacao)\b.{0,90}\b(?:mesmo sem|sem)\b.{0,45}\b(?:documentos?|documentacao)\b/
 const unverifiedStartReverse=/\b(?:mesmo sem|sem)\b.{0,40}\b(?:documentos?|documentacao)\b.{0,110}\b(?:pode|podemos|e possivel|consegue)\b.{0,35}\b(?:iniciar|abrir|registrar|dar entrada|dar andamento)\b/
 const unverifiedDocumentBarrier=/\b(?:sem (?:todos os |toda a |os )?(?:documentos|documentacao)|enquanto nao tiver (?:todos os |toda a )?(?:documentos|documentacao))\b[^.!?;]{0,130}\b(?:nao (?:consegue|pode|podera)|impossivel|impedid[oa])\b[^.!?;]{0,65}\b(?:andamento|iniciar|iniciad[oa]|concluir|concluid[oa]|inclusao|processo)\b/
+// Formulações que confundem documento faltante com proibição formal de iniciar.
+// Não são regras da operadora: exigem validação humana no laboratório.
+const ambiguousDocumentBlock=/\b(?:enquanto|porque|devido a)\b.{0,100}\b(?:documentacao incompleta|documentos? (?:incompletos|faltantes|pendentes)|falta de documentos?)\b.{0,110}\b(?:nao e possivel|nao pode|nao consegue|impossivel)\b.{0,65}\b(?:iniciar|formalizar|registrar|dar entrada)\b/
+const hypotheticalCpfCollection=/\b(?:financeiro|equipe|setor)\b.{0,90}\b(?:poder[aá]|pode|vai|devera)\b.{0,35}\b(?:solicitar|pedir|exigir|requerer)\b.{0,70}\b(?:dados|documentos|cpf|identificacao)\b/
 const timingInvented=/\b(?:com urgencia para este mes|ainda neste mes|ate o fim deste mes|em ate \d+ dias|exclusao imediata)\b/
 function affirmativeMatch(pattern,text){
  // Negation belongs to the matched verb, never to the entire answer.
@@ -74,8 +78,11 @@ export function guardClaraLabAnswer({agent,messages,answer}){
  if(affirmativeMatch(offeredUnavailableAction,norm)||affirmativeMatch(offeredDoubleAction,norm))reasons.push('oferta_de_acao_indisponivel')
  if(affirmativeMatch(accountClaim,norm))reasons.push('consulta_nao_disponivel')
  if(promisedContact.test(norm))reasons.push('retorno_ou_inicio_nao_confirmado')
- if(documentSpecific.test(norm)||unverifiedStart.test(norm)||unverifiedStartReverse.test(norm)||unverifiedDocumentBarrier.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
+ if(documentSpecific.test(norm)||unverifiedStart.test(norm)||unverifiedStartReverse.test(norm)||unverifiedDocumentBarrier.test(norm)||ambiguousDocumentBlock.test(norm))reasons.push('documentos_ou_inicio_nao_confirmados')
+ const lastUser=clean(userMessages(messages).at(-1)||'')
+ if(/\bcpf\b/.test(lastUser)&&/\b(?:precisa|preciso|informar|devo|necessario|pedir|enviar)\b/.test(lastUser)&&hypotheticalCpfCollection.test(norm))reasons.push('hipotese_de_coleta_cpf')
  if(timingInvented.test(norm))reasons.push('prazo_nao_confirmado')
  if(!reasons.length)return {answer:removeGenericClosing(original),applied:false,reason:null}
+ if(reasons.includes('hipotese_de_coleta_cpf')&&intent(messages)==='boleto')return {answer:'Neste laboratório, não é necessário informar seu CPF. Para solicitar a segunda via do boleto, procure o Financeiro pelos canais oficiais da Phoenix.',applied:true,reason:reasons}
  return {answer:SAFE[intent(messages)],applied:true,reason:reasons}
 }
