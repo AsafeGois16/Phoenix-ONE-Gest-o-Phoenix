@@ -5,6 +5,7 @@ const labels={
  consulta_nao_disponivel:'afirmação de consulta indisponível',
  retorno_ou_inicio_nao_confirmado:'promessa de contato ou início sem confirmação',
  documentos_ou_inicio_nao_confirmados:'documentos ou início de processo sem confirmação',
+ hipotese_de_coleta_cpf:'hipótese não verificada de coleta de dados após pergunta sobre CPF',
  prazo_nao_confirmado:'prazo sem confirmação'
 }
 export function labGuardFeedback(reasons){
