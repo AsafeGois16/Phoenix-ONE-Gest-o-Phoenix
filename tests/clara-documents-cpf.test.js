@@ -58,3 +58,48 @@ test('não remove encerramento do Murilo',()=>{
  const answer='Posso ajudar com mais alguma informação?'
  assert.deepEqual(guard({agent:'murilo',messages:[],answer}),{answer,applied:false,reason:null})
 })
+
+const documentConversation=[
+ {role:'user',content:'Quero incluir minha esposa no plano de saúde da empresa.'},
+ {role:'assistant',content:'O Backoffice confirma a documentação exigida pela operadora.'},
+ {role:'user',content:'Ainda não tenho todos os documentos dela. Como devo proceder?'}
+]
+const cpfConversation=[
+ {role:'user',content:'Preciso da segunda via do boleto do meu seguro Auto.'},
+ {role:'assistant',content:'O Financeiro pode ajudar com a segunda via oficial.'},
+ {role:'user',content:'Precisa do meu CPF?'}
+]
+test('reteste TXT: impede conclusão documental não verificada em resposta da Clara',()=>{
+ const answer='O Backoffice poderá orientar sobre os documentos necessários e os próximos passos conforme a operadora. Enquanto estiver com a documentação incompleta, não é possível iniciar formalmente a inclusão aqui neste canal.'
+ const result=guard({agent:'clara',messages:documentConversation,answer})
+ assert.equal(result.applied,true)
+ assert.ok(result.reason.includes('documentos_ou_inicio_nao_confirmados'))
+ assert.match(result.answer,/Backoffice/)
+ assert.doesNotMatch(result.answer,/enquanto estiver com a documentação incompleta/i)
+})
+test('orientação documental neutra deve passar sem substituição',()=>{
+ const answer='O Backoffice poderá orientar quais documentos faltam e como proceder. A possibilidade de formalizar a inclusão depende das exigências e da análise da operadora.'
+ const result=guard({agent:'clara',messages:documentConversation,answer})
+ assert.equal(result.applied,false)
+ assert.equal(result.answer,answer)
+})
+test('reteste TXT: alerta para hipótese desnecessária de coleta após pergunta sobre CPF',()=>{
+ const answer='Neste laboratório de teste, não é necessário informar o CPF. Para obter a segunda via do boleto oficial, o setor Financeiro poderá solicitar os dados necessários no canal seguro da Phoenix.'
+ const result=guard({agent:'clara',messages:cpfConversation,answer})
+ assert.equal(result.applied,true)
+ assert.ok(result.reason.includes('hipotese_de_coleta_cpf'))
+ assert.match(result.answer,/não é necessário informar seu CPF/i)
+ assert.doesNotMatch(result.answer,/poderá solicitar os dados/i)
+})
+test('resposta direta de CPF preservada sem aviso ou substituição',()=>{
+ const answer='Neste laboratório não é necessário informar seu CPF. Para a segunda via do boleto, procure o Financeiro pelos canais oficiais da Phoenix.'
+ assert.deepEqual(guard({agent:'clara',messages:cpfConversation,answer}),{answer,applied:false,reason:null})
+})
+test('não marcar a resposta CPF curta em assunto distinto como hipótese',()=>{
+ const answer='Não precisa informar CPF neste laboratório. O Backoffice poderá orientar o procedimento de inclusão.'
+ assert.deepEqual(guard({agent:'clara',messages:cpfConversation,answer}),{answer,applied:false,reason:null})
+})
+test('Murilo permanece sem pós-processamento dos dois casos',()=>{
+ const answer='O Financeiro poderá solicitar os dados necessários no canal seguro.'
+ assert.deepEqual(guard({agent:'murilo',messages:cpfConversation,answer}),{answer,applied:false,reason:null})
+})
