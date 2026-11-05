@@ -255,3 +255,24 @@ Ao finalizar, clicar **Gerar TXT da conversa** e confirmar `Murilo | prompt v8` 
 **Estado:** verificação do banco APROVADA; **homologação conversacional com IA real V8 PENDENTE**. Não confundir aprovação em laboratório com integração Clara–Murilo–Junior/WhatsApp.
 
 Esta atualização refere-se apenas à documentação. O prompt Murilo V8 foi atualizado no Supabase separadamente, sem tocar Clara V12.
+
+
+## Reteste real Murilo V8 — evidência TXT de 05/11/2026
+
+**Evidência:** `phoenix-one-rag-murilo-2026-11-05T11-49-57-929Z.txt`, gerado pelo Laboratório RAG, com cinco respostas exibidas de **Murilo, prompt v8**. Ambiente de simulação, sem integração com Junior/WhatsApp.
+
+| Turno | Resultado de revisão humana | Evidência |
+| --- | --- | --- |
+| 1 — iniciar Frota | Aprovado | Apresenta-se uma vez e pergunta quantidade de veículos. |
+| 2 — três utilitários sem modelos | Aprovado | Reconhece os três veículos e faz pergunta comercial pertinente, sem exigir modelos. |
+| 3 — mudança para exclusão Odonto | Aprovado | Interrompe venda, identifica Backoffice e faz pergunta de orientação sobre a nova demanda. |
+| 4 — pedido explícito de orientação sobre exclusão | **Revisar** | Orienta ao Backoffice sem inventar documentação obrigatória; porém termina com "Posso ajudar com mais alguma coisa?", encerramento genérico desnecessário, e diz "garantindo o correto registro da exclusão", implicando garantia que não está confirmada pela ferramenta. |
+| 5 — cliente retoma a Frota | Aprovado | Recorda três veículos utilitários e modelos não informados; continua com uma pergunta comercial útil, sem reapresentar-se nem afirmar memória persistente. |
+
+**Resultado: 4/5 aprovados, 1/5 pendente.** A falha administrativa de dois questionamentos e oferta de encaminhamento operacional da V7 **não reapareceu** na resposta visível V8. Persistiu fechamento genérico e formulação de garantia não verificada. Sem alegações explícitas de execução já realizada no texto exibido.
+
+**Resposta de referência para o turno 4:** "Para solicitar a exclusão do dependente do plano odontológico, procure o Backoffice da Phoenix pelos canais oficiais. A equipe verificará os documentos necessários e as condições aplicáveis junto à operadora. Neste ambiente de teste, não consigo registrar ou encaminhar solicitações."
+
+**Decisão:** homologação conversacional da V8 ainda **não aprovada (4/5)**, embora demais cenários anteriores tenham sido satisfatórios. Antes de adicionar outra versão extensa ao prompt, recomenda-se avaliar ajuste pontual e verificável apenas para encerramento genérico e promessa de resultado em orientações administrativas, sem alterar os demais elementos do Murilo V8 nem Clara V12. Novos testes de IA real serão necessários. Testes de WhatsApp/Junior e compartilhamento de protocolo permanecem separados.
+
+**Este registro altera somente documentação GitHub**; não modifica prompt Murilo V8, Clara V12, banco operacional, flags, integrações nem WhatsApp.
