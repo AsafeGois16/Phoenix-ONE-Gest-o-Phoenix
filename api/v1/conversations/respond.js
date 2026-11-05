@@ -116,7 +116,10 @@ export default async function handler(req,res){
   const saved=introTask?await introTask:null
   if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
   const isClara=payload.agent==='clara',isMurilo=payload.agent==='murilo'
-  const seen=Boolean(isClara?saved?.clara_apresentada:isMurilo?saved?.murilo_apresentado:false)
+  // A apresentação confirmada no histórico do Junior tem o mesmo peso da flag
+  // persistida. Nunca repetir a apresentação se qualquer fonte já a observou.
+  const spoken=observedAgentIntroductions(body.messages)
+  const seen=Boolean(isClara?(saved?.clara_apresentada||spoken.clara):isMurilo?(saved?.murilo_apresentado||spoken.murilo):false)
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
   payload=enforceHumanHandoffConsent(payload,body.messages)
