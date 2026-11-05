@@ -44,15 +44,29 @@ export function nameIntakeDecision(messages,selectedAgent){
  const intro=list.filter(isAgent)
  const known=clientDeclaredName(list)
  const latest=fold(last.text)
+ // Nome informado após a pergunta da Clara deve avançar imediatamente para o aceite
+ // da passagem comercial, em vez de voltar a iniciar o atendimento.
+ const previousAgent=list.slice(0,-1).reverse().find(isAgent)
+ const nameJustAnswered=Boolean(known&&previousAgent&&namePrompt(previousAgent.text)&&cleanName(last.text)===known)
+ const nameJustDeclared=Boolean(clientDeclaredName([last]))
+ const muriloAlreadySpoke=intro.some(m=>/\\b(?:sou\\s+(?:o\\s+)?murilo|murilo,\\s+do time comercial)\\b/i.test(fold(m.text)))
+ const muriloOfferAlreadySent=intro.some(m=>/\\b(?:posso|deseja|quer)\\b.{0,140}\\b(?:encaminhar|passar|transferir)\\b.{0,120}\\bmurilo\\b/i.test(fold(m.text)))
  // Urgências e solicitações explícitas de humano não podem ser bloqueadas pelo nome.
  if(/\b(?:ferid|acidente|emergencia|socorro|incendio|sinistro urgente|guincho agora|hospital)\b/.test(latest)||
     /\b(?:falar com|quero|preciso|transferir|encaminhar)\b.{0,65}\b(?:humano|atendente|consultor humano|pessoa do atendimento)\b/.test(latest))return null
+ if(selectedAgent==='murilo'&&known&&(nameJustAnswered||nameJustDeclared)&&!muriloAlreadySpoke&&!muriloOfferAlreadySent){
+  return {agent:'clara',reply:'Obrigado, '+known+'! Posso passar seu atendimento ao Murilo, nosso assistente comercial, para continuar a cotação?',humanHandoff:false,handoff:null}
+ }
  if(!intro.length){
   // A coleta obrigatória aqui é só na abertura comercial ou saudação pura.
   // Consultas documentais, movimentações e operações mantêm suas regras de segurança existentes.
   const greeting=/^(?:(?:oi|ola|opa)(?:[, ]+\s*(?:bom dia|boa tarde|boa noite))?|bom dia|boa tarde|boa noite)[!?. ,]*$/.test(latest)
   if(!known&&(selectedAgent==='murilo'||greeting))return {agent:'clara',reply:'Olá! Sou a Clara, assistente virtual da Phoenix Insurance. Como posso te chamar?',humanHandoff:false,handoff:null}
-  if(known&&selectedAgent==='murilo')return {agent:'clara',reply:'Olá, '+known+'! Sou a Clara, assistente virtual da Phoenix Insurance. Posso encaminhar sua cotação ao Murilo, nosso assistente comercial?',humanHandoff:false,handoff:null}
+  // O nome já informado não autoriza nova apresentação da Clara nem uma
+  // segunda oferta se o cliente acabou de dizer "sim" à passagem anterior.
+  if(known&&selectedAgent==='murilo'&&nameJustDeclared&&!muriloOfferAlreadySent){
+   return {agent:'clara',reply:'Obrigado, '+known+'! Posso passar seu atendimento ao Murilo, nosso assistente comercial, para continuar a cotação?',humanHandoff:false,handoff:null}
+  }
   return null
  }
  if(selectedAgent!=='murilo'||known)return null
