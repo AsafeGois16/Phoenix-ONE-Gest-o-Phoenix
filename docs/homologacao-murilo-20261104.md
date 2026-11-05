@@ -155,3 +155,43 @@ Foram examinadas duas transcrições exportadas pelo **Laboratório RAG**, ambas
 **Correção mínima proposta, ainda não implementada:** quando uma conversa comercial muda para exclusão/inclusão ou outro pós-venda, reconhecer a nova intenção, identificar Clara/Backoffice, suspender a qualificação comercial e oferecer **um único próximo passo**, sem perguntar simultaneamente sobre continuar vendendo. Preservar informações já recebidas *na própria conversa*; não afirmar memória persistente, registro ou transferência se a API não confirmou. Permanecer com todos os demais trechos do Murilo V6 e a Clara V12 intocados.
 
 **Decisão:** homologação integral da bateria Murilo V6 permanece **PENDENTE** de um ajuste e reteste de M5/3. O cenário de handoff real Clara–Murilo e a integração com Junior continuam pendentes e separados. Este registro altera apenas documentação.
+
+
+## Murilo V7 — correção de mudança de assunto e reteste final (05/11/2026)
+
+A segunda bateria do Murilo V6 obteve **5/6 respostas aprovadas**; uma resposta exigia ajustar a prioridade da exclusão odontológica durante uma cotação de Frota. Após autorização, foi publicado o **prompt mestre Murilo V7** no schema `phoenix_one.agent_versions` do Supabase Phoenix ONE.
+
+### Modificação aplicada (apenas adendo ao final da V6)
+
+- Ao surgir inclusão, exclusão, movimentação de beneficiários ou outra demanda de Backoffice, **priorizar a necessidade administrativa e interromper temporariamente a qualificação comercial** na resposta.
+- Reconhecer a equipe Clara/Backoffice, fazer **apenas uma pergunta útil** relativa ao encaminhamento administrativo e **não adicionar**, no mesmo turno, "Podemos seguir com a cotação?".
+- Reaproveitar os dados comerciais efetivamente presentes no histórico quando a conversa de venda for retomada; **não afirmar memória persistente, ticket criado, transferência feita ou dados salvos** sem retorno de ferramenta autorizada. Se não houver integração, apenas orientar o próximo passo.
+- Preservar os demais princípios de emergência, segurança, privacidade, apresentação única, qualificação progressiva e todos os ramos.
+
+### Verificação pós-publicação
+
+Consulta direta ao banco confirmou:
+- Murilo V6 com **10.330 caracteres** integralmente preservados como prefixo da V7, que tem **12.195 caracteres**; mesmo tom de voz;
+- V6 inativa e V7 ativa, **exatamente uma versão ativa** do Murilo;
+- Clara V12 intacta, hash de texto `cd2737e43d54a29a517bb51fbe5f5d93`;
+- status Murilo = `testing`; conexão `junior_management` = `disabled`.
+- Nenhum arquivo de código, prompt da Clara, flag de integração, mensagem WhatsApp ou tabela CRM LEADS foi modificado para este ajuste. A edição foi somente do prompt do Murilo no Supabase.
+
+### Reteste final — uma conversa de Frota com cinco turnos
+
+Entrar no **Laboratório RAG conectado** e selecionar **Murilo**. Manter desmarcada a opção "Somente recuperar fontes". Iniciar **conversa nova** e enviar, uma a uma, as seguintes mensagens fictícias:
+
+1. `Preciso de uma cotação de seguro Frota para uma empresa.`
+2. `São três veículos utilitários, mas ainda não tenho os modelos.`
+3. `Antes de continuar, também preciso excluir um dependente do plano odontológico da empresa.`
+4. `Sim, pode me orientar sobre como solicitar a exclusão?`
+5. `Obrigado. Agora quero voltar à cotação da frota. O que já te informei?`
+
+**Aceite por turno:**
+1. Apresentação única e pergunta comercial pertinente, sem CPF/CNPJ antecipado.
+2. Reconhecer os três utilitários, sem bloquear por falta dos modelos.
+3. **Ponto crítico:** priorizar Odonto/Backoffice ou Clara, fazer **uma pergunta principal** e NÃO perguntar simultaneamente sobre retomar a Frota, nem afirmar handoff realizado.
+4. Orientação geral ao Backoffice sem inventar documentos específicos, protocolo, registro ou transferência concluída.
+5. Recuperar as informações disponíveis na conversa, especialmente **três veículos utilitários** e **modelos ainda não informados**, retomando comercial sem reapresentação nem perguntas já respondidas. Não declarar que salvou dados fora do histórico.
+
+Exportar um TXT com **Gerar TXT da conversa**, conferir `Murilo | prompt v7` e encaminhar para revisão. Critério final de aceite: 5/5 respostas adequadas, uma única apresentação, zero transferências/consultas alegadas sem confirmação e preservação do contexto textual. **Ainda não executado com IA real** nesta publicação: aprovação conversacional Murilo V7 permanece **PENDENTE**. A integração ponta a ponta Clara–Murilo–Junior/WhatsApp também permanece pendente.
