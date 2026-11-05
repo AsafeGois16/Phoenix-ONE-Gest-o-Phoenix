@@ -27,7 +27,10 @@ test('Clara solicita nome que faltava antes de passar cotação ao Murilo',()=>{
 test('nomes explícitos são reconhecidos sem repetir pergunta',()=>{
  assert.equal(clientDeclaredName([inc('Oi, meu nome é Asafe Gois. Quero cotar seguro Auto.')]),'Asafe Gois')
  assert.equal(clientDeclaredName([inc('Pode me chamar de Ana Clara')]),'Ana Clara')
- assert.equal(nameIntakeDecision([inc('Quero cotar seguro Auto'),clara,inc('Asafe Gois')],'murilo'),null)
+ const afterName=nameIntakeDecision([inc('Quero cotar seguro Auto'),clara,inc('Asafe Gois')],'murilo')
+ assert.equal(afterName.agent,'clara')
+ assert.match(afterName.reply,/Posso passar.*Murilo/i)
+ assert.doesNotMatch(afterName.reply,/Sou a Clara/i)
 })
 test('resposta curta à pergunta da Clara constitui nome, mas um sim não',()=>{
  assert.equal(clientDeclaredName([inc('Oi'),clara,inc('Asafe Gois')]),'Asafe Gois')
@@ -36,7 +39,7 @@ test('resposta curta à pergunta da Clara constitui nome, mas um sim não',()=>{
 test('cotação inicial com nome informado segue com aceite Clara→Murilo',()=>{
  const decision=nameIntakeDecision([inc('Me chamo Luiza. Quero fazer cotação Auto')],'murilo')
  assert.equal(decision.agent,'clara')
- assert.match(decision.reply,/Posso encaminhar.*Murilo/i)
+ assert.match(decision.reply,/Posso (?:encaminhar|passar).*Murilo/i)
 })
 test('se Clara já perguntou nome uma vez, não bloqueia o cliente que preferir não informar',()=>{
  assert.equal(nameIntakeDecision([inc('Oi'),clara,inc('Prefiro não informar')],'murilo'),null)
