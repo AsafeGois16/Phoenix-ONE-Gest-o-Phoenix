@@ -5,7 +5,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff} from '../../../server/commercial-intake.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
@@ -59,6 +59,7 @@ const criticalInstructions=[
  'O sistema pode fornecer continuidade operacional por protocolo: agente anterior, intenção e etapa sem dados pessoais. Não interprete memória operacional como prova de titularidade nem como autorização de dados privados.',
  'REGRA GLOBAL PARA TODOS OS PRODUTOS: identifique primeiro a intenção da conversa inteira. Cobertura de assistência funeral, indenização por falecimento, assistência 24 horas, invalidez e outras proteções citadas em uma cotação pertencem ao Murilo; acionamento de assistência, sinistro ou emergência real pertencem à Clara. Uma palavra isolada como assistência NÃO justifica troca de agente.',
  'DURANTE COTAÇÃO: Murilo conduz a qualificação progressiva de Vida, Saúde, Odonto, Auto, Frota, Residencial, Empresarial, Viagem, Pet, Bike e demais ramos. Utilize informações já fornecidas e faça uma pergunta principal por mensagem. Evite repetir idade, profissão, nome e objetivos que já estejam no histórico.',
+ 'QUANDO A QUALIFICAÇÃO COMERCIAL ESTIVER SUFICIENTE: ofereça passar ao consultor responsável e aguarde o aceite; não diga que está calculando, enviará valores ou retornará em breve sem ferramenta operacional confirmada. Para Auto, Frota e RE o destino é Auto/RE (patrimonio). Após aceite explícito, humanHandoff=true com resumo e nome declarado, e o Junior executará o encaminhamento.',
  'DADOS PESSOAIS: na simulação inicial não peça CPF, CNPJ, foto de documento, endereço residencial completo nem data de nascimento para autenticação. Quando a etapa contratual de uma proposta exigir dados adicionais, explique a finalidade e encaminhe a um fluxo seguro da equipe; idade aproximada e cidade podem ser suficientes para qualificação preliminar quando pertinentes.',
  'VALIDAÇÃO HONESTA: nome, documento ou data de nascimento digitados pelo cliente não confirmam identidade. Só diga identidade validada quando a API do Junior efetivamente retornar status verified para o protocolo. Nunca use o contexto de vendas para consultar apólices privadas sem autorização.',
  'TRANSFERÊNCIA CLARA-MURILO: mudança entre agentes depende de alteração real da intenção; escolher coberturas durante cotação mantém Murilo. Atendimento humano só é acionado quando necessário e com resumo, sem assumir que o ticket foi transferido antes de retorno do sistema.',
@@ -119,6 +120,7 @@ export default async function handler(req,res){
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
   payload=enforceHumanHandoffConsent(payload,body.messages)
+  payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
   payload=alignAutoReHandoff(payload,body.messages)
@@ -167,7 +169,7 @@ export default async function handler(req,res){
  if(intake)return replyToJunior(intake)
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
- const confirmed=confirmedOfferHandoff(body.messages)
+ const confirmed=confirmedOfferHandoff(body.messages,agent)
  if(confirmed)return replyToJunior(confirmed)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
