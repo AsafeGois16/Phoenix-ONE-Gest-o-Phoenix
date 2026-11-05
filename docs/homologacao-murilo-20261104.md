@@ -80,3 +80,34 @@ Foram recebidas três transcrições TXT exportadas pelo Laboratório RAG, todas
 **Próximas ações sugeridas, sem editar automaticamente o prompt:** reforçar reconhecimento explícito de dados de imóvel/cidade quando recém-informados e preferência por uma pergunta principal na abertura da passagem comercial. Preservar o prompt Murilo V5 como base e toda a Clara V12. Repetir os turnos afetados antes de concluir a homologação; os cenários Vida e Frota seguem pendentes.
 
 **Registro documental apenas:** não foram alterados prompts, integração, produção, flags, dados de cliente nem o bridge do Junior.
+
+
+## Publicação do Murilo V6 e reteste focal — 05/11/2026
+
+Após os três TXT de 05/11/2026 (primeira bateria: 7/9 respostas aprovadas e duas para revisão), foi acrescentado **um adendo de escopo mínimo** ao fim do prompt mestre Murilo V5 diretamente no Supabase Phoenix ONE. O novo prompt foi publicado como **Murilo V6** e a V5 foi preservada no histórico.
+
+**Regra A — continuidade residencial:** reconhecer explicitamente, de modo breve e natural, o tipo de imóvel e a cidade recém-informados (por exemplo: "apartamento em Guarulhos") antes de seguir com a próxima pergunta útil; não repetir dados mecanicamente, nem pedir de novo o que já foi informado.
+
+**Regra B — passagem comercial:** inclusive após relato de encaminhamento pela Clara, apresentar-se somente uma vez e fazer uma pergunta principal por resposta. Não combinar duas perguntas independentes (p.ex., próprio/frota + cobertura desejada); usar contexto disponível e aguardar a resposta. Relato de autorização não comprova transferência real.
+
+**Verificação do banco:** Murilo V5 (8.371 caracteres) preservado como prefixo exato da V6 (10.330 caracteres), mesmo tom, V5 inativa, V6 ativa e única versão ativa, status `testing`. Clara V12 preservada, inclusive hash MD5 do prompt `cd2737e43d54a29a517bb51fbe5f5d93`. Integração `junior_management` continua `disabled`.
+
+### Reteste focal (duas conversas isoladas, dados fictícios)
+
+**R1 — Residencial / três turnos**
+1. "Quero cotar um seguro residencial."
+2. "É um apartamento em Guarulhos. Quero proteger meus bens."
+3. "Não sei a metragem ainda. Dá para seguir?"
+
+Critérios: o modelo responde com apresentação única; após o turno 2 menciona corretamente apartamento e Guarulhos sem repetir perguntas; no turno 3 continua a triagem sem bloquear por falta da metragem; faz uma pergunta principal por turno e não promete cotação/registro.
+
+**R2 — Passagem simulada da Clara / três turnos**
+1. "A Clara me explicou que vocês fazem cotações e eu autorizei falar com o Murilo. Quero comparar meu seguro Auto atual com outras seguradoras."
+2. "É renovação. Meu seguro vence no próximo mês e tenho um Corolla 2021."
+3. "Quero melhorar a assistência e conferir os valores, mas não tenho a apólice antiga comigo."
+
+Critérios: apresentação única, primeira resposta com somente uma pergunta principal; não declarar passagem efetiva, aproveitar renovação/Corolla 2021/vencimento e objetivo; continuar qualificação sem exigir apólice antiga como barreira; não inventar valores, coberturas ou consultas.
+
+**Como testar:** acessar https://phoenix-one-ai.vercel.app/ → Laboratório RAG conectado → selecionar Murilo → manter desmarcada "Somente recuperar fontes". Iniciar uma conversa nova para cada cenário, enviar mensagens uma por vez e ao fim usar **Gerar TXT da conversa**. Conferir `prompt v6` nas seis respostas. Encaminhar os dois arquivos para revisão humana por turno.
+
+**Aprovação pendente:** a publicação e o versionamento no banco estão validados; a geração ao vivo e os critérios do reteste acima **não foram ainda executados**. A homologação operacional com Junior/WhatsApp e a passagem real com contexto permanecem pendentes. Nenhum arquivo de código, prompt Clara, flag de integração ou base LEADS foi alterado.
