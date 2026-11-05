@@ -191,7 +191,8 @@ test('cumprimento curto consulta só prompt e não pesquisa a biblioteca RAG',()
  await handler(request(['Oi']),res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'clara')
- assert.deepEqual(actions,['intro_status','prompt_only'])
+ assert.deepEqual(actions,['intro_status']) // A Clara pede o nome sem acionar RAG ou OpenAI
+ assert.match(res.body.reply,/Como posso te chamar/i)
 }))
 test('CPF ausente: resposta imediata sem buscar RAG e sem chamar OpenAI',()=>withMock(async()=>{
  let requests=0
