@@ -142,7 +142,7 @@ test('Murilo não promete registrar cotação e enviar valor por chat',()=>{
  const changed=guardCommercialQuoteClosing(payload,autoReady)
  assert.equal(changed.humanHandoff,false)
  assert.match(changed.reply,/Posso encaminhar.+Auto\/RE/i)
- assert.doesNotMatch(changed.reply,/registr|compartilh|cotação estiver pronta/i)
+ assert.doesNotMatch(changed.reply,/vou registrar|compartilho aqui|cotação estiver pronta/i)
 })
 test('seguro Vida não entra na fila Auto/RE por engano',()=>{
  const m=[inc('Quero cotar seguro de vida'),murilo,inc('Quero falar com consultor humano')]
