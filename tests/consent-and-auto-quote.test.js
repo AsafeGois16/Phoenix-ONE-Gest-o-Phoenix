@@ -80,7 +80,7 @@ test('ambiguidade entre vários veículos não escolhe aleatoriamente o seguro',
 test('proteção e continuidade estão integradas no endpoint real antes de qualquer resposta',()=>{
  const route=readFileSync(new URL('../api/v1/conversations/respond.js',import.meta.url),'utf8')
  assert.match(route,/payload=enforceHumanHandoffConsent\(payload,body\.messages\)/)
- assert.match(route,/confirmedOfferHandoff\(body\.messages\)/)
+ assert.match(route,/confirmedOfferHandoff\(body\.messages,agent\)/)
  assert.match(route,/decideMuriloSwitch\(body\.messages,agent\)/)
  assert.match(route,/juniorIdentityContext\(body\.conversation_id,body\.protocolo,priorDocument,null/)
  assert.match(route,/verifiedAuto\.status==='verified'/)
