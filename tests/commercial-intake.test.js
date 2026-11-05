@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff} from '../server/commercial-intake.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing} from '../server/commercial-intake.js'
 
 const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
 const out=text=>({direction:'outbound',author:'agent',type:'text',text})
@@ -77,4 +77,22 @@ test('sem decisão de transferência, o backend nunca cria handoff',()=>{
 test('sem nome declarado não inventa nome a partir de metadados',()=>{
  const result=alignAutoReHandoff(transfer(),[inc('Quero cotar seguro Auto')])
  assert.match(result.handoff.summary,/Nome de tratamento ainda não informado/)
+})
+
+test('promessa fictícia de retorno vira pedido de autorização ao Auto/RE',()=>{
+ const messages=[inc('Quero cotar seguro Auto'),clara,inc('Asafe Gois'),inc('Meu carro é um Onix 2023, em Guarulhos'),murilo,inc('Padrão')]
+ const payload={agent:'murilo',reply:'Vou consolidar suas informações para preparar sua cotação e retorno em breve com as opções disponíveis.',humanHandoff:false,handoff:null}
+ const result=guardCommercialQuoteClosing(payload,messages)
+ assert.equal(result.humanHandoff,false)
+ assert.equal(result.handoff,null)
+ assert.match(result.reply,/Posso encaminhar.+Auto\/RE/i)
+ assert.doesNotMatch(result.reply,/retorno em breve/i)
+})
+test('pergunta comercial adequada não é substituída pela oferta de encaminhamento',()=>{
+ const base={agent:'murilo',reply:'Qual a cidade de circulação do veículo?',humanHandoff:false,handoff:null}
+ assert.equal(guardCommercialQuoteClosing(base,[inc('Quero cotar seguro Auto')]),base)
+})
+test('cotação que não é Auto/RE não sofre reescrita automática',()=>{
+ const base={agent:'murilo',reply:'Vou preparar sua cotação e retorno em breve com opções.',humanHandoff:false,handoff:null}
+ assert.equal(guardCommercialQuoteClosing(base,[inc('Quero cotar seguro de vida')]),base)
 })
