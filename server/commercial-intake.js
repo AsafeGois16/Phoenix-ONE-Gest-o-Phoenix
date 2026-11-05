@@ -49,8 +49,8 @@ export function nameIntakeDecision(messages,selectedAgent){
  const previousAgent=list.slice(0,-1).reverse().find(isAgent)
  const nameJustAnswered=Boolean(known&&previousAgent&&namePrompt(previousAgent.text)&&cleanName(last.text)===known)
  const nameJustDeclared=Boolean(clientDeclaredName([last]))
- const muriloAlreadySpoke=intro.some(m=>/\\b(?:sou\\s+(?:o\\s+)?murilo|murilo,\\s+do time comercial)\\b/i.test(fold(m.text)))
- const muriloOfferAlreadySent=intro.some(m=>/\\b(?:posso|deseja|quer)\\b.{0,140}\\b(?:encaminhar|passar|transferir)\\b.{0,120}\\bmurilo\\b/i.test(fold(m.text)))
+ const muriloAlreadySpoke=intro.some(m=>/\b(?:sou\s+(?:o\s+)?murilo|murilo,\s+do time comercial)\b/i.test(fold(m.text)))
+ const muriloOfferAlreadySent=intro.some(m=>/\b(?:posso|deseja|quer)\b.{0,140}\b(?:encaminhar|passar|transferir)\b.{0,120}\bmurilo\b/i.test(fold(m.text)))
  // Urgências e solicitações explícitas de humano não podem ser bloqueadas pelo nome.
  if(/\b(?:ferid|acidente|emergencia|socorro|incendio|sinistro urgente|guincho agora|hospital)\b/.test(latest)||
     /\b(?:falar com|quero|preciso|transferir|encaminhar)\b.{0,65}\b(?:humano|atendente|consultor humano|pessoa do atendimento)\b/.test(latest))return null
