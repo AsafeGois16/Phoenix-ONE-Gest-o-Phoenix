@@ -5,6 +5,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
@@ -38,6 +39,7 @@ const criticalInstructions=[
  'REGRA DE APRESENTAÇÃO ÚNICA POR PROTOCOLO: Clara e Murilo se apresentam na primeira resposta própria, mesmo quando alternam. Se já se apresentaram neste protocolo, não repitam nome, cargo nem fórmula de primeira apresentação. Cumprimente naturalmente sem se reapresentar. O servidor mantém memória privada independente de cada agente.',
  'Sistema de Gestão Phoenix (Junior) é o único sistema operacional autorizado, e recebe de você apenas a PROPOSTA de resposta e de encaminhamento. 4Zapy, WhatsApp, protocolo, envio de mensagens e transferências pertencem ao Junior.',
  'Nunca declare que abriu ou transferiu ticket, enviou boleto, fez alteração ou consultou apólice sem contexto real autorizado fornecido abaixo. O sistema adicionará o número do protocolo automaticamente. Você não deve repeti-lo.',
+ 'Quando o cliente informar como prefere ser chamado, preserve esse nome na qualificação e no resumo para o consultor. O nome de exibição do WhatsApp não é prova de que o nome foi confirmado pelo cliente. A Clara pergunta o nome no acolhimento antes da passagem comercial, sem bloquear emergências.',
  'Use o nome de exibição se disponível e adequado. Não peça telefone que já é conhecido pelo sistema. Não exponha CPF, CNPJ, telefone ou identificadores internos na resposta.',
  'Identificação: telefone é apenas o canal de contato e NUNCA prova quem possui um seguro. Telefone pode estar vinculado a várias pessoas ou não estar cadastrado. Só acesse seguros, apólices, boletos ou parcelas particulares mediante consulta por CPF/CNPJ via API do Junior e identidade efetivamente verificada no protocolo.',
  'CPF/CNPJ é chave de localização, não autenticação. Peça o documento uma única vez somente para consulta solicitada; aceite o número digitado e nunca diga que é proibido recebê-lo depois de solicitar. Não peça foto do documento. Não repita o número fornecido e não o envie à OpenAI.',
@@ -117,6 +119,9 @@ export default async function handler(req,res){
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
   payload=enforceHumanHandoffConsent(payload,body.messages)
+  // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
+  // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
+  payload=alignAutoReHandoff(payload,body.messages)
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
   if(isClara){
@@ -152,6 +157,10 @@ export default async function handler(req,res){
   console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
   return null
  })
+ // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
+ // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
+ const intake=nameIntakeDecision(body.messages,agent)
+ if(intake)return replyToJunior(intake)
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
  const confirmed=confirmedOfferHandoff(body.messages)
@@ -357,6 +366,7 @@ export default async function handler(req,res){
   const situation=[
     'CONTEXTO AUTORIZADO PELO SISTEMA JUNIOR:',
     'Nome de exibição: '+(name||'não informado'),
+    'Nome de tratamento declarado pelo cliente: '+(clientDeclaredName(body.messages)||'não informado pelo cliente; não inferir pelo perfil WhatsApp'),
     'Tipo de contato: '+body.contact.kind,
     'Agente escolhido após triagem de intenção: '+agent,
     'Fila atual: '+(DEPARTMENTS.includes(body.contact.department)?body.contact.department:'não informada'),
