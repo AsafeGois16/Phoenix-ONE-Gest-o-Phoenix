@@ -32,7 +32,7 @@ const offer=out('Claro! Posso encaminhar sua conversa ao Murilo, nosso assistent
 const idMock=(body)=>({ok:true,status:200,async json(){return body}})
 test('Clara nunca muda para Murilo no primeiro pedido de cotação sem aceitar a troca',async()=>{
  const requests=[]
- const r=await run([inc('Oi'),intro,quote],async(url,opts)=>{
+ const r=await run([inc('Oi'),intro,inc('Meu nome é Luiza'),quote],async(url,opts)=>{
   const body=JSON.parse(opts.body);requests.push(body.action);assert.equal(body.action,'intro_status');return idMock({clara_apresentada:true,murilo_apresentado:false})
  })
  assert.equal(r.code,200)
@@ -43,7 +43,7 @@ test('Clara nunca muda para Murilo no primeiro pedido de cotação sem aceitar a
 })
 test('com aceite da troca e verificação atual, Murilo reaproveita marca, modelo e ano sem outra pergunta de cadastro',async()=>{
  const steps=[]
- const r=await run([inc('Oi'),intro,inc('Quero consultar meus seguros'),inc('111.444.777-35'),out('Conferi as informações autorizadas dos seus seguros.'),quote,offer,inc('Sim')],async(url,opts)=>{
+ const r=await run([inc('Oi'),intro,inc('Meu nome é Luiza'),inc('Quero consultar meus seguros'),inc('111.444.777-35'),out('Conferi as informações autorizadas dos seus seguros.'),quote,offer,inc('Sim')],async(url,opts)=>{
   const body=JSON.parse(opts.body);steps.push(body.action)
   if(body.action==='intro_status')return idMock({clara_apresentada:true,murilo_apresentado:false})
   if(body.action==='identity_context'){
@@ -61,7 +61,7 @@ test('com aceite da troca e verificação atual, Murilo reaproveita marca, model
  assert.deepEqual(steps.sort(),['identity_context','intro_status'].sort())
 })
 test('com aceite mas consulta não verificada, Murilo não pode alegar veículo confirmado',async()=>{
- const r=await run([inc('Oi'),intro,inc('111.444.777-35'),quote,offer,inc('Sim')],async(url,opts)=>{
+ const r=await run([inc('Oi'),intro,inc('Meu nome é Luiza'),inc('111.444.777-35'),quote,offer,inc('Sim')],async(url,opts)=>{
   const body=JSON.parse(opts.body)
   if(body.action==='intro_status')return idMock({clara_apresentada:true,murilo_apresentado:false})
   if(body.action==='identity_context')return idMock({status:'verification_required',verification:{method:'human',attempts_left:2}})

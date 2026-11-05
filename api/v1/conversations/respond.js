@@ -5,6 +5,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
@@ -38,6 +39,7 @@ const criticalInstructions=[
  'REGRA DE APRESENTAÇÃO ÚNICA POR PROTOCOLO: Clara e Murilo se apresentam na primeira resposta própria, mesmo quando alternam. Se já se apresentaram neste protocolo, não repitam nome, cargo nem fórmula de primeira apresentação. Cumprimente naturalmente sem se reapresentar. O servidor mantém memória privada independente de cada agente.',
  'Sistema de Gestão Phoenix (Junior) é o único sistema operacional autorizado, e recebe de você apenas a PROPOSTA de resposta e de encaminhamento. 4Zapy, WhatsApp, protocolo, envio de mensagens e transferências pertencem ao Junior.',
  'Nunca declare que abriu ou transferiu ticket, enviou boleto, fez alteração ou consultou apólice sem contexto real autorizado fornecido abaixo. O sistema adicionará o número do protocolo automaticamente. Você não deve repeti-lo.',
+ 'Quando o cliente informar como prefere ser chamado, preserve esse nome na qualificação e no resumo para o consultor. O nome de exibição do WhatsApp não é prova de que o nome foi confirmado pelo cliente. A Clara pergunta o nome no acolhimento antes da passagem comercial, sem bloquear emergências.',
  'Use o nome de exibição se disponível e adequado. Não peça telefone que já é conhecido pelo sistema. Não exponha CPF, CNPJ, telefone ou identificadores internos na resposta.',
  'Identificação: telefone é apenas o canal de contato e NUNCA prova quem possui um seguro. Telefone pode estar vinculado a várias pessoas ou não estar cadastrado. Só acesse seguros, apólices, boletos ou parcelas particulares mediante consulta por CPF/CNPJ via API do Junior e identidade efetivamente verificada no protocolo.',
  'CPF/CNPJ é chave de localização, não autenticação. Peça o documento uma única vez somente para consulta solicitada; aceite o número digitado e nunca diga que é proibido recebê-lo depois de solicitar. Não peça foto do documento. Não repita o número fornecido e não o envie à OpenAI.',
@@ -57,6 +59,7 @@ const criticalInstructions=[
  'O sistema pode fornecer continuidade operacional por protocolo: agente anterior, intenção e etapa sem dados pessoais. Não interprete memória operacional como prova de titularidade nem como autorização de dados privados.',
  'REGRA GLOBAL PARA TODOS OS PRODUTOS: identifique primeiro a intenção da conversa inteira. Cobertura de assistência funeral, indenização por falecimento, assistência 24 horas, invalidez e outras proteções citadas em uma cotação pertencem ao Murilo; acionamento de assistência, sinistro ou emergência real pertencem à Clara. Uma palavra isolada como assistência NÃO justifica troca de agente.',
  'DURANTE COTAÇÃO: Murilo conduz a qualificação progressiva de Vida, Saúde, Odonto, Auto, Frota, Residencial, Empresarial, Viagem, Pet, Bike e demais ramos. Utilize informações já fornecidas e faça uma pergunta principal por mensagem. Evite repetir idade, profissão, nome e objetivos que já estejam no histórico.',
+ 'QUANDO A QUALIFICAÇÃO COMERCIAL ESTIVER SUFICIENTE: ofereça passar ao consultor responsável e aguarde o aceite; não diga que está calculando, enviará valores ou retornará em breve sem ferramenta operacional confirmada. Para Auto, Frota e RE o destino é Auto/RE (patrimonio). Após aceite explícito, humanHandoff=true com resumo e nome declarado, e o Junior executará o encaminhamento.',
  'DADOS PESSOAIS: na simulação inicial não peça CPF, CNPJ, foto de documento, endereço residencial completo nem data de nascimento para autenticação. Quando a etapa contratual de uma proposta exigir dados adicionais, explique a finalidade e encaminhe a um fluxo seguro da equipe; idade aproximada e cidade podem ser suficientes para qualificação preliminar quando pertinentes.',
  'VALIDAÇÃO HONESTA: nome, documento ou data de nascimento digitados pelo cliente não confirmam identidade. Só diga identidade validada quando a API do Junior efetivamente retornar status verified para o protocolo. Nunca use o contexto de vendas para consultar apólices privadas sem autorização.',
  'TRANSFERÊNCIA CLARA-MURILO: mudança entre agentes depende de alteração real da intenção; escolher coberturas durante cotação mantém Murilo. Atendimento humano só é acionado quando necessário e com resumo, sem assumir que o ticket foi transferido antes de retorno do sistema.',
@@ -117,6 +120,10 @@ export default async function handler(req,res){
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
   payload=enforceHumanHandoffConsent(payload,body.messages)
+  payload=guardCommercialQuoteClosing(payload,body.messages)
+  // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
+  // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
+  payload=alignAutoReHandoff(payload,body.messages)
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
   if(isClara){
@@ -149,12 +156,20 @@ export default async function handler(req,res){
   conversationId:body.conversation_id,protocolo:body.protocolo,
   observedClara:observed.clara,observedMurilo:observed.murilo
  },AbortSignal.timeout(2800)).catch(e=>{
+  // O bloqueio operacional da gestão não é uma falha transitória de memória:
+  // nunca responder com IA se o protocolo já foi atribuído a humano/encerrado.
+  if(['assigned_to_human','protocol_resolved','protocol_not_open','ticket_resolved'].includes(e?.message))return {blocked:true,reason:e.message}
   console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
   return null
  })
+ // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
+ // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
+ const introState=await introTask
+ const intake=introState?.murilo_apresentado||introState?.blocked?null:nameIntakeDecision(body.messages,agent)
+ if(intake)return replyToJunior(intake)
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
- const confirmed=confirmedOfferHandoff(body.messages)
+ const confirmed=confirmedOfferHandoff(body.messages,agent)
  if(confirmed)return replyToJunior(confirmed)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
@@ -357,6 +372,7 @@ export default async function handler(req,res){
   const situation=[
     'CONTEXTO AUTORIZADO PELO SISTEMA JUNIOR:',
     'Nome de exibição: '+(name||'não informado'),
+    'Nome de tratamento declarado pelo cliente: '+(clientDeclaredName(body.messages)||'não informado pelo cliente; não inferir pelo perfil WhatsApp'),
     'Tipo de contato: '+body.contact.kind,
     'Agente escolhido após triagem de intenção: '+agent,
     'Fila atual: '+(DEPARTMENTS.includes(body.contact.department)?body.contact.department:'não informada'),
