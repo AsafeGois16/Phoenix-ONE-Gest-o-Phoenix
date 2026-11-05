@@ -25,10 +25,10 @@ export function humanDepartmentFromOffer(messages){
  if(/\b(?:comercial|cotacao|vendas)\b/.test(s))return 'comercial'
  return null // não assumir setor sem clareza suficiente
 }
-export function confirmedOfferHandoff(messages){
+export function confirmedOfferHandoff(messages,selectedAgent='clara'){
  if(!isHumanHandoffConfirmed(messages)||!offerHuman(recentOutbound(messages))||offerMurilo(recentOutbound(messages)))return null
  const department=humanDepartmentFromOffer(messages)
- return department?{agent:'clara',reply:'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe responsável.',humanHandoff:true,handoff:{
+ return department?{agent:selectedAgent==='murilo'?'murilo':'clara',reply:'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe responsável.',humanHandoff:true,handoff:{
   department,reason:'Cliente confirmou encaminhamento humano',summary:'Solicitação de atendimento humano confirmada pelo cliente. Conferir detalhes do protocolo no sistema de gestão.'}}:null
 }
 export function enforceHumanHandoffConsent(payload,messages){
