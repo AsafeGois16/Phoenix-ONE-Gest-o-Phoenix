@@ -302,3 +302,33 @@ Entrar em https://phoenix-one-ai.vercel.app/ → Laboratório RAG conectado → 
 Exportar **Gerar TXT da conversa** com `Murilo | prompt v9` em cada resposta. O resultado atual é: **publicação e preservação técnica aprovadas; homologação conversacional V9 pendente do TXT gerado pelo modelo**. Integração ponta a ponta Clara–Murilo–Junior/WhatsApp continua desativada, não homologada.
 
 **Este registro atualiza somente a documentação do GitHub**. O prompt V9 foi alterado apenas no Supabase privado, com versionamento e registro de auditoria.
+
+
+## Murilo V9 — homologação conversacional aprovada (05/11/2026)
+
+**Evidência:** `phoenix-one-rag-murilo-2026-11-05T12-15-16-115Z.txt`, exportado em 05/11/2026 a partir do Laboratório RAG do Phoenix ONE. O arquivo apresenta cinco respostas reais do agente com `Murilo | prompt v9`, em simulação **sem integração com Junior/WhatsApp**.
+
+### Resultado: 5/5 aprovadas
+
+| Turno | Resultado | Fundamentação |
+| --- | --- | --- |
+| 1 — abertura Frota | **Aprovado** | Apresenta-se uma vez e pergunta a quantidade de veículos. |
+| 2 — três veículos utilitários | **Aprovado** | Reconhece os três veículos e faz uma pergunta de coberturas sem exigir modelos ainda não informados. |
+| 3 — inclusão de nova demanda de exclusão odontológica | **Aprovado** | Prioriza a necessidade administrativa, identifica Backoffice e orienta canais oficiais; não declara transferência executada. Observação leve: menciona disponibilidade para retomar Frota "quando desejar", sem pressionar ou impor pergunta de retomada. |
+| 4 — solicitação de orientação | **Aprovado** | Encaminha conceitualmente o assunto ao Backoffice, orienta que a equipe verificará documentação e procedimento com operadora; não promete registro realizado, não inventa prazo e **não termina com pergunta genérica**. |
+| 5 — retomada da Frota | **Aprovado** | Recupera três utilitários e modelos não informados; não se reapresenta, não diz que salvou dados ou criou ticket. Observação: pergunta para continuar de maneira ampla; uma pergunta mais qualificada poderia aumentar eficiência comercial, mas não é bloqueante. |
+
+**Decisão de homologação:** bateria conversacional planejada do **Murilo V9 APROVADA**. Os dois defeitos decisivos que motivaram o ajuste (fechamento genérico e garantia de registro não confirmada) foram corrigidos no TXT. Resultados favoráveis de cenários anteriores de Auto, Residencial e Vida continuam registrados no histórico deste relatório. **Congelar refinamentos incrementais do prompt neste estágio**, salvo evidência concreta de erro adicional.
+
+**Limites da aprovação:** somente respostas visíveis do laboratório; não prova integração operacional de identidade/documento, API Junior, WhatsApp/4Zapy, flags persistentes de apresentação, handoff real Clara→Murilo, MegaBrain ou transferência a colaborador. A **Clara V12** foi preservada no processo, mas sua homologação operacional também continua pendente.
+
+### Próxima etapa — homologação integrada controlada
+
+- Começar com protocolo fictício de novo cliente no sistema do Junior: Clara é a primeira a atender; cumprimenta-se uma vez.
+- Simular interesse em **seguro Auto novo** e autorização explícita para falar com Murilo; conferir transferência real com retorno da API e resumo autorizado (produto/intenção/veículo), sem CPF/CNPJ no LLM e sem pedir novamente dados já fornecidos.
+- Verificar `clara_apresentada`, `murilo_apresentado`, `conversation_id`, protocolo, logs e resposta do canal de saída. Não confirmar transferência se houve apenas atribuição/tag/nota.
+- Testar demanda administrativa depois da cotação: retorno à Clara/Backoffice, sem duplicar a apresentação ou perder o contexto autorizado.
+- Testar falha de integração e indisponibilidade sem promessas nem exposição de dados.
+- Iniciar somente em ambiente controlado com dados fictícios, e **não ativar produção/WhatsApp real** até aprovação operacional explícita.
+
+Registro documental apenas nesta atualização; nenhum prompt, código de integração, status ou configuração da gestão foi alterado.
