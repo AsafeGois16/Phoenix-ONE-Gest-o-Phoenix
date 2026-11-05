@@ -56,7 +56,23 @@ export function selectConversationAgent(body) {
    if(prior==='sales')return 'murilo'
  }
 
- // Contato desconhecido/lead e agent_hint "murilo" não são prova de venda.
+ // Respostas neutras de qualificação não significam troca de assunto.
+ // Quando a janela do Junior já não contém a mensagem original "quero cotar",
+ // use apenas evidências de que Murilo realmente respondeu neste protocolo.
+ const outbound=(Array.isArray(body?.messages)?body.messages:[])
+  .filter(m=>m?.direction==='outbound'&&m?.author==='agent'&&typeof m.text==='string')
+ const lastOutbound=fold(outbound.at(-1)?.text)
+ const confirmedMurilo=outbound.some(m=>/\b(?:sou (?:o )?murilo|aqui e (?:o )?murilo|me chamo murilo|murilo, do time comercial)\b/.test(fold(m.text)))
+ const recentlyClara=outbound.some(m=>/\b(?:sou (?:a )?clara|aqui e (?:a )?clara|me chamo clara)\b/.test(fold(m.text)))
+ const salesQuestion=/\b(?:cotacao|cotar|orcamento|seguro novo|renovacao|franquia|protecao padrao|cobertura padrao)\b/.test(lastOutbound)||
+  /\b(?:carro|veiculo)\b.{0,90}\b(?:uso pessoal|uso particular|frota|trabalho)\b/.test(lastOutbound)
+ const shortAnswer=stripped.length>0&&stripped.length<=110&&
+  !/^(?:oi|ola|bom dia|boa tarde|boa noite|tenho outra duvida|outro assunto)$/.test(stripped)
+ if(shortAnswer&&(confirmedMurilo||
+    (body?.agent_hint==='murilo'&&salesQuestion&&!recentlyClara))){
+   return 'murilo'
+ }
+ // Um hint ou contato desconhecido, isoladamente, não é prova de venda.
  return 'clara'
 }
 export function hasExplicitConversationIntent(messages){

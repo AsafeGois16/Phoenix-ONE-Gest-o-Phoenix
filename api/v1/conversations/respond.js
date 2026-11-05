@@ -121,6 +121,14 @@ export default async function handler(req,res){
   // persistida. Nunca repetir a apresentação se qualquer fonte já a observou.
   const spoken=observedAgentIntroductions(body.messages)
   const seen=Boolean(isClara?(saved?.clara_apresentada||spoken.clara):isMurilo?(saved?.murilo_apresentado||spoken.murilo):false)
+  // Diagnóstico sem PII: permite separar decisão do Phoenix ONE da troca
+  // realizada na gestão Junior. Não registrar texto, nome, protocolo ou telefone.
+  console.info('phoenix_routing_outcome',JSON.stringify({
+   selectedAgent:agent,responseAgent:payload.agent,lastIntent:classifyConversationIntent(last?.text),
+   juniorHint:validAgent(body.agent_hint)?body.agent_hint:null,
+   muriloObserved:Boolean(spoken.murilo||saved?.murilo_apresentado),
+   humanHandoff:Boolean(payload.humanHandoff)
+  }))
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
   payload=enforceHumanHandoffConsent(payload,body.messages)
