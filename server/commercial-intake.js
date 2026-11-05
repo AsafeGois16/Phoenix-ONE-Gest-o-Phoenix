@@ -77,3 +77,17 @@ export function alignAutoReHandoff(payload,messages){
  const complete=prefix+summary
  return {...payload,handoff:{...payload.handoff,department:'patrimonio',summary:complete.slice(0,350)}}
 }
+
+/** Substitui promessa de cotação/retorno automático por pedido de aceite ao Auto/RE. */
+export function guardCommercialQuoteClosing(payload,messages){
+ if(payload?.agent!=='murilo'||payload?.humanHandoff===true||!autoReQuote(messages))return payload
+ const last=(Array.isArray(messages)?messages:[]).filter(isContact).at(-1)
+ const lastText=fold(last?.text)
+ if(/\b(?:encaminhe|me transfira|quero falar com consultor|quero atendimento humano)\b/.test(lastText))return payload
+ const reply=fold(payload?.reply)
+ if(/\b(?:posso|deseja|quer)\b.{0,180}\b(?:encaminhar|transferir|passar)\b/.test(reply))return payload
+ const unverifiedFuture=/\b(?:vou|irei|iremos|vamos)\b[\s\S]{0,220}\b(?:preparar|enviar|retornar|retorno|consolidar)\b[\s\S]{0,170}\b(?:cotacao|opcoes|proposta|breve)\b/.test(reply)
+ const unspecifiedReturn=/\b(?:retorno|retornaremos|entraremos em contato)\b.{0,60}\b(?:em breve|com as opcoes|com a cotacao)\b/.test(reply)
+ if(!unverifiedFuture&&!unspecifiedReturn)return payload
+ return {...payload,reply:'Com as informações que você compartilhou, podemos avançar na análise da cotação. Posso encaminhar sua solicitação à equipe de Auto/RE para um consultor avaliar as opções?',humanHandoff:false,handoff:null}
+}
