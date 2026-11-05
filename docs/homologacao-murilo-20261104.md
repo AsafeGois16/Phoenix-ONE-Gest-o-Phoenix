@@ -111,3 +111,27 @@ Critérios: apresentação única, primeira resposta com somente uma pergunta pr
 **Como testar:** acessar https://phoenix-one-ai.vercel.app/ → Laboratório RAG conectado → selecionar Murilo → manter desmarcada "Somente recuperar fontes". Iniciar uma conversa nova para cada cenário, enviar mensagens uma por vez e ao fim usar **Gerar TXT da conversa**. Conferir `prompt v6` nas seis respostas. Encaminhar os dois arquivos para revisão humana por turno.
 
 **Aprovação pendente:** a publicação e o versionamento no banco estão validados; a geração ao vivo e os critérios do reteste acima **não foram ainda executados**. A homologação operacional com Junior/WhatsApp e a passagem real com contexto permanecem pendentes. Nenhum arquivo de código, prompt Clara, flag de integração ou base LEADS foi alterado.
+
+
+## Reteste de Murilo V6 — seis respostas aprovadas em 05/11/2026
+
+**Evidência:** duas transcrições TXT do Laboratório RAG com `prompt v6`, exportadas em 05/11/2026:
+- `phoenix-one-rag-murilo-2026-11-05T11-28-35-652Z.txt` — Residencial, 3 respostas.
+- `phoenix-one-rag-murilo-2026-11-05T11-30-05-052Z.txt` — Passagem simulada Clara → Murilo / renovação Auto, 3 respostas.
+
+**Resultado da avaliação humana: 6/6 respostas aprovadas**, apenas para estes dois roteiros em laboratório.
+
+| Cenário/turno | Avaliação | Evidência |
+| --- | --- | --- |
+| R1 / 1 — Residencial | Aprovado com observação | Apresenta-se uma vez e pergunta o tipo de imóvel/cidade em uma mesma mensagem; o agrupamento inicial foi considerado natural. |
+| R1 / 2 — Apartamento em Guarulhos | Aprovado | Reconhece explicitamente apartamento em Guarulhos e interesse em proteger bens; pergunta somente sobre assistências. |
+| R1 / 3 — Sem metragem | Aprovado | Permite continuar sem metragem e faz nova pergunta pertinente, sem inventar cotação ou bloquear. |
+| R2 / 1 — Passagem simulada | Aprovado | Apresentação única, uma pergunta principal (particular ou frota), sem afirmar transferência executada. |
+| R2 / 2 — Corolla 2021 | Aprovado | Reconhece Corolla 2021 e renovação; pergunta principal sobre foco da cobertura. |
+| R2 / 3 — Assistência/apólice anterior ausente | Aprovado com observação | Prossegue a qualificação sem exigir apólice antiga, não consulta nem promete valores. Menciona “proteção contra eventuais avarias” junto de assistências, que são conceitos distintos; melhorar distinção em testes mais amplos, sem mudar o prompt por isso isoladamente. |
+
+**Constatações adicionais:** nenhuma reapresentação indevida; nenhum pedido antecipado de CPF/CNPJ, preço inventado, cotação ficticiamente concluída ou transferência alegada. Estes TXT contêm respostas visíveis; não comprovam integração, memória de protocolo ou identidade verificada. O Murilo V6 está **aprovado nos dois cenários de reteste da primeira bateria**; a homologação do agente completo ainda depende de **M4 (Vida)**, **M5 (Frota/mudança de assunto)** e testes integrados separados.
+
+**Recomendação:** preservar Murilo V6 e Clara V12, sem alterações de prompt agora. Executar M4 e M5 do roteiro anterior, cada um em uma conversa isolada. Registrar novamente os TXT com versão v6 e avaliar a distinção entre assistência e cobertura. Não ativar o sistema do Junior nesta etapa.
+
+**Este registro modifica apenas documentação do GitHub**, não banco de prompts, código, integração Junior/WhatsApp, flags ou CRM LEADS.
