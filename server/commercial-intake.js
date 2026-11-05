@@ -50,7 +50,7 @@ export function nameIntakeDecision(messages,selectedAgent){
  if(!intro.length){
   // A coleta obrigatória aqui é só na abertura comercial ou saudação pura.
   // Consultas documentais, movimentações e operações mantêm suas regras de segurança existentes.
-  const greeting=/^(?:oi|ola|bom dia|boa tarde|boa noite|opa)[!?. ,]*$/.test(latest)
+  const greeting=/^(?:(?:oi|ola|opa)(?:[, ]+\s*(?:bom dia|boa tarde|boa noite))?|bom dia|boa tarde|boa noite)[!?. ,]*$/.test(latest)
   if(!known&&(selectedAgent==='murilo'||greeting))return {agent:'clara',reply:'Olá! Sou a Clara, assistente virtual da Phoenix Insurance. Como posso te chamar?',humanHandoff:false,handoff:null}
   if(known&&selectedAgent==='murilo')return {agent:'clara',reply:'Olá, '+known+'! Sou a Clara, assistente virtual da Phoenix Insurance. Posso encaminhar sua cotação ao Murilo, nosso assistente comercial?',humanHandoff:false,handoff:null}
   return null
