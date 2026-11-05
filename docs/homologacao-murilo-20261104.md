@@ -135,3 +135,23 @@ Critérios: apresentação única, primeira resposta com somente uma pergunta pr
 **Recomendação:** preservar Murilo V6 e Clara V12, sem alterações de prompt agora. Executar M4 e M5 do roteiro anterior, cada um em uma conversa isolada. Registrar novamente os TXT com versão v6 e avaliar a distinção entre assistência e cobertura. Não ativar o sistema do Junior nesta etapa.
 
 **Este registro modifica apenas documentação do GitHub**, não banco de prompts, código, integração Junior/WhatsApp, flags ou CRM LEADS.
+
+
+## Segunda bateria Murilo V6 — Vida e Frota em 05/11/2026
+
+Foram examinadas duas transcrições exportadas pelo **Laboratório RAG**, ambas com `Murilo | prompt v6`, em 05/11/2026. A primeira foi `phoenix-one-rag-murilo-2026-11-05T11-34-06-803Z.txt` (Vida) e a segunda `phoenix-one-rag-murilo-2026-11-05T11-35-16-371Z.txt` (Frota). São simulações textuais sem integração operacional ao Junior ou WhatsApp.
+
+| Teste | Resultado | Evidência |
+| --- | --- | --- |
+| M4/1 Vida: apresentação e qualificação | **Aprovado** | Apresentou-se uma vez e perguntou individual ou grupo/família. |
+| M4/2 Vida: capital segurado | **Aprovado** | Interpretou R$ 200 mil como capital segurado, não como preço, e perguntou objetivo. |
+| M4/3 Vida: invalidez/assistência funeral | **Aprovado** | Considerou as duas coberturas na análise comercial, sem tratar como sinistro, nem prometer aceitação. |
+| M5/1 Frota: abertura | **Aprovado** | Perguntou quantidade de veículos sem coleta precoce de CPF/CNPJ. |
+| M5/2 Frota: três utilitários, sem modelos | **Aprovado** | Reconheceu três utilitários e seguiu qualificação por coberturas sem bloquear por ausência de modelos. |
+| M5/3 Frota: exclusão Odonto | **Revisar** | Identificou corretamente Backoffice, mas fez duas perguntas no mesmo turno ("Posso te passar contato ou orientação?" + "podemos seguir com a cotação Frota?"), sem priorizar claramente a nova demanda administrativa. |
+
+**Resultado: 5/6 respostas aprovadas, 1/6 requer refinamento.** São melhorias de fluxo e priorização, não indícios de consulta/registro/transação fictícia. Apresentação única e privacidade permaneceram adequadas nos dois cenários.
+
+**Correção mínima proposta, ainda não implementada:** quando uma conversa comercial muda para exclusão/inclusão ou outro pós-venda, reconhecer a nova intenção, identificar Clara/Backoffice, suspender a qualificação comercial e oferecer **um único próximo passo**, sem perguntar simultaneamente sobre continuar vendendo. Preservar informações já recebidas *na própria conversa*; não afirmar memória persistente, registro ou transferência se a API não confirmou. Permanecer com todos os demais trechos do Murilo V6 e a Clara V12 intocados.
+
+**Decisão:** homologação integral da bateria Murilo V6 permanece **PENDENTE** de um ajuste e reteste de M5/3. O cenário de handoff real Clara–Murilo e a integração com Junior continuam pendentes e separados. Este registro altera apenas documentação.
