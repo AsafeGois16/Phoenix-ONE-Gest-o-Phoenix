@@ -88,3 +88,16 @@ test('proteção e continuidade estão integradas no endpoint real antes de qual
  assert.match(bridge,/veiculo:/)
  assert.doesNotMatch(bridge,/placa:cleanString|renavam:cleanString|chassi:cleanString/)
 })
+
+test('aceite de passagem comercial do Murilo mantém o agente e propõe fila Auto/RE',()=>{
+ const history=[
+  inbound('Quero cotar seguro Auto para Onix 2023'),
+  outbound('Sou o Murilo, do time comercial da Phoenix Insurance.'),
+  outbound('Posso encaminhar sua cotação à equipe de Auto/RE para um consultor preparar as opções?'),
+  inbound('Sim')
+ ]
+ const d=confirmedOfferHandoff(history,'murilo')
+ assert.equal(d.agent,'murilo')
+ assert.equal(d.humanHandoff,true)
+ assert.equal(d.handoff.department,'patrimonio')
+})
