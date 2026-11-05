@@ -81,6 +81,57 @@ function autoReQuote(messages){
  const commercial=/\b(?:cotar|cotacao|orcamento|seguro novo|renovacao|renovar|contratar|proposta|comparar|cotacoes)\b/.test(text)
  return product&&commercial
 }
+
+function quoteHistoryText(messages){
+ return (Array.isArray(messages)?messages:[]).filter(isContact).slice(-20).map(m=>String(m.text||'')).join(' ')
+}
+function quoteFacts(messages){
+ const text=quoteHistoryText(messages),folded=fold(text),info=[]
+ const ramo=/\bfrota\b/.test(folded)?'Frota':/\b(?:residencial|apartamento|imovel)\b/.test(folded)?'Residencial':'Auto'
+ info.push('Cotação '+ramo+' solicitada')
+ const vehicle=text.match(/\b([\p{L}][\p{L}\d-]{1,24})\s+((?:19|20)\d{2})\b/u)
+ if(vehicle)info.push('veículo informado: '+vehicle[1]+' '+vehicle[2])
+ if(/\b(?:uso pessoal|meu pessoal|uso particular)\b/.test(folded))info.push('uso pessoal')
+ if(/\b(?:seguro novo|protecao nova|cotacao nova)\b/.test(folded))info.push('contratação nova')
+ if(/\b(?:renovacao|renovar)\b/.test(folded))info.push('renovação')
+ if(/\b(?:protecao padrao|cobertura padrao)\b/.test(folded))info.push('interesse em proteção padrão, a definir com consultor')
+ else if(/\b(?:colisao|roubo)\b/.test(folded))info.push('interesse em colisão/roubo (coberturas a verificar)')
+ return info.join('; ')+'. '
+}
+/**
+ * Pedido inequívoco de consultor humano em uma cotação Auto/RE já em andamento
+ * é, por si só, consentimento para solicitar handoff ao Junior.
+ * Não depende da decisão generativa do Murilo nem de convite anterior.
+ */
+export function directAutoReHumanHandoff(messages,selectedAgent){
+ const list=Array.isArray(messages)?messages:[],last=list.at(-1)
+ if(selectedAgent!=='murilo'||!isContact(last)||!autoReQuote(list))return null
+ const msg=fold(last.text)
+ if(/\b(?:nao|nunca|prefiro nao)\b.{0,35}\b(?:transfer|encaminh|humano)\b/.test(msg))return null
+ const asked=/(?:\b(?:me transfira|me transferir|me encaminhe|encaminhe|transfira|transferir|transferencia)\b.{0,75}\b(?:humano|atendente|consultor|pessoa)\b|\b(?:falar|conversar|atendimento)\b.{0,55}\b(?:humano|atendente|consultor)\b|\b(?:humano|atendente|consultor)\b.{0,40}\b(?:por favor|agora)\b)/.test(msg)
+ if(!asked)return null
+ return {agent:'murilo',reply:'Entendido. Vou solicitar agora o encaminhamento da sua cotação à equipe de Auto/RE para atendimento humano.',humanHandoff:true,handoff:{
+  department:'patrimonio',
+  reason:'Cliente solicitou diretamente consultor humano para cotação Auto/RE',
+  summary:quoteFacts(list)+'Encaminhamento humano solicitado expressamente pelo cliente.'
+ }}
+}
+/** Quando os dados iniciais já bastam, oferecer o consultor sem inventar preço ou franquia. */
+export function offerReadyAutoReHandoff(messages,selectedAgent){
+ const list=Array.isArray(messages)?messages:[],last=list.at(-1)
+ if(selectedAgent!=='murilo'||!isContact(last)||!autoReQuote(list))return null
+ const lastText=fold(last.text),history=fold(quoteHistoryText(list))
+ const consentOrRefusal=/^(?:sim|nao|pode encaminhar|confirmo|autorizo|prefiro nao)[.! ]*$/.test(lastText)
+ if(consentOrRefusal||/\b(?:o que|qual valor|quanto|explique|por que|cobre|cobertura de|diferenca)\b/.test(lastText)&&lastText.includes('?'))return null
+ const endOfPreferences=/\b(?:protecao padrao|cobertura padrao|somente estas coisas|somente essas coisas|so essas coberturas|apenas essas coberturas|por aqui mesmo|a mais comum)\b/.test(lastText)
+ const hasVehicle=/\b[\p{L}][\p{L}\d-]{1,24}\s+(?:19|20)\d{2}\b/u.test(history)
+ const hasUsage=/\b(?:uso pessoal|meu pessoal|uso particular|uso comercial|frota)\b/.test(history)
+ const hasInsuranceIntent=/\b(?:seguro novo|protecao nova|contratacao|renovacao|renovar)\b/.test(history)
+ if(!endOfPreferences||!hasVehicle||!hasUsage||!hasInsuranceIntent)return null
+ // A oferta não efetiva a passagem. A próxima resposta do cliente deve confirmar.
+ return {agent:'murilo',reply:'Entendi sua preferência para a cotação. A avaliação de preços, coberturas e franquia será feita por um consultor, não automaticamente por este chat. Posso encaminhar as informações já fornecidas à equipe de Auto/RE para que um consultor continue o atendimento?',humanHandoff:false,handoff:null}
+}
+
 /** Only the Junior executes the actual human transfer; this adjusts the proposed destination. */
 export function alignAutoReHandoff(payload,messages){
  if(payload?.agent!=='murilo'||payload?.humanHandoff!==true||!payload.handoff||
@@ -88,7 +139,8 @@ export function alignAutoReHandoff(payload,messages){
  const name=clientDeclaredName(messages)
  const prefix=name?'Nome informado pelo cliente: '+name+'. ':'Nome de tratamento ainda não informado. '
  const summary=String(payload.handoff.summary||'').trim()
- const complete=prefix+summary
+ const facts=quoteFacts(messages)
+ const complete=prefix+facts+summary
  return {...payload,handoff:{...payload.handoff,department:'patrimonio',summary:complete.slice(0,350)}}
 }
 
@@ -102,6 +154,7 @@ export function guardCommercialQuoteClosing(payload,messages){
  if(/\b(?:posso|deseja|quer)\b.{0,180}\b(?:encaminhar|transferir|passar)\b/.test(reply))return payload
  const unverifiedFuture=/\b(?:vou|irei|iremos|vamos)\b[\s\S]{0,220}\b(?:preparar|enviar|retornar|retorno|consolidar)\b[\s\S]{0,170}\b(?:cotacao|opcoes|proposta|breve)\b/.test(reply)
  const unspecifiedReturn=/\b(?:retorno|retornaremos|entraremos em contato)\b.{0,60}\b(?:em breve|com as opcoes|com a cotacao)\b/.test(reply)
- if(!unverifiedFuture&&!unspecifiedReturn)return payload
+ const inventedRegistration=/\b(?:vou registrar|irei registrar|registrarei|vou anotar|compartilho aqui|enviarei a cotacao|assim que a cotacao estiver pronta)\b/.test(reply)
+ if(!unverifiedFuture&&!unspecifiedReturn&&!inventedRegistration)return payload
  return {...payload,reply:'Com as informações que você compartilhou, podemos avançar na análise da cotação. Posso encaminhar sua solicitação à equipe de Auto/RE para um consultor avaliar as opções?',humanHandoff:false,handoff:null}
 }

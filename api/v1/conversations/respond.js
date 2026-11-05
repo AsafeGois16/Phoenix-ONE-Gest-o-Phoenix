@@ -5,7 +5,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing} from '../../../server/commercial-intake.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
@@ -60,6 +60,7 @@ const criticalInstructions=[
  'REGRA GLOBAL PARA TODOS OS PRODUTOS: identifique primeiro a intenção da conversa inteira. Cobertura de assistência funeral, indenização por falecimento, assistência 24 horas, invalidez e outras proteções citadas em uma cotação pertencem ao Murilo; acionamento de assistência, sinistro ou emergência real pertencem à Clara. Uma palavra isolada como assistência NÃO justifica troca de agente.',
  'DURANTE COTAÇÃO: Murilo conduz a qualificação progressiva de Vida, Saúde, Odonto, Auto, Frota, Residencial, Empresarial, Viagem, Pet, Bike e demais ramos. Utilize informações já fornecidas e faça uma pergunta principal por mensagem. Evite repetir idade, profissão, nome e objetivos que já estejam no histórico.',
  'QUANDO A QUALIFICAÇÃO COMERCIAL ESTIVER SUFICIENTE: ofereça passar ao consultor responsável e aguarde o aceite; não diga que está calculando, enviará valores ou retornará em breve sem ferramenta operacional confirmada. Para Auto, Frota e RE o destino é Auto/RE (patrimonio). Após aceite explícito, humanHandoff=true com resumo e nome declarado, e o Junior executará o encaminhamento.',
+ 'NÃO escolha franquia média/padrão nem informe que fará a cotação ou enviará proposta pelo chat: franquia e preço dependem da seguradora, perfil e análise de um consultor. Ao receber as preferências principais de Auto, encaminhe ao Auto/RE com aceite em vez de perguntar sobre detalhes não indispensáveis.',
  'DADOS PESSOAIS: na simulação inicial não peça CPF, CNPJ, foto de documento, endereço residencial completo nem data de nascimento para autenticação. Quando a etapa contratual de uma proposta exigir dados adicionais, explique a finalidade e encaminhe a um fluxo seguro da equipe; idade aproximada e cidade podem ser suficientes para qualificação preliminar quando pertinentes.',
  'VALIDAÇÃO HONESTA: nome, documento ou data de nascimento digitados pelo cliente não confirmam identidade. Só diga identidade validada quando a API do Junior efetivamente retornar status verified para o protocolo. Nunca use o contexto de vendas para consultar apólices privadas sem autorização.',
  'TRANSFERÊNCIA CLARA-MURILO: mudança entre agentes depende de alteração real da intenção; escolher coberturas durante cotação mantém Murilo. Atendimento humano só é acionado quando necessário e com resumo, sem assumir que o ticket foi transferido antes de retorno do sistema.',
@@ -127,6 +128,7 @@ export default async function handler(req,res){
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
   payload=alignAutoReHandoff(payload,body.messages)
+  if(payload.humanHandoff)console.info('phoenix_handoff_proposed',JSON.stringify({agent:payload.agent,department:payload.handoff?.department||null}))
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
   if(isClara){
@@ -170,12 +172,23 @@ export default async function handler(req,res){
  const introState=await introTask
  const intake=introState?.murilo_apresentado||introState?.blocked?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
+ // Pedido explícito de atendimento humano é autorização direta para handoff.
+ // Não delegar essa decisão ao texto gerado pelo Murilo.
+ const directHuman=directAutoReHumanHandoff(body.messages,agent)
+ if(directHuman){
+  console.info('phoenix_auto_re_handoff',JSON.stringify({source:'explicit_customer_request',department:'patrimonio'}))
+  return replyToJunior(directHuman)
+ }
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
  const confirmed=confirmedOfferHandoff(body.messages,agent)
  if(confirmed)return replyToJunior(confirmed)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
+ // Em cotação Auto/RE já qualificada, pedir aceite de passagem antes de abrir
+ // opções de franquia, prometer cotação por aqui ou prolongar sem finalidade.
+ const readyQuote=offerReadyAutoReHandoff(body.messages,agent)
+ if(readyQuote)return replyToJunior(readyQuote)
  if(isStandaloneNewRequest(last.text)){
    return replyToJunior({agent:'clara',reply:'Claro! 💙 Como posso ajudar com a sua nova solicitação?',humanHandoff:false,handoff:null})
  }

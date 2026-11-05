@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing} from '../server/commercial-intake.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff} from '../server/commercial-intake.js'
 
 const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
 const out=text=>({direction:'outbound',author:'agent',type:'text',text})
@@ -98,4 +98,53 @@ test('pergunta comercial adequada não é substituída pela oferta de encaminham
 test('cotação que não é Auto/RE não sofre reescrita automática',()=>{
  const base={agent:'murilo',reply:'Vou preparar sua cotação e retorno em breve com opções.',humanHandoff:false,handoff:null}
  assert.equal(guardCommercialQuoteClosing(base,[inc('Quero cotar seguro de vida')]),base)
+})
+
+const autoReady=[
+ inc('Quero uma cotação de seguro Auto para Onix 2023'),
+ clara,inc('Asafe Gois'),
+ out('Posso passar seu atendimento ao Murilo?'),inc('Sim'),
+ murilo,
+ inc('É meu pessoal'),
+ out('Você já possui algum seguro ou é novo?'),
+ inc('Uma proteção nova'),
+ out('Qual o objetivo principal da proteção?'),
+ inc('Quero uma proteção padrão')
+]
+test('Murilo pede aceite depois de produto, uso, seguro novo e proteção padrão',()=>{
+ const r=offerReadyAutoReHandoff(autoReady,'murilo')
+ assert.equal(r.agent,'murilo')
+ assert.equal(r.humanHandoff,false)
+ assert.equal(r.handoff,null)
+ assert.match(r.reply,/Posso encaminhar.+Auto\/RE/i)
+ assert.doesNotMatch(r.reply,/franquia mais comum|retorno em breve|cotação pronta/i)
+})
+test('o pedido direto para humano já autoriza handoff para a fila Auto/RE',()=>{
+ const r=directAutoReHumanHandoff([...autoReady,out('Qual a franquia?'),inc('Quero que me transfira para um humano')],'murilo')
+ assert.equal(r.humanHandoff,true)
+ assert.equal(r.handoff.department,'patrimonio')
+ assert.match(r.handoff.summary,/Onix 2023/)
+ assert.match(r.handoff.summary,/uso pessoal/)
+ assert.match(r.reply,/encaminhamento.+Auto\/RE/i)
+ const full=alignAutoReHandoff(r,[...autoReady,inc('Quero que me transfira para um humano')])
+ assert.match(full.handoff.summary,/Nome informado pelo cliente: Asafe Gois/i)
+ assert.match(full.handoff.summary,/Onix 2023/i)
+})
+test('contato sem cotação não aciona handoff automático pelo texto humano',()=>{
+ assert.equal(directAutoReHumanHandoff([inc('Quero falar com humano')],'murilo'),null)
+ assert.equal(directAutoReHumanHandoff([...autoReady,inc('Quero que me transfira para um humano')],'clara'),null)
+})
+test('recusa de atendimento humano não vira transferência',()=>{
+ assert.equal(directAutoReHumanHandoff([...autoReady,inc('Não quero que me transfira para um humano')],'murilo'),null)
+})
+test('Murilo não promete registrar cotação e enviar valor por chat',()=>{
+ const payload={agent:'murilo',reply:'Valeu, Asafe! Vou registrar seu interesse. Assim que a cotação estiver pronta, compartilho aqui no chat. Posso ajudar com outra coisa?',humanHandoff:false,handoff:null}
+ const changed=guardCommercialQuoteClosing(payload,autoReady)
+ assert.equal(changed.humanHandoff,false)
+ assert.match(changed.reply,/Posso encaminhar.+Auto\/RE/i)
+ assert.doesNotMatch(changed.reply,/vou registrar|compartilho aqui|cotação estiver pronta/i)
+})
+test('seguro Vida não entra na fila Auto/RE por engano',()=>{
+ const m=[inc('Quero cotar seguro de vida'),murilo,inc('Quero falar com consultor humano')]
+ assert.equal(directAutoReHumanHandoff(m,'murilo'),null)
 })
