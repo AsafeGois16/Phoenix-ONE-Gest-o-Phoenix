@@ -441,7 +441,14 @@ test('cada agente tem sua própria apresentação mesmo após outro agente já t
   throw Error('chamada inesperada')
  }
  const input=request(['Quero cotar seguro residencial'])
- input.body.messages.unshift({direction:'outbound',author:'agent',type:'text',text:'Sou a Clara, concierge Phoenix.'},{direction:'inbound',author:'contact',type:'text',text:'Meu nome é Luiza'},{direction:'outbound',author:'agent',type:'text',text:'Posso encaminhar sua cotação ao Murilo, nosso assistente comercial?'},{direction:'inbound',author:'contact',type:'text',text:'Sim'})
+ input.body.messages=[
+  {direction:'inbound',author:'contact',type:'text',text:'Oi'},
+  {direction:'outbound',author:'agent',type:'text',text:'Sou a Clara, concierge Phoenix.'},
+  {direction:'inbound',author:'contact',type:'text',text:'Meu nome é Luiza'},
+  {direction:'inbound',author:'contact',type:'text',text:'Quero cotar seguro residencial'},
+  {direction:'outbound',author:'agent',type:'text',text:'Posso encaminhar sua cotação ao Murilo, nosso assistente comercial?'},
+  {direction:'inbound',author:'contact',type:'text',text:'Sim'}
+ ]
  const res=response();await handler(input,res)
  assert.equal(res.code,200);assert.match(res.body.reply,/Sou o Murilo/)
  assert.doesNotMatch(res.body.reply,/Sou a Clara/)
