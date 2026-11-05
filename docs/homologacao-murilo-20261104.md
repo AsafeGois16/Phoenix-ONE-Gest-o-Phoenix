@@ -52,3 +52,31 @@ Aceite: reaproveita quantidade e tipo sem insistir em lista completa; ao mudar p
 **Pendente de execução.** Registrar resultado por turno (aprovado/revisão), motivo objetivo da reprovação, revisão de segurança/identidade, confirmação de apresentação única e versão exibida nos TXT. Os arquivos exportados não incluem fontes RAG, tokens ou dados pessoais do sistema. Nenhuma aprovação automática ou validação operacional é inferida por este plano.
 
 **Preservação:** não alterar prompt Murilo V5 ou Clara V12 para preparar QA; só mudar após comprovação de falha e com mínimo delta autorizado.
+
+
+## Primeira bateria executada — evidências de 05/11/2026
+
+Foram recebidas três transcrições TXT exportadas pelo Laboratório RAG, todas com **Murilo prompt v5**; cada conversa contém 3 mensagens do cliente e 3 respostas do agente, sem dados pessoais reais e sem ligação à gestão do Junior:
+- `phoenix-one-rag-murilo-2026-11-05T11-15-26-928Z.txt` — M1 Auto novo.
+- `phoenix-one-rag-murilo-2026-11-05T11-17-44-791Z.txt` — M2 Residencial.
+- `phoenix-one-rag-murilo-2026-11-05T11-20-14-125Z.txt` — M3 passagem simulada Clara → Murilo.
+
+### Avaliação humana (9 respostas)
+
+| Cenário/turno | Resultado | Evidência |
+| --- | --- | --- |
+| M1 Auto / 1 | Aprovado | Apresentação do Murilo e pedido de modelo/ano. |
+| M1 Auto / 2 | Aprovado com observação | Pergunta sobre cobertura anterior / primeiro seguro; não está formalmente repetindo "seguro novo", mas pode soar como requalificação de intenção já informada. Melhor diferenciar modalidade de histórico anterior. |
+| M1 Auto / 3 | Aprovado | Reaproveita Onix 2023, Guarulhos, roubo e colisão; pergunta sobre padrão de uso sem inventar cobertura. |
+| M2 Residencial / 1 | Aprovado | Apresentação única; pergunta casa/apartamento e cidade na abertura. |
+| M2 Residencial / 2 | **Revisar** | Após receber "apartamento em Guarulhos", pergunta por assistências/danos sem reconhecer explicitamente apartamento nem cidade, contrariando o critério de continuidade da ficha de homologação. Não repete perguntas, mas falta reconhecimento breve do contexto. |
+| M2 Residencial / 3 | Aprovado | Permite continuar sem metragem; não condiciona cotação a documento/endereço completo. |
+| M3 Clara→Murilo / 1 | **Revisar** | Apresenta-se corretamente, mas faz **duas perguntas independentes** de qualificação (veículo próprio/frota e coberturas) antes de ouvir a resposta à primeira. Refinar para uma pergunta principal por turno. Não há transferência real. |
+| M3 Clara→Murilo / 2 | Aprovado | Reconhece renovação próxima e Corolla 2021; pergunta o que deseja melhorar. |
+| M3 Clara→Murilo / 3 | Aprovado com observação | Pergunta cidade pertinente e não exige apólice antiga; poderia reconhecer explicitamente que é possível seguir com triagem parcial sem ela. Não inventa preço. |
+
+**Resultado:** 7/9 respostas aprovadas (2 observações de estilo não bloqueantes); **2/9 pedem refinamento**, portanto a homologação conversacional da primeira bateria está **pendente**. Foram observados: apresentação única em cada conversa, ausência de pedidos de CPF/CNPJ e de preços ou atos inventados. O cenário de passagem é textual, não prova memória compartilhada nem consentimento registrado ou handoff operacional.
+
+**Próximas ações sugeridas, sem editar automaticamente o prompt:** reforçar reconhecimento explícito de dados de imóvel/cidade quando recém-informados e preferência por uma pergunta principal na abertura da passagem comercial. Preservar o prompt Murilo V5 como base e toda a Clara V12. Repetir os turnos afetados antes de concluir a homologação; os cenários Vida e Frota seguem pendentes.
+
+**Registro documental apenas:** não foram alterados prompts, integração, produção, flags, dados de cliente nem o bridge do Junior.
