@@ -276,3 +276,29 @@ Esta atualização refere-se apenas à documentação. O prompt Murilo V8 foi at
 **Decisão:** homologação conversacional da V8 ainda **não aprovada (4/5)**, embora demais cenários anteriores tenham sido satisfatórios. Antes de adicionar outra versão extensa ao prompt, recomenda-se avaliar ajuste pontual e verificável apenas para encerramento genérico e promessa de resultado em orientações administrativas, sem alterar os demais elementos do Murilo V8 nem Clara V12. Novos testes de IA real serão necessários. Testes de WhatsApp/Junior e compartilhamento de protocolo permanecem separados.
 
 **Este registro altera somente documentação GitHub**; não modifica prompt Murilo V8, Clara V12, banco operacional, flags, integrações nem WhatsApp.
+
+
+## Murilo V9 — fechamento administrativo e garantias não confirmadas (05/11/2026)
+
+Após o reteste conversacional do Murilo V8 (4/5 respostas aprovadas), foi publicado **Murilo V9** diretamente em `phoenix_one.agent_versions`, com um **único adendo pontual** de duas orientações, mantendo toda a V8 intacta:
+
+1. Após orientar o cliente sobre Backoffice e esclarecer que o setor verificará os requisitos da operadora, terminar a resposta **sem pergunta genérica de cortesia** como "Posso ajudar com mais alguma coisa?" e sem convite prematuro a retomar a cotação.
+2. Evitar garantias sem confirmação como "garantindo o correto registro da exclusão", "pedido registrado" ou "exclusão realizada"; mencionar apenas o que o Backoffice verificará. Se a ação não foi executada por API autorizada, não declará-la como concluída.
+
+**Verificação de integridade:** Murilo V8 arquivado, V9 **ativa** e única versão ativa; a V8 inteira (14.539 caracteres) aparece como prefixo idêntico da V9 (15.801 caracteres), mesmo tom. **Clara V12** manteve o hash do prompt `cd2737e43d54a29a517bb51fbe5f5d93`, status dos agentes `testing`; conexão `junior_management` permanece `disabled`. Nenhuma alteração no bridge, WhatsApp, CRM LEADS, bancos operacionais ou prompt da Clara.
+
+### Reteste focal V9 — sequência de cinco turnos
+
+Entrar em https://phoenix-one-ai.vercel.app/ → Laboratório RAG conectado → Murilo; desmarcar **Somente recuperar fontes**. Em uma conversa nova, enviar separadamente:
+
+1. `Preciso de uma cotação de seguro Frota para uma empresa.`
+2. `São três veículos utilitários, mas ainda não tenho os modelos.`
+3. `Antes de continuar, também preciso excluir um dependente do plano odontológico da empresa.`
+4. `Sim, pode me orientar sobre como solicitar a exclusão?`
+5. `Obrigado. Agora quero voltar à cotação da frota. O que já te informei?`
+
+**Critérios de aceite:** 5 respostas relevantes ao pedido; apresentação única; o Murilo identifica Backoffice, não inventa exigência documental nem ação executada; **no quarto turno responde de forma completa, sem pergunta de encerramento nem garantia de registro**; no quinto, retoma o contexto dos três utilitários sem modelos, sem reapresentação, com somente uma pergunta comercial útil. Nenhuma coleta de CPF/CNPJ no laboratório e nenhuma simulação de transferência executada.
+
+Exportar **Gerar TXT da conversa** com `Murilo | prompt v9` em cada resposta. O resultado atual é: **publicação e preservação técnica aprovadas; homologação conversacional V9 pendente do TXT gerado pelo modelo**. Integração ponta a ponta Clara–Murilo–Junior/WhatsApp continua desativada, não homologada.
+
+**Este registro atualiza somente a documentação do GitHub**. O prompt V9 foi alterado apenas no Supabase privado, com versionamento e registro de auditoria.
