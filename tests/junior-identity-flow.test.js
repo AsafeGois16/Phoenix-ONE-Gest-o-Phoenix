@@ -440,7 +440,9 @@ test('cada agente tem sua própria apresentação mesmo após outro agente já t
   if(url.includes('api.openai.com'))return json({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'É uma casa ou apartamento?',humanHandoff:false,handoff:null})}]}]})
   throw Error('chamada inesperada')
  }
- const res=response();await handler(request(['Quero cotar seguro residencial']),res)
+ const input=request(['Quero cotar seguro residencial'])
+ input.body.messages.unshift({direction:'outbound',author:'agent',type:'text',text:'Sou a Clara, concierge Phoenix.'},{direction:'inbound',author:'contact',type:'text',text:'Meu nome é Luiza'},{direction:'outbound',author:'agent',type:'text',text:'Posso encaminhar sua cotação ao Murilo, nosso assistente comercial?'},{direction:'inbound',author:'contact',type:'text',text:'Sim'})
+ const res=response();await handler(input,res)
  assert.equal(res.code,200);assert.match(res.body.reply,/Sou o Murilo/)
  assert.doesNotMatch(res.body.reply,/Sou a Clara/)
 }))
@@ -516,7 +518,9 @@ test('cotação Vida com assistência funeral não volta à Clara por memória a
   throw Error('fetch inesperado')
  }
  const res=response()
- await handler(request(['Quero fazer uma cotação de Seguro de Vida','Indenização por falecimento e assistência funeral familiar']),res)
+ const input=request(['Quero fazer uma cotação de Seguro de Vida','Indenização por falecimento e assistência funeral familiar'])
+ input.body.messages.splice(1,0,{direction:'outbound',author:'agent',type:'text',text:'Sou o Murilo, do time comercial da Phoenix Insurance.'})
+ await handler(input,res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'murilo')
  assert.equal(res.body.humanHandoff,false)
@@ -579,7 +583,9 @@ test('cobertura de Vida dentro de cotação nunca coleta CPF por engano de Backo
   throw Error('Não consultar identidade durante cotação')
  }
  const res=response()
- await handler(request(['Quero cotar seguro de Vida','Quero incluir assistência funeral familiar na cotação do seguro de Vida']),res)
+ const input=request(['Quero cotar seguro de Vida','Quero incluir assistência funeral familiar na cotação do seguro de Vida'])
+ input.body.messages.splice(1,0,{direction:'outbound',author:'agent',type:'text',text:'Sou o Murilo, do time comercial da Phoenix Insurance.'})
+ await handler(input,res)
  assert.equal(res.code,200)
  assert.equal(res.body.agent,'murilo')
  assert.equal(res.body.humanHandoff,false)
