@@ -54,3 +54,52 @@ test('continuidade comercial de Murilo nas respostas comuns',()=>{
  assert.equal(selectConversationAgent(request('O imóvel é uma casa',{history:['Oi','Quero cotar seguro residencial']})),'murilo')
  assert.equal(selectConversationAgent(request('Fica em Guarulhos',{history:['Quero cotar seguro residencial']})),'murilo')
 })
+
+const outbound=text=>({direction:'outbound',author:'agent',type:'text',text})
+
+test('regressão real: "Uso pessoal" após apresentação do Murilo NÃO troca para Clara',()=>{
+ const messages=[
+  outbound('Prazer, Asafe! Sou o Murilo, do time comercial da Phoenix Insurance. Vou te ajudar com a cotação para o Onix 2023. Você utiliza o carro para uso pessoal?'),
+  msg('Uso pessoal')
+ ]
+ assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages}),'murilo')
+})
+
+test('Murilo continua mesmo se o Junior enviar hint Clara por engano, quando sua apresentação é confirmada',()=>{
+ const messages=[
+  outbound('Prazer, sou o Murilo, da Phoenix. Para começar, o veículo é para uso pessoal?'),
+  msg('Uso pessoal')
+ ]
+ assert.equal(selectConversationAgent({agent_hint:'clara',contact:{kind:'lead'},messages}),'murilo')
+})
+
+test('após truncamento da apresentação, pergunta comercial e hint Murilo mantêm a triagem',()=>{
+ const messages=[
+  outbound('Para o seu Onix 2023, você gostaria de proteção padrão ou mais cobertura?'),
+  msg('Proteção padrão')
+ ]
+ assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages}),'murilo')
+})
+
+test('respostas curtas do Murilo não causam troca, mesmo que a intenção inicial saiu da janela',()=>{
+ for(const reply of ['Uma proteção nova','Somente eu','A mais comum','Uso pessoal','Proteção padrão']){
+  const messages=[outbound('Prazer! Sou o Murilo, do time comercial da Phoenix Insurance.'),msg(reply)]
+  assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages}),'murilo',reply)
+ }
+})
+
+test('solicitação operacional explícita prevalece sobre apresentação anterior do Murilo',()=>{
+ for(const reply of ['Preciso da segunda via do meu boleto','Quero excluir meu dependente','Preciso acionar meu seguro após acidente']){
+  const messages=[msg('Quero cotar seguro Auto'),outbound('Sou o Murilo, do time comercial da Phoenix Insurance.'),msg(reply)]
+  assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages}),'clara',reply)
+ }
+})
+
+test('a saudação da Clara não é confundida com confirmação de atendimento comercial',()=>{
+ const messages=[msg('Oi'),outbound('Olá, sou a Clara, assistente virtual. Como posso te chamar?'),msg('Asafe')]
+ assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages}),'clara')
+})
+
+test('sem apresentação ou histórico comercial, hint Murilo sozinho não escolhe o SDR',()=>{
+ assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages:[msg('Uso pessoal')]}),'clara')
+})
