@@ -195,3 +195,24 @@ Entrar no **Laboratório RAG conectado** e selecionar **Murilo**. Manter desmarc
 5. Recuperar as informações disponíveis na conversa, especialmente **três veículos utilitários** e **modelos ainda não informados**, retomando comercial sem reapresentação nem perguntas já respondidas. Não declarar que salvou dados fora do histórico.
 
 Exportar um TXT com **Gerar TXT da conversa**, conferir `Murilo | prompt v7` e encaminhar para revisão. Critério final de aceite: 5/5 respostas adequadas, uma única apresentação, zero transferências/consultas alegadas sem confirmação e preservação do contexto textual. **Ainda não executado com IA real** nesta publicação: aprovação conversacional Murilo V7 permanece **PENDENTE**. A integração ponta a ponta Clara–Murilo–Junior/WhatsApp também permanece pendente.
+
+
+## Reteste conversacional Murilo V7 — evidência de 05/11/2026
+
+**Evidência:** arquivo de transcrição `phoenix-one-rag-murilo-2026-11-05T11-42-50-042Z.txt` gerado pelo Laboratório RAG em 05/11/2026, `Murilo | prompt v7`, uma conversa com 5 respostas. Apenas diálogo visível; não é simulação da API operacional do Junior.
+
+| Turno | Estado | Evidência |
+| --- | --- | --- |
+| 1 — abertura de cotação Frota | Aprovado | Apresentação única, pergunta quantidade de veículos, nenhuma alegação de criação de cotação. |
+| 2 — três veículos utilitários sem modelos | Aprovado | Aproveita o dado, qualifica interesses de cobertura sem bloquear por falta de modelos. |
+| 3 — nova solicitação de exclusão Odonto | Aprovado | Suspende venda, identifica Backoffice e faz uma única pergunta administrativa, sem declarar transferência. |
+| 4 — cliente pede orientação sobre exclusão | **Revisar** | Indica Backoffice, mas presume requisitos de dados/documentação e solicitação por escrito sem validação da operadora; oferece "Posso ajudar a encaminhar" sem ferramenta, e faz duas perguntas ao mesmo tempo, incluindo retomar Frota. |
+| 5 — cliente retoma cotação e pergunta o histórico | Aprovado | Recorda três veículos utilitários, modelos não informados; pergunta cidade e não se reapresenta nem alega persistência fora do histórico. |
+
+**Resultado: 4/5 respostas aprovadas; 1/5 reprovada.** O motivo original da V7 (priorizar Backoffice na mudança de assunto) foi corrigido **no turno 3**, mas o turno seguinte ainda viola as mesmas orientações. A **homologação conversacional Murilo V7 permanece PENDENTE**. Não aprovar integração com Junior/WhatsApp com base neste teste.
+
+**Próximo refinamento pontual recomendado (ainda não implementado):** em resposta a "Sim, pode me orientar sobre como solicitar a exclusão?", explicar brevemente que o Backoffice verifica documentos e exigências da operadora, sem inventar requisitos formais, pedir dados privados, oferecer encaminhamento sem ferramenta ou terminar perguntando se deseja voltar à cotação. Preferir uma orientação completa sem perguntas adicionais quando a dúvida já foi respondida. Preservar Murilo V7 e Clara V12; repetir o mesmo roteiro de 5 turnos e comprovar o texto mostrado pelo modelo.
+
+**Resposta-alvo de referência:** "Para solicitar a exclusão do dependente do plano odontológico, procure o Backoffice da Phoenix pelos canais oficiais de atendimento. A equipe confirmará os documentos e as condições exigidas pela operadora para realizar a movimentação. Neste ambiente de teste, não consigo registrar ou encaminhar a solicitação."
+
+Esta atualização refere-se somente ao relatório de testes, sem edição do prompt ou integração.
