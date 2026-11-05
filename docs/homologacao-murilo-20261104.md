@@ -216,3 +216,42 @@ Exportar um TXT com **Gerar TXT da conversa**, conferir `Murilo | prompt v7` e e
 **Resposta-alvo de referência:** "Para solicitar a exclusão do dependente do plano odontológico, procure o Backoffice da Phoenix pelos canais oficiais de atendimento. A equipe confirmará os documentos e as condições exigidas pela operadora para realizar a movimentação. Neste ambiente de teste, não consigo registrar ou encaminhar a solicitação."
 
 Esta atualização refere-se somente ao relatório de testes, sem edição do prompt ou integração.
+
+
+## Murilo V8 — orientação administrativa sem requisitos inventados (05/11/2026)
+
+Após o reteste da V7 (4/5 respostas aprovadas, um erro de orientação de exclusão odontológica), foi publicada a versão **Murilo V8** no Supabase Phoenix ONE, acrescentando um único bloco ao final do prompt mestre.
+
+### Ajuste incorporado
+
+- Nas dúvidas sobre inclusão/exclusão e movimentações em Saúde, Odonto e Vida, responder diretamente e indicar Backoffice/canais oficiais.
+- Não presumir carta, e-mail obrigatório, documento, CPF, dados do titular/dependente, prazo ou procedimento específico sem confirmação da operadora e da equipe.
+- Quando a orientação solicitada já tiver sido respondida, **não** adicionar perguntas como "Posso encaminhar?" ou "Vamos seguir com Frota?".
+- No laboratório, não oferecer encaminhamento, registro, transferência nem consulta sem ferramenta. No atendimento integrado, depender do retorno de execução real da API do Junior.
+- Preservar o contexto comercial disponível na conversa para eventual retomada autorizada, sem afirmar armazenamento externo.
+
+### Verificação após publicação
+
+Consulta ao Supabase confirmou: V7 arquivada (`active=false`), V8 ativa (`active=true`), **exatamente uma versão ativa**, mesmo tom; **12.195 caracteres originais da V7 preservados como prefixo exato dos 14.539 caracteres da V8**. Clara V12 permaneceu ativa, com hash do prompt `cd2737e43d54a29a517bb51fbe5f5d93`. Ambos os agentes seguem em `testing`; `junior_management` permanece `disabled`. Nenhuma mudança no bridge, integração WhatsApp ou CRM LEADS.
+
+### Reteste final V8 — Frota → Backoffice → Frota
+
+No endereço https://phoenix-one-ai.vercel.app/ → Laboratório RAG conectado, escolher **Murilo**, desmarcar "Somente recuperar fontes" e iniciar conversa nova com dados fictícios:
+
+1. `Preciso de uma cotação de seguro Frota para uma empresa.`
+2. `São três veículos utilitários, mas ainda não tenho os modelos.`
+3. `Antes de continuar, também preciso excluir um dependente do plano odontológico da empresa.`
+4. `Sim, pode me orientar sobre como solicitar a exclusão?`
+5. `Obrigado. Agora quero voltar à cotação da frota. O que já te informei?`
+
+**Ponto crítico, turno 4:** deve orientar sobre o Backoffice e confirmação das exigências da operadora, sem inventar documentos/carta obrigatória e **sem oferecer encaminhamento que não consegue executar**, nem perguntar se deseja voltar à cotação. A orientação pode terminar sem qualquer pergunta quando já respondeu ao cliente.
+
+**Ponto de continuidade, turno 5:** deve recordar três veículos utilitários sem modelos definidos, sem afirmar memória persistente ou transferência real, e seguir com a cotação com uma pergunta útil.
+
+Os demais critérios permanecem: apresentação única, uma pergunta principal por turno quando necessária, não solicitar CPF/CNPJ no laboratório, nenhuma ação ou prazo inventado.
+
+Ao finalizar, clicar **Gerar TXT da conversa** e confirmar `Murilo | prompt v8` nas cinco respostas. Enviar o TXT para análise humana.
+
+**Estado:** verificação do banco APROVADA; **homologação conversacional com IA real V8 PENDENTE**. Não confundir aprovação em laboratório com integração Clara–Murilo–Junior/WhatsApp.
+
+Esta atualização refere-se apenas à documentação. O prompt Murilo V8 foi atualizado no Supabase separadamente, sem tocar Clara V12.
