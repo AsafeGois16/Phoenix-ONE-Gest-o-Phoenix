@@ -154,12 +154,16 @@ export default async function handler(req,res){
   conversationId:body.conversation_id,protocolo:body.protocolo,
   observedClara:observed.clara,observedMurilo:observed.murilo
  },AbortSignal.timeout(2800)).catch(e=>{
+  // O bloqueio operacional da gestão não é uma falha transitória de memória:
+  // nunca responder com IA se o protocolo já foi atribuído a humano/encerrado.
+  if(['assigned_to_human','protocol_resolved','protocol_not_open','ticket_resolved'].includes(e?.message))return {blocked:true,reason:e.message}
   console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
   return null
  })
  // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
  // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
- const intake=nameIntakeDecision(body.messages,agent)
+ const introState=await introTask
+ const intake=introState?.murilo_apresentado||introState?.blocked?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
