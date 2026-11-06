@@ -11,7 +11,7 @@ const no=/^(?:nao|não|nao obrigado|não obrigada|nao quero|não quero|prefiro n
 const offerHuman=msg=>/\b(?:posso|deseja|quer|gostaria|poderia|confirma)\b.{0,140}\b(?:encaminhar|direcionar|transferir|passar|falar com|contato com)\b.{0,120}\b(?:equipe|atendimento|setor|departamento|especialista|colaborador|consultor|humano|backoffice)\b/i.test(fold(msg)) ||
  /\b(?:posso|deseja|quer|gostaria|poderia|confirma)\b.{0,90}\b(?:encaminhar|transferir)\b/i.test(fold(msg))
 const offerMurilo=msg=>/\b(?:posso|quer|deseja|gostaria|poderia|confirm[ae])\b.{0,140}\b(?:murilo|time comercial|equipe comercial)\b/i.test(fold(msg))
-const wantHuman=text=>/\b(?:quero|preciso|pode|solicito|me encaminhe|me transfira|encaminhe|transfira|chame)\b.{0,80}\b(?:atendente|humano|pessoa do atendimento|consultor|especialista|equipe|setor|departamento|backoffice|transferir|encaminhar)\b/i.test(fold(text))
+const wantHuman=text=>/\b(?:quero|preciso|pode|solicito|me encaminhe|me transfira|encaminhe|transfira|chame)\b.{0,80}\b(?:atendente|humano|pessoa do atendimento|consultor|especialista|equipe|setor|departamento|backoffice|financeiro|transferir|encaminhar)\b/i.test(fold(text))
 export function isHumanHandoffConfirmed(messages){
  const last=lastText(messages),previous=recentOutbound(messages)
  if(wantHuman(last))return true
@@ -19,6 +19,7 @@ export function isHumanHandoffConfirmed(messages){
 }
 export function humanDepartmentFromOffer(messages){
  const s=fold(recentOutbound(messages))
+ if(/\bfinanceir[oa]\b/.test(s))return 'financeiro'
  if(/\b(?:backoffice|movimentac|inclusao|exclusao|dependente|beneficiario)\b/.test(s))return 'backoffice'
  if(/\b(?:auto|automovel|carro|veiculo|patrimonio|sinistro)\b/.test(s))return 'patrimonio'
  if(/\b(?:saude|odonto|beneficios|plano de saude)\b/.test(s))return 'beneficios'
@@ -35,7 +36,7 @@ export function enforceHumanHandoffConsent(payload,messages){
  if(payload?.humanHandoff!==true||!payload?.handoff)return payload
  if(isHumanHandoffConfirmed(messages))return payload
  const department=payload.handoff.department
- const label={patrimonio:'Atendimento Auto e Patrimonial',beneficios:'Benefícios',backoffice:'Backoffice',comercial:'Comercial'}[department]||'atendimento'
+ const label={patrimonio:'Atendimento Auto e Patrimonial',beneficios:'Benefícios',backoffice:'Backoffice',comercial:'Comercial',financeiro:'Financeiro'}[department]||'atendimento'
  if(no.test(fold(lastText(messages)))&&offerHuman(recentOutbound(messages))){
   return {...payload,reply:'Tudo bem, não farei o encaminhamento. Podemos continuar por aqui. Em que mais posso ajudar?',humanHandoff:false,handoff:null,consentPending:false}
  }
