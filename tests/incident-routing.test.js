@@ -41,15 +41,12 @@ test('cotação hipotética de cobertura de colisão NÃO é sinistro',()=>{
  }
 })
 
-test('após segurança confirmada, perguntar apenas a necessidade de assistência',()=>{
+test('após segurança confirmada, solicitar identificação diretamente, sem etapa extra de guincho',()=>{
  const step=incidentFirstSafetyDecision([inc(original)])
  const follow=incidentFollowupDecision([inc(original),out(step.reply),inc('Sim, estamos em local seguro')])
- assert.match(follow.reply,/precisa de guincho/i)
- assert.doesNotMatch(follow.reply,/CPF|CNPJ|franquia|capital segurado/i)
- const document=incidentFollowupDecision([inc(original),out(step.reply),inc('Sim, estamos em local seguro'),
-  out(follow.reply),inc('Não preciso de guincho')])
- assert.match(document.reply,/CPF ou CNPJ do titular/i)
- assert.doesNotMatch(document.reply,/já (?:abri|acionei)|cobertura confirmada/i)
+ assert.match(follow.reply,/CPF ou CNPJ do titular/i)
+ assert.match(follow.reply,/facilitar o atendimento/i)
+ assert.doesNotMatch(follow.reply,/precisa de guincho|franquia|capital segurado/i)
 })
 
 test('confirmação simultânea de local seguro e guincho desnecessário reduz perguntas',()=>{
@@ -67,20 +64,19 @@ test('solicitação de guincho não promete acionamento nem dispensa aceite huma
  const d=incidentFollowupDecision(list)
  assert.equal(d.humanHandoff,false)
  assert.match(d.reply,/Auto\/RE/i)
- assert.match(d.reply,/não consigo solicitar um guincho|não posso confirmar cobertura/i)
+ assert.match(d.reply,/não consigo acionar o guincho|nenhum guincho foi solicitado/i)
  assert.doesNotMatch(d.reply,/já (?:acionei|solicitei)|guincho encaminhado/i)
 })
 
-test('cliente pede humano de Sinistros Auto: handoff legítimo para patrimonio',()=>{
+test('pedido de humano sem urgência segue para identificação, antes de transferir',()=>{
  const history=[inc(original),out(incidentFirstSafetyDecision([inc(original)]).reply),
   inc('Quero falar com um responsável pelo setor de Sinistros Auto')]
  const d=incidentFollowupDecision(history)
  assert.equal(d.agent,'clara')
- assert.equal(d.humanHandoff,true)
- assert.equal(d.handoff.department,'patrimonio')
- assert.match(d.handoff.summary,/colisão\/acidente/i)
- assert.doesNotMatch(d.handoff.summary,/CPF|CNPJ|número da apólice|franquia/i)
- assert.match(d.reply,/não significa que um sinistro ou guincho já tenha sido acionado/i)
+ assert.equal(d.humanHandoff,false)
+ assert.equal(d.handoff,null)
+ assert.match(d.reply,/CPF ou CNPJ do titular/i)
+ assert.match(d.reply,/facilitar o atendimento/i)
 })
 
 test('informação da apólice validada: só apresenta seguradora Auto, sem listagem de coberturas',()=>{
@@ -94,7 +90,7 @@ test('informação da apólice validada: só apresenta seguradora Auto, sem list
  assert.match(d.reply,/Bradesco/)
  assert.match(d.reply,/Auto\/RE/)
  assert.doesNotMatch(d.reply,/Vida|Operadora Vida|4586|100000|Colisão R\$|LIFE|AUTO-987/)
- assert.match(d.reply,/não confirma cobertura/i)
+ assert.match(d.reply,/equipe confirmará os próximos passos e a cobertura aplicável/i)
  assert.equal(d.humanHandoff,false)
 })
 
@@ -142,4 +138,30 @@ test('não repete apresentação nem pergunta de segurança quando a Clara já p
 test('um documento digitado não é tratado como resposta de guincho',()=>{
  const m=[inc(original),out('Para consultar o seguro, pode informar o CPF ou CNPJ do titular?'),inc('111.444.777-35')]
  assert.equal(incidentFollowupDecision(m),null)
+})
+
+
+test('urgência de guincho pula CPF, mas ainda pede aceite ao humano',()=>{
+ const list=[inc(original),out('Você e o veículo estão em local seguro?'),
+  inc('Estamos em local seguro'),out('Para agilizar, pode informar CPF ou CNPJ do titular?'),
+  inc('Preciso de guincho urgente')]
+ const d=incidentFollowupDecision(list)
+ assert.equal(d.agent,'clara')
+ assert.equal(d.humanHandoff,false)
+ assert.match(d.reply,/Auto\/RE/)
+ assert.doesNotMatch(d.reply,/CPF|CNPJ|franquia/i)
+})
+test('pedido de humano com situação de risco imediato permite prioridade',()=>{
+ const list=[inc(original),out('Você está em local seguro?'),
+  inc('Preciso falar com atendente: o carro pegou fogo')]
+ const d=incidentFollowupDecision(list)
+ assert.equal(d.humanHandoff,true)
+ assert.equal(d.handoff.department,'patrimonio')
+ assert.match(d.reply,/prioridade|socorro/i)
+})
+test('se o pedido de humano ocorre na primeira mensagem sem urgência, segurança ainda vem antes',()=>{
+ const list=[inc('Sofri colisão com meu carro. Quero falar com responsável por Sinistros Auto. Ninguém ficou ferido.')]
+ const d=incidentFirstSafetyDecision(list)
+ assert.equal(d.humanHandoff,false)
+ assert.match(d.reply,/local seguro/)
 })
