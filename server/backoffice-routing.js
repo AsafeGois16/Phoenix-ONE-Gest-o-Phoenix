@@ -80,7 +80,7 @@ export function isStandaloneNewRequest(text){
  // sobre a movimentação anterior. "Já recebeu meu pedido?" não é novo assunto.
  const newSubject=/^(?:(?:e )?agora[, ]+)?(?:tenho (?:uma )?outra (?:duvida|pergunta|coisa)|gostaria de (?:fazer )?outra pergunta|quero (?:tratar|falar) de outro assunto|preciso de ajuda com outra coisa|posso falar de outro assunto)$/
  const clauses=value.split(/[.!?;]+/).map(p=>p.trim()).filter(Boolean)
- if(clauses.length>1&&newSubject.test(clauses.at(-1)))return true
+ if(newSubject.test(value)||clauses.length>1&&newSubject.test(clauses.at(-1)))return true
  // Também aceitar a pontuação natural "O Backoffice já recebeu, agora tenho
  // outra dúvida", sem confundir pedidos de andamento/estado da exclusão.
  const now=value.lastIndexOf(' agora ')
