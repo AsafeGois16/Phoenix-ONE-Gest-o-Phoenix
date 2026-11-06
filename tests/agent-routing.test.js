@@ -103,3 +103,30 @@ test('a saudação da Clara não é confundida com confirmação de atendimento 
 test('sem apresentação ou histórico comercial, hint Murilo sozinho não escolhe o SDR',()=>{
  assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages:[msg('Uso pessoal')]}),'clara')
 })
+
+
+test('cotação Frota interrompida para exclusão de dependente odontológico passa ao Clara',()=>{
+ const m=text=>({direction:'inbound',author:'contact',type:'text',text})
+ const a=text=>({direction:'outbound',author:'agent',type:'text',text})
+ const history=[
+  m('Quero cotar um seguro Frota'),
+  a('Sou o Murilo, do time comercial da Phoenix Insurance.'),
+  m('São três veículos utilitários, ainda não tenho modelos.'),
+  a('Já possuem seguro ou será contratação nova?')
+ ]
+ const movement='Antes de continuar a cotação, preciso excluir um dependente do plano odontológico da empresa.'
+ assert.equal(classifyConversationIntent(movement),'service')
+ assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages:[...history,m(movement)]}),'clara')
+ const reaffirm='Sim, quero resolver a exclusão odontológica agora. Me encaminhe para a Clara dar continuidade com o Backoffice. Depois retomamos a cotação da frota.'
+ assert.equal(classifyConversationIntent(reaffirm),'service')
+ assert.equal(selectConversationAgent({agent_hint:'murilo',contact:{kind:'lead'},messages:[...history,m(movement),a('Recomendo procurar o Backoffice.'),m(reaffirm)]}),'clara')
+})
+test('incluir COBERTURA ou assistência na cotação continua com Murilo',()=>{
+ for(const input of [
+  'Quero incluir cobertura de assistência funeral na cotação do seguro de vida.',
+  'Quero incluir proteção adicional na cotação de Auto.',
+  'Quero cotar plano de Saúde com dependentes.'
+ ]){
+  assert.equal(selectConversationAgent(request(input,{hint:'murilo'})),'murilo',input)
+ }
+})
