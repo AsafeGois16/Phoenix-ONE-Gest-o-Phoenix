@@ -5,7 +5,7 @@
  * não para dúvidas sobre requisitos, prazos ou carência.
  */
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
-const movementSubjects=/\b(beneficiari[oa]s?|dependentes?|titulares?|funcionari[oa]s?|colaborador(?:es|as)?|empregad[oa]s?|filh[oa]s?|espos[oa]|conjuge|vidas?|plano(?: de saude| odontologico| odonto)?|cadastro|dados cadastrais|matricula)\b/
+const movementSubjects=/\b(beneficiari[oa]s?|dependentes?|titulares?|funcionari[oa]s?|colaborador(?:es|as)?|empregad[oa]s?|filh[oa]s?|espos[oa]|conjuge|vidas?|plano(?: de saude| odontologico| odonto)?|odontologic[ao]s?|cadastro|dados cadastrais|matricula)\b/
 const productFor=t=>/\bodonto|odontologico\b/.test(t)?'Odonto':/\bsaude|medico|medica\b/.test(t)?'Saúde':'plano ou cadastro'
 
 export function detectBackofficeStatusRequest(message){
@@ -31,7 +31,16 @@ const movementKind=text=>{
  // de beneficiário. Vale para todos os ramos (Vida, Saúde, Auto etc.).
  const isQuote=/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta|contratar|contratacao|novo seguro)\b/.test(t)
  const isQuoteScope=/\b(?:cobertura|assistencia|indenizacao|protecao|seguro|plano)\b/.test(t)
- if(isQuote&&isQuoteScope)return null
+ // Quando o cliente interrompe uma cotação para INCLUIR/EXCLUIR um
+ // beneficiário de um plano existente, a movimentação é prioritária.
+ // "incluir cobertura/assistência na cotação" continua sendo comercial.
+ const beneficiaryChange=/\b(?:excluir|exclusao|retirar|remover|desvincular|incluir|inclusao|adicionar|cadastrar)\b/.test(t)&&
+  /\b(?:beneficiari[oa]s?|dependentes?|titulares?|funcionari[oa]s?|colaborador(?:es|as)?|filh[oa]s?|espos[ao]s?|conjuge)\b/.test(t)&&
+  /\b(?:plano|saude|odonto|odontologic[ao]|cadastro|apolice)\b/.test(t)
+ // "Quero incluir minha esposa NA COTAÇÃO" é cadastro de proposta,
+ // não inclusão operacional em apólice vigente.
+ const enrollingInQuote=/\b(?:incluir|inclusao|adicionar|cadastrar)\b.{0,100}\b(?:na cotacao|no orcamento|na proposta|na simulacao|para cotar)\b/.test(t)
+ if(isQuote&&isQuoteScope&&(!beneficiaryChange||enrollingInQuote))return null
  if(/\b(?:como funciona|quais documentos|documentacao necessaria|qual o prazo|quanto tempo|tenho uma duvida|gostaria de saber|queria saber|como fazer|pode me explicar)\b/.test(t))return null
  if(!movementSubjects.test(t))return null
  if(/\b(?:seguro auto|automovel|veiculo|carro|residencial|sinistro)\b/.test(t)&&!/\b(?:saude|odonto|beneficiari|dependente|funcionario|colaborador)\b/.test(t))return null
@@ -42,6 +51,9 @@ const movementKind=text=>{
   /\b(?:incluir|inclusao|adicionar|cadastrar|colocar|admissao)\b/.test(t)?'inclusao':
   /\b(?:alterar|alteracao|corrigir|atualizar|mudanca|mudar|ajustar|migrar|transferir)\b/.test(t)?'alteracao':null
 }
+/** Movimentação real de beneficiário, não simples inclusão de cobertura na cotação.
+ * É usado somente na classificação determinística entre agentes. */
+export function isAdministrativeMovementRequest(text){return Boolean(movementKind(text))}
 const getProduct=text=>{
  const t=fold(text)
  const health=/\b(?:saude|medico|medica)\b/.test(t)
@@ -150,12 +162,15 @@ export function assessBackofficeIntake(messages){
  let first=-1,kind=null
  for(let i=history.length-1;i>=0;i--){
    const type=movementKind(history[i].text)
-   if(type){first=i;kind=type;break}
+   if(!type)continue
+   if(kind!==null&&type!==kind)break // nova movimentação diferente: não misturar pedidos
+   kind=type
+   first=i // retomar dados do MESMO pedido se o cliente repetiu "quero excluir"
  }
  if(first<0)return null
  const turns=history.slice(first)
  // Novo assunto explícito encerra a triagem anterior.
- if(first<history.length-1&&newTopic.test(last))return null
+ if(first<history.length-1&&newTopic.test(last)&&!movementKind(history.at(-1).text))return null
  const corpus=turns.map(m=>fold(m.text)).join(' ')
  const product=getProduct(corpus)
  const relation=getRelation(corpus)

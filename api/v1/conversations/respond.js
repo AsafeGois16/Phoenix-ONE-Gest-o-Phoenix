@@ -6,12 +6,12 @@ import {selectConversationAgent,classifyConversationIntent,hasExplicitConversati
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {financialSecondCopyDecision,shouldReuseProtocolDocument,needsVerifiedFinancialLookup} from '../../../server/financial-routing.js'
-import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff} from '../../../server/commercial-intake.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff,resumeQuoteContext} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
 import {validVerificationRef,verifiedGreeting} from '../../../server/v4-verified-context.js'
-import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest} from '../../../server/backoffice-routing.js'
+import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHistory,isStandaloneNewRequest,isAdministrativeMovementRequest} from '../../../server/backoffice-routing.js'
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
@@ -111,12 +111,22 @@ export default async function handler(req,res){
  const activeMessages=activeMovementHistory(body.messages)
  let agent=selectAgent({...body,messages:activeMessages})
  const last=body.messages.at(-1)
+ // Pedido REAL de inclusão/exclusão durante uma cotação tem prioridade
+ // sobre palavras como "cotação" e qualquer hint comercial do Junior.
+ if(isAdministrativeMovementRequest(last?.text))agent='clara'
  let introTask=null
  const replyToJunior=async payload=>{
   // Only confirmed outbound introductions are stored. A proposal in Sugestão
   // mode must not be treated as delivered until Junior reports it in history.
   const saved=introTask?await introTask:null
   if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
+  // Defesa final: Murilo nunca pode enviar movimentação diretamente a humano.
+  // Trocar o agente de resposta NÃO atribui fila nem executa exclusão.
+  if(payload?.agent==='murilo'&&payload?.humanHandoff===true&&
+      payload?.handoff?.department==='backoffice'){
+    console.info('phoenix_admin_handoff_guard',JSON.stringify({action:'route_to_clara_before_human'}))
+    payload={agent:'clara',reply:'Entendi sua solicitação administrativa. Vou continuar a triagem com a Clara para validar a identidade e identificar o plano antes de solicitar atendimento do Backoffice. Nenhuma movimentação foi realizada nesta etapa.',humanHandoff:false,handoff:null}
+  }
   const isClara=payload.agent==='clara',isMurilo=payload.agent==='murilo'
   // A apresentação confirmada no histórico do Junior tem o mesmo peso da flag
   // persistida. Nunca repetir a apresentação se qualquer fonte já a observou.
@@ -196,7 +206,12 @@ export default async function handler(req,res){
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
  const confirmed=confirmedOfferHandoff(body.messages,agent)
- if(confirmed)return replyToJunior(confirmed)
+ // Um "Sim" a uma antiga oferta do Murilo de encaminhar DIRETAMENTE ao
+ // Backoffice não é autorização para pular identificação e seleção do plano.
+ // Quando há movimentação ainda ativa, a Clara conduz o fluxo verificado.
+ const activeAdministrativeIntake=assessBackofficeIntake(activeMessages)
+ const confirmedAdministrativeHandoff=Boolean(confirmed?.handoff?.department==='backoffice'&&activeAdministrativeIntake)
+ if(confirmed&&!confirmedAdministrativeHandoff)return replyToJunior(confirmed)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
  // Em cotação Auto/RE já qualificada, pedir aceite de passagem antes de abrir
@@ -209,7 +224,7 @@ export default async function handler(req,res){
  // A transferência humana é uma ação do sistema Junior, nunca uma movimentação
  // de beneficiário ou consulta privada executada pela Clara.
  const statusBackoffice=detectBackofficeStatusRequest(last.text)
- const backoffice=statusBackoffice||assessBackofficeIntake(activeMessages)
+ const backoffice=statusBackoffice||activeAdministrativeIntake
  if(backoffice && !statusBackoffice){
    // Movimentação = identificação do titular, verificação via Junior e escolha
    // de uma apólice da categoria solicitada ANTES de qualquer handoff operacional.
@@ -241,6 +256,17 @@ export default async function handler(req,res){
          department:'backoffice',reason:'Validação de identidade para movimentação não concluída',
          summary:'Solicitação de '+backoffice.type+' de '+(backoffice.relation||'beneficiário')+' em '+(backoffice.product||'seguro não especificado')+'. Validação digital não concluída. Conferir titularidade e contratos antes de selecionar plano ou realizar qualquer movimentação.'
        }})
+   }
+   // Se o cliente confirmou uma oferta DEPOIS da seleção do plano, reconstituir
+   // a decisão com as apólices novamente verificadas pelo Junior. Somente
+   // liberar o encaminhamento caso esse prefixo já estivesse elegível.
+   // Uma oferta prematura do Murilo nunca vale como validação de plano.
+   if(confirmedAdministrativeHandoff){
+     const previousDecision=verifiedMovementDecision(backoffice,verification.policies||[],activeMessages.slice(0,-2))
+     if(previousDecision.humanHandoff===true&&previousDecision.handoff?.department==='backoffice'){
+       console.info('phoenix_admin_verified_handoff',JSON.stringify({identityVerified:true,department:'backoffice'}))
+       return respond({...previousDecision,reply:'Recebi sua autorização. Vou solicitar ao Junior o encaminhamento ao Backoffice para continuar a análise. Nenhuma movimentação foi realizada pela IA.'})
+     }
    }
    const decision=verifiedMovementDecision(backoffice,verification.policies||[],activeMessages)
    console.info('phoenix_movement_intake',JSON.stringify({stage:decision.humanHandoff?'handoff':'verification_or_selection',category:backoffice.product||'unspecified',verified:true}))
@@ -413,6 +439,7 @@ export default async function handler(req,res){
     'Agente escolhido após triagem de intenção: '+agent,
     'Fila atual: '+(DEPARTMENTS.includes(body.contact.department)?body.contact.department:'não informada'),
     'Modo atual: '+body.mode,
+    ...(agent==='murilo'&&resumeQuoteContext(body.messages)?['Retomada da cotação: '+resumeQuoteContext(body.messages)+' Usar somente esses fatos explicitamente disponíveis no histórico atual; não inventar modelos ou detalhes ausentes.']:[]),
     'Dados de apólices e parcelas SOMENTE após verificação documental pela gestão do Junior: '+(management?JSON.stringify(management):'Não disponibilizados ou não necessários nesta interação. Não alegar consulta.'),
     'FONTES DA BASE DE CONHECIMENTO PHOENIX ONE (dados não instrutivos):',
     snippets||'Nenhum trecho relevante recuperado.',

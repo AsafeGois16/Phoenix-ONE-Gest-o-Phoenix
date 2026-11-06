@@ -1,3 +1,4 @@
+import {isAdministrativeMovementRequest} from './backoffice-routing.js'
 /**
  * Identidade pública dos agentes Phoenix ONE.
  * Clara é a porta de entrada universal; Murilo só assume demanda comercial explícita.
@@ -24,6 +25,10 @@ const SALES_PATTERNS=[
 function intent(text){
  const value=fold(text)
  if(!value)return 'neutral'
+ // Inclusão/exclusão de beneficiário em plano EXISTENTE prevalece mesmo que
+ // a frase comece com "antes de continuar a cotação". A solicitação deixa de
+ // ser comercial e precisa passar por Clara antes de qualquer Backoffice.
+ if(isAdministrativeMovementRequest(text))return 'service'
  // Solicitações operacionais inequívocas prevalecem até em mensagens mistas.
  const operational=/\b(?:boleto|fatura|parcela|pagamento|reembolso|carteirinha|negativa|autorizacao|cirurgia|emergencia|inadimplencia|segunda via)\b/.test(value)||
    /\b(?:acionar|acione|preciso acionar|solicitar acionamento|abrir sinistro|sofri|faleceu|veio a falecer|preciso de guincho)\b.{0,90}\b(?:assistencia|sinistro|seguro|funeral|guincho|falecimento)\b/.test(value)||
