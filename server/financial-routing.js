@@ -44,6 +44,13 @@ export function isFinancialAccountQuestion(text){
  const t=fold(text)
  return /\b(?:boleto|boletos|fatura|faturas|parcela|parcelas|pagamento|vencimento)\b/.test(t)
 }
+/** Valores, vencimentos e status são privados e requerem identity/resolve. */
+export function needsVerifiedFinancialLookup(text){
+ const t=fold(text)
+ if(/\b(?:como funciona|como fazer|como obter|como solicitar)\b/.test(t))return false
+ return isFinancialAccountQuestion(t)&&
+  /\b(?:qual|quanto|valor|vencimento|vence|data|situacao|status|pendente|vencido|pagou|pago|meu|meus|minha|minhas)\b/.test(t)
+}
 /**
  * Reaproveitar somente a CHAVE documental digitada neste protocolo e apenas
  * em uma nova consulta à API do Junior. Ter CPF NÃO autentica o titular.
