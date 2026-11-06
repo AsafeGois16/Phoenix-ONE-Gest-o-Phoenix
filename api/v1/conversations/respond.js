@@ -5,7 +5,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
-import {financialSecondCopyDecision,shouldReuseProtocolDocument} from '../../../server/financial-routing.js'
+import {financialSecondCopyDecision,shouldReuseProtocolDocument,needsVerifiedFinancialLookup} from '../../../server/financial-routing.js'
 import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
@@ -308,7 +308,8 @@ export default async function handler(req,res){
     }
    }
   }
-  const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
+  const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))||
+   (agent==='clara'&&needsVerifiedFinancialLookup(last.text))
   // Um novo assunto não deve reativar a triagem de movimentação; porém, para
   // uma nova consulta financeira no MESMO protocolo, o CPF já digitado ainda
   // pode ser usado como chave no servidor e REVALIDADO pela API do Junior.
