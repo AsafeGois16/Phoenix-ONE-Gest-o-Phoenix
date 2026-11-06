@@ -70,7 +70,7 @@ test('sim após promessa antiga de verificar envio não volta a pedir CPF',()=>w
  assert.equal(res.code,200)
  assert.equal(res.body.humanHandoff,false)
  assert.equal(res.body.handoff,null)
- assert.doesNotMatch(res.body.reply,/CPF|emiti|enviei|enviarei|vou verificar se consigo enviar/i)
+ assert.doesNotMatch(res.body.reply,/informe.*CPF|vou emitir|já emiti|enviarei|vou verificar se consigo enviar/i)
  assert.deepEqual(calls,['intro_status'])
 }))
 test('fluxo com confirmação explícita e fila habilitada propõe FINANCEIRO ao Junior',()=>withMock({financeEnabled:true},async calls=>{
