@@ -210,8 +210,8 @@ export default async function handler(req,res){
  // Backoffice não é autorização para pular identificação e seleção do plano.
  // Quando há movimentação ainda ativa, a Clara conduz o fluxo verificado.
  const activeAdministrativeIntake=assessBackofficeIntake(activeMessages)
- if(confirmed&&!(confirmed.handoff?.department==='backoffice'&&activeAdministrativeIntake))
-   return replyToJunior(confirmed)
+ const confirmedAdministrativeHandoff=Boolean(confirmed?.handoff?.department==='backoffice'&&activeAdministrativeIntake)
+ if(confirmed&&!confirmedAdministrativeHandoff)return replyToJunior(confirmed)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
  // Em cotação Auto/RE já qualificada, pedir aceite de passagem antes de abrir
@@ -256,6 +256,17 @@ export default async function handler(req,res){
          department:'backoffice',reason:'Validação de identidade para movimentação não concluída',
          summary:'Solicitação de '+backoffice.type+' de '+(backoffice.relation||'beneficiário')+' em '+(backoffice.product||'seguro não especificado')+'. Validação digital não concluída. Conferir titularidade e contratos antes de selecionar plano ou realizar qualquer movimentação.'
        }})
+   }
+   // Se o cliente confirmou uma oferta DEPOIS da seleção do plano, reconstituir
+   // a decisão com as apólices novamente verificadas pelo Junior. Somente
+   // liberar o encaminhamento caso esse prefixo já estivesse elegível.
+   // Uma oferta prematura do Murilo nunca vale como validação de plano.
+   if(confirmedAdministrativeHandoff){
+     const previousDecision=verifiedMovementDecision(backoffice,verification.policies||[],activeMessages.slice(0,-2))
+     if(previousDecision.humanHandoff===true&&previousDecision.handoff?.department==='backoffice'){
+       console.info('phoenix_admin_verified_handoff',JSON.stringify({identityVerified:true,department:'backoffice'}))
+       return respond({...previousDecision,reply:'Recebi sua autorização. Vou solicitar ao Junior o encaminhamento ao Backoffice para continuar a análise. Nenhuma movimentação foi realizada pela IA.'})
+     }
    }
    const decision=verifiedMovementDecision(backoffice,verification.policies||[],activeMessages)
    console.info('phoenix_movement_intake',JSON.stringify({stage:decision.humanHandoff?'handoff':'verification_or_selection',category:backoffice.product||'unspecified',verified:true}))
