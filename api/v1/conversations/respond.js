@@ -5,6 +5,7 @@ import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerific
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
+import {financialSecondCopyDecision,shouldReuseProtocolDocument} from '../../../server/financial-routing.js'
 import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
@@ -187,6 +188,11 @@ export default async function handler(req,res){
   console.info('phoenix_auto_re_handoff',JSON.stringify({source:'explicit_customer_request',department:'patrimonio'}))
   return replyToJunior(directHuman)
  }
+ // Solicitação de segunda via: é uma ação humana, não um novo boleto
+ // que a Clara possa gerar ou enviar. Priorizar este fluxo inclusive
+ // quando a conversa acabou de retornar do Backoffice.
+ const financial=financialSecondCopyDecision(body.messages,agent)
+ if(financial)return replyToJunior(financial)
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
  const confirmed=confirmedOfferHandoff(body.messages,agent)
@@ -303,7 +309,12 @@ export default async function handler(req,res){
    }
   }
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))
-  const document=contextNeeded?findInboundDocument(activeMessages):null
+  // Um novo assunto não deve reativar a triagem de movimentação; porém, para
+  // uma nova consulta financeira no MESMO protocolo, o CPF já digitado ainda
+  // pode ser usado como chave no servidor e REVALIDADO pela API do Junior.
+  // Não há reaproveitamento automático da identidade nem exposição ao modelo.
+  const documentHistory=shouldReuseProtocolDocument(body.messages,activeMessages)?body.messages:activeMessages
+  const document=contextNeeded?findInboundDocument(documentHistory):null
   let knowledgeTask=null
   let management=null
   if(contextNeeded){
