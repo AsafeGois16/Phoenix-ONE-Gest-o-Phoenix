@@ -39,7 +39,7 @@ const movementKind=text=>{
   /\b(?:plano|saude|odonto|odontologic[ao]|cadastro|apolice)\b/.test(t)
  // "Quero incluir minha esposa NA COTAÇÃO" é cadastro de proposta,
  // não inclusão operacional em apólice vigente.
- const enrollingInQuote=/\b(?:incluir|inclusao|adicionar|cadastrar)\b.{0,100}\b(?:na cotacao|no orcamento|na proposta|para cotar)\b/.test(t)
+ const enrollingInQuote=/\b(?:incluir|inclusao|adicionar|cadastrar)\b.{0,100}\b(?:na cotacao|no orcamento|na proposta|na simulacao|para cotar)\b/.test(t)
  if(isQuote&&isQuoteScope&&(!beneficiaryChange||enrollingInQuote))return null
  if(/\b(?:como funciona|quais documentos|documentacao necessaria|qual o prazo|quanto tempo|tenho uma duvida|gostaria de saber|queria saber|como fazer|pode me explicar)\b/.test(t))return null
  if(!movementSubjects.test(t))return null
@@ -170,7 +170,7 @@ export function assessBackofficeIntake(messages){
  if(first<0)return null
  const turns=history.slice(first)
  // Novo assunto explícito encerra a triagem anterior.
- if(first<history.length-1&&newTopic.test(last))return null
+ if(first<history.length-1&&newTopic.test(last)&&!movementKind(history.at(-1).text))return null
  const corpus=turns.map(m=>fold(m.text)).join(' ')
  const product=getProduct(corpus)
  const relation=getRelation(corpus)
