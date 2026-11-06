@@ -6,6 +6,7 @@ import {selectConversationAgent,classifyConversationIntent,hasExplicitConversati
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {financialSecondCopyDecision,shouldReuseProtocolDocument,needsVerifiedFinancialLookup} from '../../../server/financial-routing.js'
+import {incidentContext,incidentFirstSafetyDecision,incidentFollowupDecision,incidentVerifiedDecision,enrichConfirmedIncidentHandoff} from '../../../server/incident-routing.js'
 import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff,resumeQuoteContext} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
@@ -113,7 +114,7 @@ export default async function handler(req,res){
  const last=body.messages.at(-1)
  // Pedido REAL de inclusão/exclusão durante uma cotação tem prioridade
  // sobre palavras como "cotação" e qualquer hint comercial do Junior.
- if(isAdministrativeMovementRequest(last?.text))agent='clara'
+ if(isAdministrativeMovementRequest(last?.text)||incidentContext(activeMessages))agent='clara'
  let introTask=null
  const replyToJunior=async payload=>{
   // Only confirmed outbound introductions are stored. A proposal in Sugestão
@@ -143,6 +144,7 @@ export default async function handler(req,res){
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
   payload=enforceHumanHandoffConsent(payload,body.messages)
+  payload=enrichConfirmedIncidentHandoff(payload,body.messages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
@@ -189,6 +191,9 @@ export default async function handler(req,res){
  // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
  // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
  const introState=await introTask
+ // Sinistro ou acidente real: segurança vem antes de nome, CPF ou consulta.
+ const immediateSafety=incidentFirstSafetyDecision(activeMessages)
+ if(immediateSafety)return replyToJunior(immediateSafety)
  const intake=introState?.murilo_apresentado||introState?.blocked?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
@@ -211,7 +216,9 @@ export default async function handler(req,res){
  // Quando há movimentação ainda ativa, a Clara conduz o fluxo verificado.
  const activeAdministrativeIntake=assessBackofficeIntake(activeMessages)
  const confirmedAdministrativeHandoff=Boolean(confirmed?.handoff?.department==='backoffice'&&activeAdministrativeIntake)
- if(confirmed&&!confirmedAdministrativeHandoff)return replyToJunior(confirmed)
+ if(confirmed&&!confirmedAdministrativeHandoff)return replyToJunior(enrichConfirmedIncidentHandoff(confirmed,activeMessages))
+ const incidentHelp=incidentFollowupDecision(activeMessages)
+ if(incidentHelp)return replyToJunior(incidentHelp)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
  // Em cotação Auto/RE já qualificada, pedir aceite de passagem antes de abrir
@@ -335,7 +342,8 @@ export default async function handler(req,res){
    }
   }
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))||
-   (agent==='clara'&&needsVerifiedFinancialLookup(last.text))
+   (agent==='clara'&&needsVerifiedFinancialLookup(last.text))||
+   (agent==='clara'&&Boolean(incidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')
   // Um novo assunto não deve reativar a triagem de movimentação; porém, para
   // uma nova consulta financeira no MESMO protocolo, o CPF já digitado ainda
   // pode ser usado como chave no servidor e REVALIDADO pela API do Junior.
@@ -401,6 +409,12 @@ export default async function handler(req,res){
    }
    management={policies:identity.policies,installments:identity.installments,pending:identity.pending||[],
     ...(v4Enabled?{verified_profile:identity.verified_profile||null}:{})}
+   // Sinistro não é consulta de carteira. Mostrar somente confirmação objetiva
+   // de uma apólice Auto, sem enumerar franquias, limites, prêmios ou cobertura.
+   if(agent==='clara'&&incidentContext(activeMessages)){
+    const incidentSummary=incidentVerifiedDecision(activeMessages,identity.policies||[])
+    if(incidentSummary)return replyToJunior(incidentSummary)
+   }
    // Consultas informativas autorizadas são respondidas diretamente a partir da API.
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
    if(agent==='clara'&&isVerifiedReadonlyContext(activeMessages)){
