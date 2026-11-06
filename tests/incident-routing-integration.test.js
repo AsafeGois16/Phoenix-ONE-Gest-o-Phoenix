@@ -86,7 +86,7 @@ test('apólice consultada após identity VERIFIED: não despeja limites, franqui
  assert.equal(res.body.humanHandoff,false)
  assert.match(res.body.reply,/Bradesco/)
  assert.match(res.body.reply,/Auto\/RE/)
- assert.match(res.body.reply,/não confirma cobertura/i)
+ assert.match(res.body.reply,/cobertura aplicável/i)
  assert.doesNotMatch(res.body.reply,/R\$|4500|100000|franquia|apólice FAKE|Vida|Outra/i)
  assert.doesNotMatch(res.body.reply,/11144477735|111.444.777-35/i)
  assert.deepEqual(calls,['intro_status','identity_context'])
