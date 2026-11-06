@@ -9,7 +9,10 @@ const outbound=m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==
 const pureYes=t=>/^(?:sim|s|claro|isso|exatamente|esta|esta sim|sim esta|sim estou|estamos|seguro|estamos seguros)[.!, ]*$/.test(fold(t))
 const pureNo=t=>/^(?:nao|n|nao preciso|dispenso|sem necessidade|nao, obrigado)[.!, ]*$/.test(fold(t))
 const humanRequest=t=>/\b(?:quero|preciso|pode|solicito|me encaminhe|me transfira|encaminhe|transfira|falar com|conversar com)\b.{0,100}\b(?:humano|atendente|pessoa|consultor|equipe|sinistros|atendimento auto|auto\/re)\b/.test(fold(t))
-const danger=t=>/\b(?:ferid[oa]s?|sangr|desmai|inconscient|pres[oa]|nao respira|grave|risco de vida|fogo|incendio|fumaca|vazamento|perigo|em risco|na pista|via movimentada)\b/.test(fold(t))
+const danger=t=>{const value=fold(t)
+ return /\b(?:sangr|desmai|inconscient|pres[oa]|nao respira|grave|risco de vida|fogo|incendio|fumaca|vazamento|perigo|em risco|na pista|via movimentada)\b/.test(value)||
+  /\bferid[oa]s?\b/.test(value)&&!noInjuries(value)
+}
 const noInjuries=t=>/\b(?:ninguem (?:se )?feriu|ninguem ficou ferido|sem feridos|nao houve feridos|todos bem|ninguem se machucou)\b/.test(fold(t))
 const towRequest=t=>/\b(?:preciso|necessito|quero|chamar|solicitar|acionar)\b.{0,75}\b(?:guincho|reboque|assistencia 24|assistencia auto)\b/.test(fold(t))
 const noTow=t=>/\b(?:nao preciso|sem necessidade|dispenso|nao quero|sem)\b.{0,55}\b(?:guincho|reboque|assistencia)\b/.test(fold(t))
@@ -73,7 +76,7 @@ export function incidentFirstSafetyDecision(messages){
  const ctx=incidentContext(messages),list=Array.isArray(messages)?messages:[]
  const last=list.at(-1)
  if(!ctx||!inbound(last)||!isIncidentReport(last.text))return null
- const alreadyAsked=list.slice(ctx.start+1).some(m=>outbound(m)&&
+ const alreadyAsked=list.some(m=>outbound(m)&&
    /\b(?:local seguro|voce esta em seguranca|guincho|assistencia de emergencia)\b/.test(fold(m.text)))
  if(alreadyAsked)return null
  const text=String(last.text||'')
@@ -97,7 +100,7 @@ export function incidentFollowupDecision(messages){
  // Não interceptar a confirmação de uma oferta humana: o tratamento
  // genérico de consentimento vem primeiro no endpoint.
  if(pureYes(text)&&/\b(?:encaminhar|transferir|equipe auto|sinistros auto)\b/.test(prior))return null
- if(towRequest(text)||danger(text)&&!noInjuries(text)){
+ if(towRequest(text)&&!noTow(text)||danger(text)){
   const emergency=danger(text)?'Se houver risco imediato, priorize sua segurança e acione o socorro apropriado. ':''
   return base(emergency+'Não consigo solicitar um guincho ou confirmar a cobertura automaticamente. Posso encaminhar seu atendimento à equipe de Auto/RE para avaliar a assistência com prioridade?')
  }
