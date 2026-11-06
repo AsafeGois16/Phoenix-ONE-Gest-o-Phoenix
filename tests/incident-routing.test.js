@@ -68,14 +68,14 @@ test('solicitação de guincho não promete acionamento nem dispensa aceite huma
  assert.doesNotMatch(d.reply,/já (?:acionei|solicitei)|guincho encaminhado/i)
 })
 
-test('pedido de humano sem urgência segue para identificação, antes de transferir',()=>{
+test('pedido de humano sem urgência confirma segurança, antes de transferir',()=>{
  const history=[inc(original),out(incidentFirstSafetyDecision([inc(original)]).reply),
   inc('Quero falar com um responsável pelo setor de Sinistros Auto')]
  const d=incidentFollowupDecision(history)
  assert.equal(d.agent,'clara')
  assert.equal(d.humanHandoff,false)
  assert.equal(d.handoff,null)
- assert.match(d.reply,/CPF ou CNPJ do titular/i)
+ assert.match(d.reply,/local seguro/i)
  assert.match(d.reply,/facilitar o atendimento/i)
 })
 
