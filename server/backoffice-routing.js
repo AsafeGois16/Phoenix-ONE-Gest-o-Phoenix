@@ -37,7 +37,10 @@ const movementKind=text=>{
  const beneficiaryChange=/\b(?:excluir|exclusao|retirar|remover|desvincular|incluir|inclusao|adicionar|cadastrar)\b/.test(t)&&
   /\b(?:beneficiari[oa]s?|dependentes?|titulares?|funcionari[oa]s?|colaborador(?:es|as)?|filh[oa]s?|espos[ao]s?|conjuge)\b/.test(t)&&
   /\b(?:plano|saude|odonto|odontologic[ao]|cadastro|apolice)\b/.test(t)
- if(isQuote&&isQuoteScope&&!beneficiaryChange)return null
+ // "Quero incluir minha esposa NA COTAÇÃO" é cadastro de proposta,
+ // não inclusão operacional em apólice vigente.
+ const enrollingInQuote=/\b(?:incluir|inclusao|adicionar|cadastrar)\b.{0,100}\b(?:na cotacao|no orcamento|na proposta|para cotar)\b/.test(t)
+ if(isQuote&&isQuoteScope&&(!beneficiaryChange||enrollingInQuote))return null
  if(/\b(?:como funciona|quais documentos|documentacao necessaria|qual o prazo|quanto tempo|tenho uma duvida|gostaria de saber|queria saber|como fazer|pode me explicar)\b/.test(t))return null
  if(!movementSubjects.test(t))return null
  if(/\b(?:seguro auto|automovel|veiculo|carro|residencial|sinistro)\b/.test(t)&&!/\b(?:saude|odonto|beneficiari|dependente|funcionario|colaborador)\b/.test(t))return null
@@ -159,8 +162,10 @@ export function assessBackofficeIntake(messages){
  let first=-1,kind=null
  for(let i=history.length-1;i>=0;i--){
    const type=movementKind(history[i].text)
-   if(type){first=i;kind=type;break}
- }
+   if(!type)continue
+   if(kind!==null&&type!==kind)break // nova movimentação diferente: não misturar pedidos
+   kind=type
+   first=i // retomar dados do MESMO pedido se o cliente repetiu "quero excluir"
  if(first<0)return null
  const turns=history.slice(first)
  // Novo assunto explícito encerra a triagem anterior.
