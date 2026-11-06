@@ -31,7 +31,12 @@ export async function bridge(action,params={},signal){
  return payload
 }
 export function redact(s){
- return safeText(s,5000).replace(/\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/gi,'[EMAIL]')
+ // Caixa institucional da Phoenix: endereço público e não dado pessoal.
+ // Preservar somente este endereço, mantendo ocultos os demais e-mails.
+ return safeText(s,5000)
+ .replace(/relacionamento@phoenixseg\.com\.br/gi,'[CONTATO_FINANCEIRO_OFICIAL]')
+ .replace(/\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b/gi,'[EMAIL]')
+ .replace(/\[CONTATO_FINANCEIRO_OFICIAL\]/g,'relacionamento@phoenixseg.com.br')
  .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g,'[DOCUMENTO]')
  .replace(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g,'[DOCUMENTO]')
  .replace(/\b(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}\b/g,'[CONTATO]')
