@@ -63,7 +63,7 @@ test('segurança confirmada: solicita identidade',async()=>{
  const first=(await simulated([inc(incident)])).res.body.reply
  const {res,calls}=await simulated([inc(incident),out(first),inc('Sim, estamos em local seguro')])
  assert.equal(res.code,200)
- assert.match(res.body.reply,/precisa de guincho/i)
+ assert.match(res.body.reply,/facilitar o atendimento/i)
  assert.doesNotMatch(res.body.reply,/CPF|CNPJ|cobertura garantida|guincho solicitado/i)
  assert.deepEqual(calls,['intro_status'])
 })
