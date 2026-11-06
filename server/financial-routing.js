@@ -37,7 +37,7 @@ const summary=(messages)=>{
  const prior=sameProtocolDocumentMention(messages)?
   'Há informação documental no histórico do protocolo; validar identidade e vínculo novamente na gestão antes de consultar ou revelar parcelas. ':
   'Verificar identidade e vínculo por canal seguro antes de consultar ou revelar parcelas. '
- return 'Cliente solicita suporte para segunda via de boleto de '+product+'. '+prior+
+ return 'Cliente solicita '+(financialTopic(messages)?'suporte para segunda via de boleto de '+product:'atendimento do Financeiro')+'. '+prior+
   'IA não emitiu, enviou ou registrou boleto. Financeiro deve conferir as condições e o canal oficial de emissão.'
 }
 export function isFinancialAccountQuestion(text){
@@ -65,8 +65,8 @@ export function financeDepartmentEnabled(){
  // A chave permanece desabilitada até confirmação explícita da compatibilidade.
  return process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'
 }
-function financeContactReply(){
- return 'A segunda via deve ser conferida pelo Financeiro da Phoenix junto à operadora. '+
+function financeContactReply(boleto=true){
+ return (boleto?'A segunda via deve ser conferida pelo Financeiro da Phoenix junto à operadora. ':'O atendimento solicitado é de responsabilidade do Financeiro da Phoenix. ')+
  'Ainda não consigo solicitar transferência automática à fila Financeiro nesta integração. '+
  'Você pode contatar o setor pelo canal oficial relacionamento@phoenixseg.com.br. '+
  'Nenhum boleto foi emitido ou enviado por mim. Caso precise de dados do contrato, a equipe confirmará sua identidade com segurança.'
@@ -102,8 +102,8 @@ export function financialSecondCopyDecision(messages,agent='clara'){
  if(isYes(text)&&deceptiveOffer(prior)&&financialTopic(list)){
   return financeDepartmentEnabled()?offerFinancialHandoff():{agent:'clara',reply:financeContactReply(),humanHandoff:false,handoff:null}
  }
- if(requestFinance(text)&&financialTopic(list)){
-  return financeDepartmentEnabled()?handoff(list):{agent:'clara',reply:financeContactReply(),humanHandoff:false,handoff:null}
+ if(requestFinance(text)){
+  return financeDepartmentEnabled()?handoff(list):{agent:'clara',reply:financeContactReply(financialTopic(list)),humanHandoff:false,handoff:null}
  }
  if(billingReissue(text)){
   return financeDepartmentEnabled()?offerFinancialHandoff():{agent:'clara',reply:financeContactReply(),humanHandoff:false,handoff:null}
