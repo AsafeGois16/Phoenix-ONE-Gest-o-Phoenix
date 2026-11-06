@@ -94,3 +94,12 @@ test('nova consulta de valor pode reutilizar CPF informado antes da mudança de 
  assert.ok(calls.includes('identity_context'))
  assert.doesNotMatch(JSON.stringify(res.body),/11144477735|111.444.777-35/)
 }))
+
+
+test('schema oferece financeiro somente com feature flag explícita',async()=>{
+ const {readFile}=await import('node:fs/promises')
+ const source=await readFile(new URL('../api/v1/conversations/respond.js',import.meta.url),'utf8')
+ assert.match(source,/const DEPARTMENTS=.*PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED/)
+ assert.match(source,/process\.env\.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'/)
+ assert.match(source,/department:\{type:'string',enum:DEPARTMENTS\}/)
+})

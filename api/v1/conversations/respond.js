@@ -16,7 +16,7 @@ import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/v
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 export const config={maxDuration:20}
-const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice']
+const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
 const formatSchema={
  type:'object',additionalProperties:false,required:['reply','humanHandoff','handoff'],
  properties:{
