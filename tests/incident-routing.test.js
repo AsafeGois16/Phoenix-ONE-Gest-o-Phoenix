@@ -183,3 +183,13 @@ test('roteiro direto: local seguro → identificação → oferta única ao Auto
  assert.equal(accepted.humanHandoff,true)
  assert.equal(accepted.handoff.department,'patrimonio')
 })
+
+
+test('cliente informa que NÃO está em local seguro: nunca avançar para identificação',()=>{
+ for(const reply of ['Não estamos em local seguro','Ainda estamos na pista','Não estou seguro']){
+  const history=[inc(original),out('Você e o veículo estão em local seguro?'),inc(reply)]
+  const result=incidentFollowupDecision(history)
+  assert.match(result.reply,/segurança|socorro/i,reply)
+  assert.doesNotMatch(result.reply,/CPF|CNPJ|informar documento/i,reply)
+ }
+})
