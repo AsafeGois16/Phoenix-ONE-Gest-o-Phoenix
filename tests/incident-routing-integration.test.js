@@ -59,12 +59,12 @@ test('Teste 6 real: primeiro responde segurança, sem CPF, RAG ou consulta',asyn
  assert.doesNotMatch(res.body.reply,/CPF|CNPJ|seguradora|franquia|coberturas|R\$|100\.000/i)
  assert.deepEqual(calls,['intro_status'])
 })
-test('segurança confirmada: apenas identifica necessidade de guincho',async()=>{
+test('segurança confirmada: solicita identidade',async()=>{
  const first=(await simulated([inc(incident)])).res.body.reply
  const {res,calls}=await simulated([inc(incident),out(first),inc('Sim, estamos em local seguro')])
  assert.equal(res.code,200)
- assert.match(res.body.reply,/precisa de guincho/i)
- assert.doesNotMatch(res.body.reply,/CPF|CNPJ|cobertura garantida|guincho solicitado/i)
+ assert.match(res.body.reply,/facilitar o atendimento/i)
+ assert.doesNotMatch(res.body.reply,/cobertura garantida|guincho solicitado/i)
  assert.deepEqual(calls,['intro_status'])
 })
 test('após guincho dispensado, identifica titular, sem afirmar que abriu sinistro',async()=>{
@@ -86,7 +86,7 @@ test('apólice consultada após identity VERIFIED: não despeja limites, franqui
  assert.equal(res.body.humanHandoff,false)
  assert.match(res.body.reply,/Bradesco/)
  assert.match(res.body.reply,/Auto\/RE/)
- assert.match(res.body.reply,/não confirma cobertura/i)
+ assert.match(res.body.reply,/cobertura aplicável/i)
  assert.doesNotMatch(res.body.reply,/R\$|4500|100000|franquia|apólice FAKE|Vida|Outra/i)
  assert.doesNotMatch(res.body.reply,/11144477735|111.444.777-35/i)
  assert.deepEqual(calls,['intro_status','identity_context'])
@@ -109,11 +109,11 @@ test('sinistro com feridos não aguarda CPF para orientar socorro',async()=>{
  assert.doesNotMatch(res.body.reply,/CPF|CNPJ/i)
  assert.deepEqual(calls,['intro_status'])
 })
-test('pedido direto de humano no sinistro: solicita fila Auto/RE imediatamente',async()=>{
+test('pedido direto de humano no sinistro: prioriza segurança antes de encaminhar',async()=>{
  const {res,calls}=await simulated([inc('Sofri uma colisão com meu carro. Quero falar com um atendente de Sinistros Auto agora.')])
  assert.equal(res.code,200)
- assert.equal(res.body.humanHandoff,true)
- assert.equal(res.body.handoff.department,'patrimonio')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
  assert.match(res.body.reply,/local seguro|socorro|segurança/i)
  assert.deepEqual(calls,['intro_status'])
 })

@@ -63,14 +63,14 @@ function note(messages){
 }
 function handoff(messages,priority=false){
  return base((priority?'Entendido. Como a assistência pode ser urgente, ':'Entendido. ')+
-  'Vou solicitar ao Junior o encaminhamento à equipe Auto/RE para atendimento de Sinistros Auto. '+
-  'Isso não significa que um sinistro ou guincho já tenha sido acionado.',true,{
+  'Vou solicitar seu atendimento à equipe Auto/RE para dar continuidade ao sinistro. '+
+  'O sinistro e o guincho ainda não foram acionados pela IA.',true,{
    department:'patrimonio',reason:'Atendimento humano de Sinistros Auto solicitado pelo cliente',
    summary:note(messages).slice(0,350)
   })
 }
-const safetyQuestion='Antes de consultar o seguro, você e o veículo estão em local seguro? Se houver perigo imediato, priorize o afastamento da via e o atendimento de emergência.'
-const traumaQuestion='Se houver alguém ferido ou risco imediato, acione o socorro local (SAMU 192, Bombeiros 193 ou Polícia 190 conforme a situação). Você está em local seguro?'
+const safetyQuestion='Antes de prosseguir, você e o veículo estão em local seguro? Se houver risco imediato, priorize o socorro e sua segurança.'
+const traumaQuestion='Se houver feridos ou perigo imediato, priorize o socorro (SAMU 192, Bombeiros 193 ou Polícia 190, conforme o caso). Você está em local seguro?'
 /** Rodar ANTES de coleta de nome, documento e consulta de apólices. */
 export function incidentFirstSafetyDecision(messages){
  const ctx=incidentContext(messages),list=Array.isArray(messages)?messages:[]
@@ -82,47 +82,55 @@ export function incidentFirstSafetyDecision(messages){
  const text=String(last.text||'')
  const safety=danger(text)?traumaQuestion:
   (noInjuries(text)?'Que bom que ninguém ficou ferido. ':'Sinto muito pelo ocorrido. ')+safetyQuestion
- if(humanRequest(text))return {
-  ...handoff(list,true),reply:safety+' Vou solicitar atendimento humano de Sinistros Auto agora.'
+ if(humanRequest(text)&&danger(text))return {
+  ...handoff(list,true),reply:safety+' Vou solicitar o atendimento humano de Sinistros Auto com prioridade.'
  }
  return base(safety)
 }
 /** Não confundir preferência de cobertura no seguro novo com sinistro real. */
+const identificationQuestion='Para facilitar o atendimento pela equipe Auto/RE, pode informar o CPF ou CNPJ do titular do seguro? A gestão poderá solicitar uma confirmação adicional de identidade.'
+/** Segurança → identificação → Auto/RE. Guincho urgente não aguarda CPF. */
 export function incidentFollowupDecision(messages){
  const list=Array.isArray(messages)?messages:[]
  const ctx=incidentContext(list),last=list.at(-1)
  if(!ctx||!inbound(last))return null
- const text=String(last.text||'')
- const prior=fold(latestAgent(list))
- if(humanRequest(text))return handoff(list,true)
- // Não bloquear coleta documental em etapa já explicitamente solicitada.
+ const text=String(last.text||''),normal=fold(text),prior=fold(latestAgent(list))
+ const customerSince=list.slice(ctx.start).filter(inbound).map(m=>m.text)
+ const safetyConfirmed=customerSince.some(safeConfirmed)
+ const urgent=danger(text)||towRequest(text)&&!noTow(text)
+ // Mesmo num atendimento já em curso, risco físico ou guincho urgente
+ // prevalecem sobre documento, seguro e consentimento comercial.
+ if(urgent){
+  const warning=danger(text)?'Se houver risco imediato, priorize sua segurança e o socorro local. ':''
+  if(humanRequest(text))return {...handoff(list,true),reply:warning+'Vou solicitar atendimento humano de Sinistros Auto com prioridade. Não acionei o guincho.'}
+  return base(warning+'Posso encaminhar você ao Auto/RE com prioridade para avaliar a assistência? Não consigo acionar o guincho automaticamente.')
+ }
+ // Não interromper validação documental solicitada pelo Junior, inclusive
+ // a resposta de nascimento/CEP. O CPF não comprova identidade sozinho.
  if(/\b(?:cpf|cnpj|data de nascimento|cep cadastrado)\b/.test(prior))return null
- // Não interceptar a confirmação de uma oferta humana: o tratamento
- // genérico de consentimento vem primeiro no endpoint.
+ // O aceite de oferta de Auto/RE é processado por consent-routing.
  if(pureYes(text)&&/\b(?:encaminhar|transferir|equipe auto|sinistros auto)\b/.test(prior))return null
- if(towRequest(text)&&!noTow(text)||danger(text)){
-  const emergency=danger(text)?'Se houver risco imediato, priorize sua segurança e acione o socorro apropriado. ':''
-  return base(emergency+'Não consigo solicitar um guincho ou confirmar a cobertura automaticamente. Posso encaminhar seu atendimento à equipe de Auto/RE para avaliar a assistência com prioridade?')
- }
- if(/\blocal seguro\b/.test(prior)||/\besta[o]? em local seguro\b/.test(prior)){
-  if(pureNo(text)||/\b(?:nao esta seguro|ainda na pista|em risco|perigo)\b/.test(fold(text))){
-   return base('Priorize sair da área de risco, se for seguro fazê-lo. Se houver perigo imediato, acione o socorro local. Precisa que eu solicite o encaminhamento à equipe Auto/RE para atendimento humano?')
+ const answeringSafety=/\blocal seguro\b/.test(prior)||/\best[aá] em seguranca\b/.test(prior)
+ if(answeringSafety){
+  if(pureNo(text)||/\b(?:nao\s+(?:estou|estamos|esta|ficou|e)\s+(?:(?:em|num|no)\s+)?(?:um\s+)?local\s+seguro|nao\s+(?:estou|estamos|esta|ficou)\s+seguros?|ainda\s+(?:estou|estamos|esta)\s+(?:na|no)\s+(?:pista|via)|ainda\s+na\s+pista|em\s+risco|perigo)\b/.test(normal)){
+   return base('Priorize sua segurança e acione o socorro local se houver risco. Posso encaminhar você ao Auto/RE com prioridade?')
   }
-  if(safeConfirmed(text)||pureYes(text)){
-   if(noTow(text))return base('Entendi. Não vou acionar serviços sem autorização. Para localizar sua apólice Auto com segurança e dar continuidade ao atendimento de Sinistros, pode informar o CPF ou CNPJ do titular? A confirmação de identidade pode exigir uma etapa adicional.')
-   return base('Que bom que estão em segurança. Você precisa de guincho ou assistência para o veículo agora?')
-  }
-  return base('Não é necessário informar a apólice neste momento. Antes de prosseguir, você e o veículo estão em local seguro?')
+  if(safeConfirmed(text)||pureYes(text))return base('Que bom que estão em segurança. '+identificationQuestion)
+  return base('Entendi. Você e o veículo estão em local seguro?')
  }
+ // Resposta a uma pergunta antiga sobre guincho: não criar outra rodada
+ // de perguntas; passar para a identificação, salvo assistência urgente.
  if(/\b(?:precisa de guincho|guincho ou assistencia|precisa de assistencia)\b/.test(prior)){
-  if(pureNo(text)||noTow(text))
-   return base('Entendido. Para consultar a apólice Auto com segurança antes de encaminhar a solicitação, pode informar o CPF ou CNPJ do titular? A confirmação de identidade pode exigir uma etapa adicional.')
-  if(pureYes(text))
-   return base('Posso solicitar agora o encaminhamento à equipe Auto/RE para orientar o acionamento de assistência? Não posso confirmar cobertura nem solicitar guincho automaticamente.')
-  return null
+  if(pureYes(text))return base('Posso encaminhar você ao Auto/RE com prioridade para avaliar a assistência? Nenhum guincho foi solicitado pela IA.')
+  if(pureNo(text)||noTow(text))return base(identificationQuestion)
+ }
+ if(humanRequest(text)){
+  if(!safetyConfirmed)return base(safetyQuestion)
+  return base(identificationQuestion)
  }
  return null
 }
+
 const isAuto=policy=>{
  const t=fold([policy?.ramo,policy?.linha,policy?.product_code].filter(Boolean).join(' '))
  return /\b(?:auto|automovel|veiculo|carro|frota|moto|motocicleta)\b/.test(t)
@@ -140,7 +148,7 @@ export function incidentVerifiedDecision(messages,policies){
  }else{
   reference+='Não encontrei uma apólice de Auto identificável nessa consulta. A equipe poderá conferir o cadastro. '
  }
- return base(reference+'A consulta não confirma cobertura para o acidente nem autorização de guincho. Posso encaminhar você ao Auto/RE para atendimento de Sinistros Auto?')
+ return base(reference+'Posso encaminhar seu atendimento de Sinistros Auto ao Auto/RE? A equipe confirmará os próximos passos e a cobertura aplicável.')
 }
 /** Enriquecer o resumo após consentimento, sem expor identificação ou apólice. */
 export function enrichConfirmedIncidentHandoff(decision,messages){
