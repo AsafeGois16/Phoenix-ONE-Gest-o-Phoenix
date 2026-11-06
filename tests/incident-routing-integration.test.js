@@ -59,7 +59,7 @@ test('Teste 6 real: primeiro responde segurança, sem CPF, RAG ou consulta',asyn
  assert.doesNotMatch(res.body.reply,/CPF|CNPJ|seguradora|franquia|coberturas|R\$|100\.000/i)
  assert.deepEqual(calls,['intro_status'])
 })
-test('segurança confirmada: apenas identifica necessidade de guincho',async()=>{
+test('segurança confirmada: solicita identidade',async()=>{
  const first=(await simulated([inc(incident)])).res.body.reply
  const {res,calls}=await simulated([inc(incident),out(first),inc('Sim, estamos em local seguro')])
  assert.equal(res.code,200)
