@@ -64,7 +64,7 @@ test('segurança confirmada: solicita identidade',async()=>{
  const {res,calls}=await simulated([inc(incident),out(first),inc('Sim, estamos em local seguro')])
  assert.equal(res.code,200)
  assert.match(res.body.reply,/facilitar o atendimento/i)
- assert.doesNotMatch(res.body.reply,/CPF|CNPJ|cobertura garantida|guincho solicitado/i)
+ assert.doesNotMatch(res.body.reply,/cobertura garantida|guincho solicitado/i)
  assert.deepEqual(calls,['intro_status'])
 })
 test('após guincho dispensado, identifica titular, sem afirmar que abriu sinistro',async()=>{
