@@ -1,3 +1,5 @@
+import {isAdministrativeMovementRequest} from './backoffice-routing.js'
+
 /**
  * Coleta de nome de tratamento e roteamento de oportunidades Auto/RE.
  * Sem persistência, sem identificação documental e sem acesso ao Junior.
@@ -174,6 +176,9 @@ export function resumeQuoteContext(messages){
  let quoteAt=-1
  for(let i=before.length-1;i>=0;i--){
    const v=fold(before[i].text)
+   // O cliente pode dizer "antes de continuar a cotação, preciso EXCLUIR
+   // dependente do Odonto"; essa é a MOVIMENTAÇÃO, não a última cotação.
+   if(isAdministrativeMovementRequest(before[i].text))continue
    if(/\b(?:cotacao|cotar|orcamento|contratar)\b/.test(v)&&
       /\b(?:frota|auto|residencial|vida|saude|odonto)\b/.test(v)){quoteAt=i;break}
  }
