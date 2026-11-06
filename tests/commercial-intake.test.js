@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff} from '../server/commercial-intake.js'
+import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff,resumeQuoteContext} from '../server/commercial-intake.js'
 
 const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
 const out=text=>({direction:'outbound',author:'agent',type:'text',text})
@@ -147,4 +147,25 @@ test('Murilo não promete registrar cotação e enviar valor por chat',()=>{
 test('seguro Vida não entra na fila Auto/RE por engano',()=>{
  const m=[inc('Quero cotar seguro de vida'),murilo,inc('Quero falar com consultor humano')]
  assert.equal(directAutoReHumanHandoff(m,'murilo'),null)
+})
+
+test('retomada da Frota mantém três utilitários e a pendência dos modelos sem CPF',()=>{
+ const input=[
+  inc('Quero cotar um seguro Frota para minha empresa'),
+  inc('São três veículos utilitários, mas ainda não tenho os modelos.'),
+  out('Sou o Murilo, do comercial.'),
+  inc('Antes de continuar a cotação, preciso excluir um dependente do Odonto'),
+  inc('111.444.777-35'),
+  out('A Clara pediu confirmação do titular e do plano Odonto.'),
+  inc('Quero retomar a cotação da frota')
+ ]
+ const summary=resumeQuoteContext(input)
+ assert.match(summary,/Cotação de Frota/i)
+ assert.match(summary,/três veículos utilitários/i)
+ assert.match(summary,/modelos ainda não informados/i)
+ assert.doesNotMatch(summary,/111|444|777|cpf|cnpj/i)
+})
+test('não inventar contexto comercial quando Junior não entregou a cotação anterior',()=>{
+ assert.equal(resumeQuoteContext([inc('Quero retomar a cotação')]),null)
+ assert.equal(resumeQuoteContext([inc('Preciso excluir dependente do Odonto')]),null)
 })
