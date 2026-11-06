@@ -186,3 +186,40 @@ test('inclusão de beneficiário em plano vigente continua sendo Backoffice',()=
   assert.equal(decision.department,'backoffice')
  }
 })
+
+
+test('regressão 06/11: Backoffice recebeu o pedido, agora outra dúvida não reabre exclusão',()=>{
+ const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
+ const out=text=>({direction:'outbound',author:'agent',type:'text',text})
+ const history=[
+  inc('Preciso excluir minha esposa do plano de Saúde empresarial'),
+  out('Concluí a etapa de verificação, mas não localizei plano para seleção. Posso encaminhar ao Backoffice?'),
+  inc('Sim'),
+  out('Perfeito, vou solicitar o encaminhamento à equipe de Backoffice.'),
+  {direction:'outbound',author:'staff',type:'text',text:'Retornado à Clara'},
+  inc('O Backoffice já recebeu minha solicitação. Agora tenho outra dúvida.')
+ ]
+ assert.equal(isStandaloneNewRequest(history.at(-1).text),true)
+ assert.deepEqual(activeMovementHistory(history),[history.at(-1)])
+ assert.equal(assessBackofficeIntake(history),null)
+})
+test('aceita abertura de novo assunto após uma frase de contexto, mas preserva pergunta de andamento',()=>{
+ const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
+ const previous=[inc('Quero excluir minha esposa do plano de Saúde')]
+ for(const phrase of [
+  'O Backoffice já recebeu minha solicitação. Agora tenho outra dúvida.',
+  'O Backoffice já recebeu minha solicitação, agora tenho outra dúvida',
+  'O atendimento passou ao Backoffice; agora tenho uma outra pergunta.',
+  'Agora tenho outra dúvida.',
+  'O Backoffice recebeu meu pedido. Quero tratar de outro assunto.'
+ ]){
+  assert.equal(isStandaloneNewRequest(phrase),true,phrase)
+  assert.equal(assessBackofficeIntake([...previous,inc(phrase)]),null,phrase)
+ }
+ for(const phrase of [
+  'O Backoffice já recebeu minha solicitação?',
+  'Não tenho outra dúvida.',
+  'Tenho outra dúvida sobre os documentos da exclusão',
+  'O Backoffice recebeu meu pedido. Qual é o prazo da exclusão?'
+ ])assert.equal(isStandaloneNewRequest(phrase),false,phrase)
+})
