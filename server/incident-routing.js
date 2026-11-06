@@ -112,7 +112,7 @@ export function incidentFollowupDecision(messages){
  if(pureYes(text)&&/\b(?:encaminhar|transferir|equipe auto|sinistros auto)\b/.test(prior))return null
  const answeringSafety=/\blocal seguro\b/.test(prior)||/\best[aá] em seguranca\b/.test(prior)
  if(answeringSafety){
-  if(pureNo(text)||/\b(?:nao est[aá] seguro|ainda na pista|em risco|perigo)\b/.test(normal)){
+  if(pureNo(text)||/\b(?:nao\s+(?:estou|estamos|esta|ficou|e)\s+(?:(?:em|num|no)\s+)?(?:um\s+)?local\s+seguro|nao\s+(?:estou|estamos|esta|ficou)\s+seguros?|ainda\s+(?:estou|estamos|esta)\s+(?:na|no)\s+(?:pista|via)|ainda\s+na\s+pista|em\s+risco|perigo)\b/.test(normal)){
    return base('Priorize sua segurança e acione o socorro local se houver risco. Posso encaminhar você ao Auto/RE com prioridade?')
   }
   if(safeConfirmed(text)||pureYes(text))return base('Que bom que estão em segurança. '+identificationQuestion)
