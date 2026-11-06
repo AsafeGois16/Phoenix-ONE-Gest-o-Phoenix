@@ -223,3 +223,34 @@ test('aceita abertura de novo assunto após uma frase de contexto, mas preserva 
   'O Backoffice recebeu meu pedido. Qual é o prazo da exclusão?'
  ])assert.equal(isStandaloneNewRequest(phrase),false,phrase)
 })
+
+
+test('movimentação de dependente odontológico interrompe cotação sem transferir ao humano',async()=>{
+ const {isAdministrativeMovementRequest}=await import('../server/backoffice-routing.js')
+ const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
+ const out=text=>({direction:'outbound',author:'agent',type:'text',text})
+ const quote=inc('Quero cotar seguro Frota para três veículos utilitários.')
+ const movement=inc('Antes de continuar a cotação, preciso excluir um dependente do plano odontológico da empresa.')
+ const history=[quote,out('Sou o Murilo. Já tem os modelos?'),inc('Ainda não.'),movement]
+ assert.equal(isAdministrativeMovementRequest(movement.text),true)
+ const result=assessBackofficeIntake(history)
+ assert.equal(result.type,'exclusao')
+ assert.equal(result.product,'Odonto')
+ assert.equal(result.relation,'dependente')
+ assert.equal(result.department,'backoffice')
+ assert.equal(result.humanHandoff,false)
+ assert.equal(result.stage,'ask_reference')
+ assert.equal(isAdministrativeMovementRequest('Quero incluir assistência funeral na cotação de Vida.'),false)
+})
+test('pedido explícito para Clara após o Murilo mantém movimentação Odonto sem inventar titular',async()=>{
+ const {isAdministrativeMovementRequest}=await import('../server/backoffice-routing.js')
+ const inc=text=>({direction:'inbound',author:'contact',type:'text',text})
+ const src=inc('Sim, quero resolver a exclusão odontológica agora. Por favor, me encaminhe para a Clara dar continuidade com o Backoffice. Depois retomamos a cotação da frota.')
+ assert.equal(isAdministrativeMovementRequest(src.text),true)
+ const history=[inc('Antes de continuar a cotação, preciso excluir um dependente do plano odontológico da empresa.'),src]
+ const intake=assessBackofficeIntake(history)
+ assert.equal(intake.type,'exclusao')
+ assert.equal(intake.product,'Odonto')
+ assert.equal(intake.relation,'dependente')
+ assert.equal(intake.humanHandoff,false)
+})
