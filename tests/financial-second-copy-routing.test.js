@@ -78,3 +78,17 @@ test('sem suporte financeiro, pedido humano não vai silenciosamente a Benefíci
  assert.equal(r.humanHandoff,false)
  assert.match(r.reply,/ainda não consigo/i)
 }))
+
+test('pedido direto ao Financeiro sem segunda via no histórico não cai em Benefícios',()=>withFlag(null,()=>{
+ const r=financialSecondCopyDecision([inc('Preciso falar com o Financeiro')],'clara')
+ assert.equal(r.agent,'clara')
+ assert.equal(r.humanHandoff,false)
+ assert.equal(r.handoff,null)
+ assert.match(r.reply,/canal oficial relacionamento@phoenixseg.com.br/)
+}))
+test('pedido direto ao Financeiro com contrato habilitado usa destino financeiro',()=>withFlag('true',()=>{
+ const r=financialSecondCopyDecision([inc('Preciso falar com o Financeiro')],'clara')
+ assert.equal(r.humanHandoff,true)
+ assert.equal(r.handoff.department,'financeiro')
+ assert.doesNotMatch(r.handoff.summary,/111.444|11144477735/)
+}))
