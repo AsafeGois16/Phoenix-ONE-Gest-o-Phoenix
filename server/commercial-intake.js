@@ -158,3 +158,34 @@ export function guardCommercialQuoteClosing(payload,messages){
  if(!unverifiedFuture&&!unspecifiedReturn&&!inventedRegistration)return payload
  return {...payload,reply:'Com as informações que você compartilhou, podemos avançar na análise da cotação. Posso encaminhar sua solicitação à equipe de Auto/RE para um consultor avaliar as opções?',humanHandoff:false,handoff:null}
 }
+
+/**
+ * Retomada comercial após Backoffice sem persistir PII: usa somente fatos
+ * explícitos fornecidos no histórico do MESMO protocolo pelo Junior.
+ * Se o histórico original saiu da janela enviada pelo Junior, não inventar.
+ */
+export function resumeQuoteContext(messages){
+ const list=Array.isArray(messages)?messages:[],last=list.at(-1)
+ if(!isContact(last))return null
+ const latest=fold(last.text)
+ if(!/\b(?:retomar|voltar|continuar|voltemos|retornemos)\b/.test(latest)||
+    !/\b(?:cotacao|orcamento|frota|seguro|proposta)\b/.test(latest))return null
+ const before=list.slice(0,-1).filter(isContact)
+ let quoteAt=-1
+ for(let i=before.length-1;i>=0;i--){
+   const v=fold(before[i].text)
+   if(/\b(?:cotacao|cotar|orcamento|contratar)\b/.test(v)&&
+      /\b(?:frota|auto|residencial|vida|saude|odonto)\b/.test(v)){quoteAt=i;break}
+ }
+ if(quoteAt<0)return null
+ const corpus=fold(before.slice(quoteAt).map(m=>m.text).join(' '))
+ const ramo=/\bfrota\b/.test(corpus)?'Frota':/\b(?:auto|carro|automovel)\b/.test(corpus)?'Auto':
+  /\bresidencial\b/.test(corpus)?'Residencial':/\bvida\b/.test(corpus)?'Vida':
+  /\bsaude\b/.test(corpus)?'Saúde':'Odonto'
+ const facts=['Cotação de '+ramo+' mencionada pelo cliente']
+ if(/\b(?:tres|3)\s+(?:veiculos|carros)\s+utilitarios\b/.test(corpus))
+   facts.push('três veículos utilitários')
+ if(/\b(?:nao tenho os modelos|nao sei os modelos|modelos ainda nao informados|ainda nao tenho os modelos|sem os modelos)\b/.test(corpus))
+   facts.push('modelos ainda não informados')
+ return facts.join('; ')+'.'
+}
