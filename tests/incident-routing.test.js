@@ -165,3 +165,21 @@ test('se o pedido de humano ocorre na primeira mensagem sem urgência, seguranç
  assert.equal(d.humanHandoff,false)
  assert.match(d.reply,/local seguro/)
 })
+
+
+test('roteiro direto: local seguro → identificação → oferta única ao Auto/RE',()=>{
+ const history=[inc(original)]
+ const first=incidentFirstSafetyDecision(history)
+ assert.match(first.reply,/local seguro/i)
+ history.push(out(first.reply),inc('Estamos em local seguro'))
+ const second=incidentFollowupDecision(history)
+ assert.match(second.reply,/facilitar o atendimento/i)
+ assert.match(second.reply,/titular do seguro/i)
+ assert.doesNotMatch(second.reply,/precisa de guincho/i)
+ const third=incidentVerifiedDecision(history,[{ramo:'Auto',seguradora:'Bradesco'}])
+ assert.equal(third.humanHandoff,false)
+ assert.match(third.reply,/Posso encaminhar seu atendimento/i)
+ const accepted=confirmedOfferHandoff([...history,out(third.reply),inc('Sim')])
+ assert.equal(accepted.humanHandoff,true)
+ assert.equal(accepted.handoff.department,'patrimonio')
+})
