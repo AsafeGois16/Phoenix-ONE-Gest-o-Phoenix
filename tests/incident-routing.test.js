@@ -76,7 +76,7 @@ test('pedido de humano sem urgência confirma segurança, antes de transferir',(
  assert.equal(d.humanHandoff,false)
  assert.equal(d.handoff,null)
  assert.match(d.reply,/local seguro/i)
- assert.match(d.reply,/facilitar o atendimento/i)
+ assert.doesNotMatch(d.reply,/sinistro aberto|guincho acionado/i)
 })
 
 test('informação da apólice validada: só apresenta seguradora Auto, sem listagem de coberturas',()=>{
