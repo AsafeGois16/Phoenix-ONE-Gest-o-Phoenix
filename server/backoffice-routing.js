@@ -72,7 +72,20 @@ const newTopic=/\b(?:cotar|cotacao|orcamento|quais seguros|meus seguros|segunda 
  */
 export function isStandaloneNewRequest(text){
  const value=fold(text).replace(/[?!.]+$/,'').trim()
- return /^(?:(?:certo|ok|beleza|obrigad[oa]|tudo bem|entendi|perfeito|ta bom|combinado)[, ]+)?(?:pode(?:ria)? me ajudar (?:em|com) (?:(?:mais )?uma|outra|uma outra) coisa|tem como me ajudar (?:em|com) (?:(?:mais )?uma|outra) coisa|tenho (?:(?:mais )?uma|outra) (?:duvida|pergunta|coisa)|posso (?:te )?pedir (?:(?:mais )?uma|outra) coisa|posso (?:te )?fazer (?:(?:mais )?uma|outra) pergunta|posso falar de outro assunto|podemos falar de outro assunto|preciso de ajuda com outra coisa|quero tratar de outro assunto|e sobre outro assunto|mais uma coisa|outra duvida|outra pergunta|outra coisa|pode me ajudar novamente)$/.test(value)
+ const standalone=/^(?:(?:certo|ok|beleza|obrigad[oa]|tudo bem|entendi|perfeito|ta bom|combinado)[, ]+)?(?:pode(?:ria)? me ajudar (?:em|com) (?:(?:mais )?uma|outra|uma outra) coisa|tem como me ajudar (?:em|com) (?:(?:mais )?uma|outra) coisa|tenho (?:(?:mais )?uma|outra) (?:duvida|pergunta|coisa)|posso (?:te )?pedir (?:(?:mais )?uma|outra) coisa|posso (?:te )?fazer (?:(?:mais )?uma|outra) pergunta|posso falar de outro assunto|podemos falar de outro assunto|preciso de ajuda com outra coisa|quero tratar de outro assunto|e sobre outro assunto|mais uma coisa|outra duvida|outra pergunta|outra coisa|pode me ajudar novamente)$/
+ if(standalone.test(value))return true
+ // Retorno do atendimento humano: uma frase contextual ("O Backoffice já
+ // recebeu minha solicitação.") pode anteceder a ABERTURA de novo assunto.
+ // Só cortar o histórico se a última oração não trouxer uma questão específica
+ // sobre a movimentação anterior. "Já recebeu meu pedido?" não é novo assunto.
+ const newSubject=/^(?:(?:e )?agora[, ]+)?(?:tenho (?:uma )?outra (?:duvida|pergunta|coisa)|gostaria de (?:fazer )?outra pergunta|quero (?:tratar|falar) de outro assunto|preciso de ajuda com outra coisa|posso falar de outro assunto)$/
+ const clauses=value.split(/[.!?;]+/).map(p=>p.trim()).filter(Boolean)
+ if(clauses.length>1&&newSubject.test(clauses.at(-1)))return true
+ // Também aceitar a pontuação natural "O Backoffice já recebeu, agora tenho
+ // outra dúvida", sem confundir pedidos de andamento/estado da exclusão.
+ const now=value.lastIndexOf(' agora ')
+ return now>0&&newSubject.test(value.slice(now+1))&&
+   /\b(?:backoffice|atendimento|solicitacao|pedido|equipe|departamento)\b/.test(value.slice(0,now))
 }
 function movementHandoffCompleted(message){
  if(message?.direction!=='outbound'||message.author!=='agent'||typeof message.text!=='string')return false
