@@ -68,7 +68,7 @@ function offerFinancialHandoff(){
  return {
   agent:'clara',
   reply:'A segunda via é disponibilizada pela operadora, e a equipe do Financeiro poderá conferir o procedimento. '+
-    'Eu não consigo emitir nem enviar boletos diretamente por aqui. Posso solicitar o encaminhamento do seu atendimento ao Financeiro?',
+    'Eu não consigo emitir nem enviar boletos diretamente por aqui. Posso encaminhar sua solicitação ao Financeiro para atendimento humano?',
   humanHandoff:false,handoff:null
  }
 }
