@@ -109,11 +109,11 @@ test('sinistro com feridos não aguarda CPF para orientar socorro',async()=>{
  assert.doesNotMatch(res.body.reply,/CPF|CNPJ/i)
  assert.deepEqual(calls,['intro_status'])
 })
-test('pedido direto de humano no sinistro: solicita fila Auto/RE imediatamente',async()=>{
+test('pedido direto de humano no sinistro: prioriza segurança antes de encaminhar',async()=>{
  const {res,calls}=await simulated([inc('Sofri uma colisão com meu carro. Quero falar com um atendente de Sinistros Auto agora.')])
  assert.equal(res.code,200)
- assert.equal(res.body.humanHandoff,true)
- assert.equal(res.body.handoff.department,'patrimonio')
+ assert.equal(res.body.humanHandoff,false)
+ assert.equal(res.body.handoff,null)
  assert.match(res.body.reply,/local seguro|socorro|segurança/i)
  assert.deepEqual(calls,['intro_status'])
 })
