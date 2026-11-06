@@ -166,6 +166,7 @@ export function assessBackofficeIntake(messages){
    if(kind!==null&&type!==kind)break // nova movimentação diferente: não misturar pedidos
    kind=type
    first=i // retomar dados do MESMO pedido se o cliente repetiu "quero excluir"
+ }
  if(first<0)return null
  const turns=history.slice(first)
  // Novo assunto explícito encerra a triagem anterior.
