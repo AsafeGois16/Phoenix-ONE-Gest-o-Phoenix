@@ -1,4 +1,6 @@
 import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
+import {validJuniorProtocol} from '../../../server/protocol-contract.js'
+import {isAudioOnlyNotice,audioHandoffDecision} from '../../../server/audio-handoff.js'
 import {shadowObserveMegaBrain} from '../../../server/megabrain-observation.js'
 import {readMegaBrainHint} from '../../../server/megabrain-agent-context.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
@@ -78,7 +80,7 @@ function normalizeMessages(ms){
  })).filter(m=>m.content.length>0)
 }
 function checkPayload(body){
- if(!body||typeof body!=='object'||!uuidValid(body.conversation_id)||!/^\d{8}-\d{4}$/.test(body.protocolo||''))return false
+ if(!body||typeof body!=='object'||!uuidValid(body.conversation_id)||!validJuniorProtocol(body.protocolo))return false
  if(!['sugestao','automatico','desligado'].includes(body.mode)||!Array.isArray(body.messages)||body.messages.length<1||body.messages.length>20)return false
  if(body.agent_hint!==undefined&&!validAgent(body.agent_hint))return false
  // Optional authenticated Junior-to-Phoenix proof reference, never a
@@ -143,7 +145,9 @@ export default async function handler(req,res){
   }))
   // Encaminhamento humano é sempre condicionado ao aceite explícito.
   // Centralizado aqui para proteger também os fluxos determinísticos.
-  payload=enforceHumanHandoffConsent(payload,body.messages)
+  // O aviso de áudio sem transcrição é handoff OBRIGATÓRIO pelo contrato v1.2.
+  // Não exigir aceite adicional de algo cujo conteúdo a IA não conhece.
+  if(!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
   payload=enrichConfirmedIncidentHandoff(payload,body.messages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
@@ -191,6 +195,10 @@ export default async function handler(req,res){
  // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
  // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
  const introState=await introTask
+ // A última mensagem é apenas um aviso de áudio não transcrito.
+ // Responder de forma determinística, sem modelo, RAG ou inferência de assunto.
+ const audioDecision=audioHandoffDecision(body)
+ if(audioDecision)return replyToJunior(audioDecision)
  // Sinistro ou acidente real: segurança vem antes de nome, CPF ou consulta.
  const immediateSafety=incidentFirstSafetyDecision(activeMessages)
  if(immediateSafety)return replyToJunior(immediateSafety)
