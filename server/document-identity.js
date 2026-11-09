@@ -41,6 +41,8 @@ export function isDocumentResponseToIdentityRequest(messages){
  const previous=[...list.slice(0,-1)].reverse().find(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string')
  if(!previous)return false
  const prompt=previous.text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+ // Regras negativas não são um pedido de documento.
+ if(/\b(?:nao|nunca)\s+(?:informe|envie|digite|compartilhe|forneca)\b/.test(prompt))return false
  const asksDocument=/\b(?:cpf|cnpj)\b/.test(prompt)&&
   /\b(?:informe|informar|envie|enviar|pode|poderia|preciso|solicito|confirmar|verificar)\b/.test(prompt)
  return asksDocument
