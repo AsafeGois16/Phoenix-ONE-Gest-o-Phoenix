@@ -1,4 +1,5 @@
 import {hmacSignature,secureMatch,readRaw,bridge,uuidValid,jsonResponse} from '../../server/junior-v1.js'
+import {validJuniorProtocol} from '../../server/protocol-contract.js'
 export const config={api:{bodyParser:false}}
 const types=new Set(['ticket.assigned.v1','ticket.updated.v1','ticket.returned_to_agent.v1','ticket.resolved.v1'])
 export default async function handler(req,res){
@@ -20,7 +21,7 @@ export default async function handler(req,res){
   try{event=JSON.parse(raw)}catch{return jsonResponse(res,400,{error:'invalid_json'})}
   if(!event||event.event_id!==eid||!types.has(event.event_type)||!event.ticket||typeof event.ticket!=='object')return jsonResponse(res,400,{error:'invalid_event'})
   const ticket=event.ticket
-  if(!/^\d{8}-\d{4}$/.test(String(ticket.id||''))||!uuidValid(ticket.conversation_id))return jsonResponse(res,400,{error:'invalid_ticket_reference'})
+  if(!validJuniorProtocol(ticket.id)||!uuidValid(ticket.conversation_id))return jsonResponse(res,400,{error:'invalid_ticket_reference'})
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),9000)
   try{
    const result=await bridge('event',{event:{
