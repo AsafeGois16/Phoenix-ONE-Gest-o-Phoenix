@@ -91,6 +91,28 @@ export function extractVerificationProof(messages,documentType) {
  }
  return null
 }
+
+/**
+ * Continuação de prova adicional exigida pelo Junior após a Clara pedir
+ * nascimento ou CEP. Documento anterior continua sendo somente uma chave.
+ * Nunca interpretar uma data ou CEP como CPF/CNPJ.
+ */
+export function isVerificationProofResponse(messages){
+ const list=Array.isArray(messages)?messages:[]
+ const last=list.at(-1)
+ if(last?.direction!=='inbound'||last.author!=='contact'||typeof last.text!=='string')return false
+ const previous=[...list.slice(0,-1)].reverse().find(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string')
+ if(!previous)return false
+ const prompt=previous.text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+ const document=findInboundDocument(list.slice(0,-1))
+ if(document.status!=='valid')return false
+ if(document.type==='cnpj'&&/\bcep\b/.test(prompt)&&/\b(?:informar|informe|pode|verificar|cadastrado)\b/.test(prompt))
+  return /^(?:\s*\d{5}-?\d{3}\s*)$/.test(last.text)
+ if(document.type==='cpf'&&/data de nascimento/.test(prompt)&&/\b(?:informar|informe|pode|verificar)\b/.test(prompt))
+  return extractVerificationProof(list,document.type)!==null
+ return false
+}
+
 export function scrubVerificationProof(text){
  return String(text||'')
  .replace(/(?<!\d)(?:19|20)\d{2}[-/.]\d{1,2}[-/.]\d{1,2}(?!\d)/g,'[DATA DE VERIFICACAO]')
