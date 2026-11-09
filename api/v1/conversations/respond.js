@@ -4,6 +4,7 @@ import {isAudioOnlyNotice,audioHandoffDecision} from '../../../server/audio-hand
 import {shadowObserveMegaBrain} from '../../../server/megabrain-observation.js'
 import {readMegaBrainHint} from '../../../server/megabrain-agent-context.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
+import {documentContinuationState,repeatsDocumentRequest,noRepeatAfterVerified} from '../../../server/document-continuity.js'
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
@@ -202,7 +203,10 @@ export default async function handler(req,res){
  // Sinistro ou acidente real: segurança vem antes de nome, CPF ou consulta.
  const immediateSafety=incidentFirstSafetyDecision(activeMessages)
  if(immediateSafety)return replyToJunior(immediateSafety)
- const intake=introState?.murilo_apresentado||introState?.blocked?null:nameIntakeDecision(body.messages,agent)
+ // Quando o próprio cliente já apresentou o documento para um serviço,
+ // não bloquear a validação para pedir nome nem descartar o documento.
+ const documentArrival=documentContinuationState(activeMessages,agent)
+ const intake=introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
  // Não delegar essa decisão ao texto gerado pelo Murilo.
@@ -349,15 +353,21 @@ export default async function handler(req,res){
     }
    }
   }
+  // Se a Clara PEDIU CPF/CNPJ e recebeu o documento ou prova, continuar
+  // a validação para qualquer ramo, mesmo se o último texto não mencionar
+  // apólice, boleto ou contrato (ex.: acionamento de Seguro Fiança).
+  // Nunca autenticar pela simples presença de um número antigo no histórico.
+  const documentContinuation=documentArrival
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))||
    (agent==='clara'&&needsVerifiedFinancialLookup(last.text))||
-   (agent==='clara'&&Boolean(incidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')
+   (agent==='clara'&&Boolean(incidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')||
+   Boolean(documentContinuation)
   // Um novo assunto não deve reativar a triagem de movimentação; porém, para
   // uma nova consulta financeira no MESMO protocolo, o CPF já digitado ainda
   // pode ser usado como chave no servidor e REVALIDADO pela API do Junior.
   // Não há reaproveitamento automático da identidade nem exposição ao modelo.
   const documentHistory=shouldReuseProtocolDocument(body.messages,activeMessages)?body.messages:activeMessages
-  const document=contextNeeded?findInboundDocument(documentHistory):null
+  const document=contextNeeded?(documentContinuation?.document||findInboundDocument(documentHistory)):null
   let knowledgeTask=null
   let management=null
   if(contextNeeded){
@@ -495,6 +505,12 @@ export default async function handler(req,res){
   // Regras de segurança no servidor sobrepõem uma resposta inadequada do modelo.
   // A triagem comercial vale para TODOS os ramos, não apenas Residencial ou Vida.
   decision={...decision,reply:refineUnverifiedIdentityClaim(refineCommercialReply(decision.reply,activeMessages,agent),Boolean(management))}
+  // Defesa final: a confirmação documental já veio da API do Junior.
+  // O modelo não pode abrir novamente o ciclo pedindo o mesmo CPF/CNPJ.
+  if(documentContinuation&&management&&repeatsDocumentRequest(decision.reply)){
+    console.info('phoenix_document_continuity_guard',JSON.stringify({verified:true,reason:'repeated_document_request'}))
+    decision={reply:noRepeatAfterVerified(activeMessages),humanHandoff:false,handoff:null}
+  }
   const normalizedDecision=normalizeHandoffDecision(decision,DEPARTMENTS)
   const handoff=normalizedDecision.handoff
   const item=handoff&&DEPARTMENTS.includes(handoff.department)?{
