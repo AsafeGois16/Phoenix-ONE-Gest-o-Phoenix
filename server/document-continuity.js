@@ -35,10 +35,22 @@ function priorDocumentRequested(messages){
  * interpreta um documento antigo como autorização para novo assunto.
  */
 export function documentContinuationState(messages,agent){
- if(agent!=='clara'||!Array.isArray(messages)||messages.length<2)return null
- const last=messages.at(-1),previous=precedingAgent(messages)
- if(!inbound(last)||!previous)return null
+ if(agent!=='clara'||!Array.isArray(messages)||!messages.length)return null
+ const last=messages.at(-1)
+ if(!inbound(last))return null
  const latest=findInboundDocument([last])
+ const value=fold(last.text)
+ // O cliente pode oferecer o CPF/CNPJ junto com o próprio pedido de serviço.
+ // Não solicitar outro documento e NÃO ativar consulta em cotações.
+ const personalService=/\b(?:acionar|acionamento|sinistro|indenizacao|reembolso|consultar|verificar|segunda via|cancelar|excluir|incluir)\b/.test(value)&&
+  /\b(?:seguro|apolice|contrato|plano|boleto|fatura|sinistro)\b/.test(value)
+ const quoteOnly=/\b(?:cotacao|cotar|orcamento|simulacao|simular|seguro novo)\b/.test(value)&&
+  !/\b(?:sinistro|acionar|acionamento|cancelar|excluir)\b/.test(value)
+ if(latest.status!=='missing'&&personalService&&!quoteOnly){
+  return {kind:'document',document:latest}
+ }
+ const previous=precedingAgent(messages)
+ if(!previous)return null
  if(latest.status!=='missing'&&asksDoc(previous.text)){
   return {kind:'document',document:latest}
  }
