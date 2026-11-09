@@ -93,3 +93,25 @@ test('modelo pedindo novamente documento após verified é barrado',()=>{
  assert.match(fallback,/Auto\/RE/i)
  assert.doesNotMatch(fallback,/apólice encontrada|sinistro aberto|guincho acionado/i)
 })
+
+
+test('pedido de serviço com documento no primeiro contato pode validar sem pedir o número novamente',()=>{
+ for(const text of [
+  'Preciso acionar meu Seguro Fiança. CNPJ: '+cnpj,
+  'Quero consultar a apólice de Vida do titular. CPF: '+cpf,
+  'Gostaria de verificar meu contrato de Seguro Residencial. CPF: '+cpf
+ ]){
+  const d=documentContinuationState([inc(text)],'clara')
+  assert.ok(d,text)
+  assert.equal(d.document.status,'valid')
+ }
+})
+test('CPF/CNPJ espontâneo durante cotação comercial não autoriza consulta de carteira',()=>{
+ for(const text of [
+  'Quero cotar seguro Auto novo. Meu CNPJ é '+cnpj,
+  'Gostaria de fazer uma simulação de seguro Empresarial com CPF '+cpf,
+  'Quero contratar seguro Vida, tenho CPF '+cpf
+ ]){
+  assert.equal(documentContinuationState([inc(text)],'clara'),null,text)
+ }
+})
