@@ -24,6 +24,28 @@ export function findInboundDocument(messages){
  }
  return {status:'missing'}
 }
+
+/**
+ * Se a Clara acabou de solicitar CPF/CNPJ, o documento recebido deve
+ * obrigatoriamente passar pela validação da gestão. Uma solicitação de
+ * acionamento ("seguro fiança", por exemplo) pode não conter as palavras
+ * "minha apólice" usadas pelo classificador de consultas informativas.
+ * Ignorar o documento e pedir novamente é uma falha de fluxo.
+ * Isso NÃO significa que CPF/CNPJ, sozinho, autentica identidade.
+ */
+export function isDocumentResponseToIdentityRequest(messages){
+ const list=Array.isArray(messages)?messages:[]
+ const last=list.at(-1)
+ if(last?.direction!=='inbound'||last.author!=='contact'||typeof last.text!=='string')return false
+ if(findInboundDocument([last]).status==='missing')return false
+ const previous=[...list.slice(0,-1)].reverse().find(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string')
+ if(!previous)return false
+ const prompt=previous.text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
+ const asksDocument=/\b(?:cpf|cnpj)\b/.test(prompt)&&
+  /\b(?:informe|informar|envie|enviar|pode|poderia|preciso|solicito|confirmar|verificar)\b/.test(prompt)
+ return asksDocument
+}
+
 export function scrubDocuments(t){return String(t||'').replace(DOCUMENTS,'[DOCUMENTO]')}
 export function requiresPersonalLookup(history){
  return (Array.isArray(history)?history:[]).filter(m=>m?.direction==='inbound'&&m.author==='contact').slice(-6).some(m=>
@@ -32,7 +54,7 @@ export function requiresPersonalLookup(history){
 export function handoffDepartment(history){
  const text=(Array.isArray(history)?history:[]).slice(-6).map(m=>m?.text||'').join(' ').toLowerCase()
  if(/sa[uú]de|odont|benefici[aá]r|dependente|inclus[aã]o|plano de sa[uú]de/.test(text))return 'beneficios'
- if(/auto|autom[oó]vel|residencial|frota|patrimonial|sinistro|inc[eê]ndio/.test(text))return 'patrimonio'
+ if(/auto|autom[oó]vel|residencial|frota|patrimonial|sinistro|inc[eê]ndio|fian[cç]a|locat[ií]ci[oa]|seguro garantia|responsabilidade civil/.test(text))return 'patrimonio'
  return 'comercial'
 }
 
