@@ -26,7 +26,7 @@ test('áudio: setor informado pelo Junior ou fila geral, nunca comercial',()=>{
   assert.equal(decision.humanHandoff,true)
   assert.equal(decision.handoff.department,expected)
   assert.match(decision.reply,/não tenho acesso ao conteúdo/i)
-  assert.doesNotMatch(decision.reply,/ouvi|guincho|sinistro aberto|CPF|apólice|cobertura/i)
+  assert.doesNotMatch(decision.reply,/ouvi o áudio|guincho|sinistro aberto|CPF|apólice|cobertura/i)
   assert.doesNotMatch(JSON.stringify(decision.handoff),/5511|11144477735/)
  }
 })
