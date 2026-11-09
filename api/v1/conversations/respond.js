@@ -3,7 +3,8 @@ import {validJuniorProtocol} from '../../../server/protocol-contract.js'
 import {isAudioOnlyNotice,audioHandoffDecision} from '../../../server/audio-handoff.js'
 import {shadowObserveMegaBrain} from '../../../server/megabrain-observation.js'
 import {readMegaBrainHint} from '../../../server/megabrain-agent-context.js'
-import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
+import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment,isDocumentResponseToIdentityRequest} from '../../../server/document-identity.js'
+import {isFiancaClaimRequest,verifiedFiancaClaimDecision} from '../../../server/fianca-claim-routing.js'
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
@@ -350,6 +351,10 @@ export default async function handler(req,res){
    }
   }
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))||
+   // A Clara já solicitou CPF/CNPJ e o titular respondeu: não permitir que
+   // a classificação de produto (ex.: acionamento de Fiança) devolva o número
+   // mascarado ao modelo, causando repetição infinita do mesmo pedido.
+   (agent==='clara'&&isDocumentResponseToIdentityRequest(activeMessages))||
    (agent==='clara'&&needsVerifiedFinancialLookup(last.text))||
    (agent==='clara'&&Boolean(incidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')
   // Um novo assunto não deve reativar a triagem de movimentação; porém, para
@@ -422,6 +427,12 @@ export default async function handler(req,res){
    if(agent==='clara'&&incidentContext(activeMessages)){
     const incidentSummary=incidentVerifiedDecision(activeMessages,identity.policies||[])
     if(incidentSummary)return replyToJunior(incidentSummary)
+   }
+   // Acionamento de Fiança: evitar nova solicitação de documento depois de
+   // identidade verificada. Uma apólice cadastrada não confirma indenização.
+   if(agent==='clara'&&isFiancaClaimRequest(activeMessages)){
+    const fiancaResponse=verifiedFiancaClaimDecision(activeMessages,identity.policies||[])
+    if(fiancaResponse)return replyToJunior(fiancaResponse)
    }
    // Consultas informativas autorizadas são respondidas diretamente a partir da API.
    // Não pedir intervenção humana nem apresentar estimativas em dados financeiros já confirmados.
