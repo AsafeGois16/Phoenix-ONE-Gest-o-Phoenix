@@ -148,7 +148,7 @@ export default async function handler(req,res){
   // O aviso de áudio sem transcrição é handoff OBRIGATÓRIO pelo contrato v1.2.
   // Não exigir aceite adicional de algo cujo conteúdo a IA não conhece.
   if(!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
-  payload=enrichConfirmedIncidentHandoff(payload,body.messages)
+  if(!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
