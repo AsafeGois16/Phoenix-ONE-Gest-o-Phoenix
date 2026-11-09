@@ -1,6 +1,7 @@
 import {createHash,createHmac,timingSafeEqual} from 'node:crypto'
 import {validVerificationRef,validV4Purpose,validProductCode,v4VerifiedSummary} from './v4-verified-context.js'
 import {sanitizeV41Risk} from './v4-universal-risk.js'
+import {validJuniorProtocol} from './protocol-contract.js'
 
 export const origins={phoenix:'https://phoenix-one-ai.vercel.app'}
 export function secureMatch(a,b){
@@ -43,7 +44,7 @@ export function redact(s){
  .replace(/\b\d{8,}\b/g,'[IDENTIFICADOR]')
 }
 export async function juniorIdentityContext(conversationId,protocolo,document,proof,signal,options={}){
- if(!uuidValid(conversationId)||!/^\d{8}-\d{4}$/.test(protocolo))return {status:'unavailable'}
+ if(!uuidValid(conversationId)||!validJuniorProtocol(protocolo))return {status:'unavailable'}
  try{
   const v4=process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'&&options.v4===true
   const ref=v4&&validVerificationRef(options.verificationRef)?options.verificationRef:null
