@@ -203,7 +203,10 @@ export default async function handler(req,res){
  // Sinistro ou acidente real: segurança vem antes de nome, CPF ou consulta.
  const immediateSafety=incidentFirstSafetyDecision(activeMessages)
  if(immediateSafety)return replyToJunior(immediateSafety)
- const intake=introState?.murilo_apresentado||introState?.blocked?null:nameIntakeDecision(body.messages,agent)
+ // Quando o próprio cliente já apresentou o documento para um serviço,
+ // não bloquear a validação para pedir nome nem descartar o documento.
+ const documentArrival=documentContinuationState(activeMessages,agent)
+ const intake=introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
  // Não delegar essa decisão ao texto gerado pelo Murilo.
@@ -354,7 +357,7 @@ export default async function handler(req,res){
   // a validação para qualquer ramo, mesmo se o último texto não mencionar
   // apólice, boleto ou contrato (ex.: acionamento de Seguro Fiança).
   // Nunca autenticar pela simples presença de um número antigo no histórico.
-  const documentContinuation=documentContinuationState(activeMessages,agent)
+  const documentContinuation=documentArrival
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))||
    (agent==='clara'&&needsVerifiedFinancialLookup(last.text))||
    (agent==='clara'&&Boolean(incidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')||
