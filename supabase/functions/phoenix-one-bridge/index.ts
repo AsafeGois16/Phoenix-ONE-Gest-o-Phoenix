@@ -28,7 +28,7 @@ async function authenticate(token){
 }
 async function openAgentState(data){
  const ticket=data.protocolo,conversation=data.conversationId,intent=data.intent,suggested=data.suggestedAgent||data.agent
- if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}$/.test(ticket)||!['neutral','service','sales'].includes(intent)||!agentOk(suggested))
+ if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}(?:-[1-9]\d*)?$/.test(ticket)||!['neutral','service','sales'].includes(intent)||!agentOk(suggested))
    return {blocked:true,reason:'invalid_agent_state'}
  return pg.begin(async tx=>{
    await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
@@ -56,7 +56,7 @@ Deno.serve(async request=>{
   if(!data||typeof data!=='object')return reply(400,{error:'invalid_json'})
   if(data.action==='intro_status'){
    const ticket=data.protocolo,conversation=data.conversationId
-   if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}$/.test(ticket)||
+   if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}(?:-[1-9]\d*)?$/.test(ticket)||
       typeof data.observedClara!=='boolean'||typeof data.observedMurilo!=='boolean')
      return reply(400,{error:'invalid_intro_status'})
    const result=await pg.begin(async tx=>{
@@ -97,7 +97,7 @@ Deno.serve(async request=>{
   }
   if(data.action==='identity_context'){
    const conversationId=data.conversationId,protocolo=data.protocolo
-   if(!uuid(conversationId)||typeof protocolo!=='string'||!/^\d{8}-\d{4}$/.test(protocolo))return reply(400,{error:'invalid_identity_request'})
+   if(!uuid(conversationId)||typeof protocolo!=='string'||!/^\d{8}-\d{4}(?:-[1-9]\d*)?$/.test(protocolo))return reply(400,{error:'invalid_identity_request'})
    const doc=typeof data.document==='string'?data.document:'',typ=data.documentType
    // New contract is explicitly OFF until joint homologation.
    const v4=data.v4===true&&Deno.env.get('PHOENIX_ONE_V4_VERIFIED_CONTEXT')==='true'
@@ -344,7 +344,7 @@ Deno.serve(async request=>{
   }
   if(data.action==='event'){
    const v=data.event
-   if(!v||!uuid(v.event_id)||!eventsAllowed.has(v.event_type)||!v.ticket||!uuid(v.ticket.conversation_id)||typeof v.ticket.id!=='string'||!/^\d{8}-\d{4}$/.test(v.ticket.id))return reply(400,{error:'invalid_event'})
+   if(!v||!uuid(v.event_id)||!eventsAllowed.has(v.event_type)||!v.ticket||!uuid(v.ticket.conversation_id)||typeof v.ticket.id!=='string'||!/^\d{8}-\d{4}(?:-[1-9]\d*)?$/.test(v.ticket.id))return reply(400,{error:'invalid_event'})
    const category=cleanString(v.ticket.category,80).replace(/[^a-zA-Z0-9_.-]/g,'_')
    const department=cleanString(v.ticket.department,40).replace(/[^a-zA-Z0-9_.-]/g,'_')
    const status= v.event_type==='ticket.resolved.v1'?'resolved':v.event_type==='ticket.returned_to_agent.v1'?'with_agent':v.event_type==='ticket.assigned.v1'?'assigned':cleanString(v.ticket.status,30)||'queued'
