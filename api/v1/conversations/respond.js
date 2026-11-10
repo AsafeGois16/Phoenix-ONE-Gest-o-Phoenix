@@ -11,6 +11,7 @@ import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {financialSecondCopyDecision,shouldReuseProtocolDocument,needsVerifiedFinancialLookup} from '../../../server/financial-routing.js'
 import {incidentContext,incidentFirstSafetyDecision,incidentFollowupDecision,incidentVerifiedDecision,enrichConfirmedIncidentHandoff} from '../../../server/incident-routing.js'
 import {productIncidentContext,productIncidentFirstDecision,productIncidentFollowupDecision,productIncidentVerifiedDecision,enrichProductIncidentHandoff} from '../../../server/incident-product-routing.js'
+import {routeBenefitsToBackoffice} from '../../../server/benefits-handoff-routing.js'
 import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff,resumeQuoteContext} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
@@ -149,9 +150,13 @@ export default async function handler(req,res){
   // Centralizado aqui para proteger também os fluxos determinísticos.
   // O aviso de áudio sem transcrição é handoff OBRIGATÓRIO pelo contrato v1.2.
   // Não exigir aceite adicional de algo cujo conteúdo a IA não conhece.
+  // Benefícios: Saúde, Odonto, Vida e correlatos têm Backoffice como fila humana.
+  // Não remapear áudios: o destino do áudio sem transcrição vem do Junior.
+  if(!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
   if(!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
   if(!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
   if(!isAudioOnlyNotice(last))payload=enrichProductIncidentHandoff(payload,activeMessages)
+  if(!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
