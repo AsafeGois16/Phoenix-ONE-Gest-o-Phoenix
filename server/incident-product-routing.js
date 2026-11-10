@@ -29,7 +29,23 @@ const PROFILES={
  condominio:{label:'Sinistro Condomínio',department:'patrimonio',team:'Auto/RE',match:/\b(?:condominio|predio|portaria|area comum|sindico)\b/,
   first:'Priorize os moradores e funcionários: havendo incêndio, fumaça ou perigo estrutural, afaste as pessoas e acione Bombeiros 193. Todos estão em segurança?'},
  saude:{label:'Urgência de Saúde',department:'beneficios',team:'Benefícios',match:/\b(?:saude|hospital|internacao|urgencia medica|emergencia medica|pronto.socorro)\b/,
-  first:'Entendi a urgência. Qual é a situação clínica que precisa de atendimento? Se houver risco imediato à vida, procure pronto-socorro ou SAMU 192 sem aguardar a validação do plano.'}
+  first:'Entendi a urgência. Qual é a situação clínica que precisa de atendimento? Se houver risco imediato à vida, procure pronto-socorro ou SAMU 192 sem aguardar a validação do plano.'},
+ moto:{label:'Sinistro Moto',department:'patrimonio',team:'Auto/RE',
+  first:'Sinto muito pelo ocorrido com a moto. Alguém precisa de atendimento médico imediato? Se houver feridos ou perigo, procure socorro (SAMU 192 ou Polícia 190, conforme a situação).'},
+ frota:{label:'Sinistro Frota',department:'patrimonio',team:'Auto/RE',
+  first:'Vamos priorizar a equipe e os condutores: há feridos ou risco imediato no local do acidente com a frota? Se necessário, acione o socorro antes de informar documentos.'},
+ equipamento:{label:'Sinistro Equipamentos',department:'patrimonio',team:'Auto/RE',
+  first:'Antes de tratar do equipamento, há risco de choque, incêndio ou ferimentos? Não manuseie equipamento danificado ou energizado em situação de perigo.'},
+ bike:{label:'Sinistro Bicicleta',department:'patrimonio',team:'Auto/RE',
+  first:'Sinto muito pelo ocorrido com a bicicleta. Você se feriu ou precisa de atendimento médico? Se houver risco imediato, procure socorro.'},
+ odonto:{label:'Urgência Odontológica',department:'beneficios',team:'Benefícios',
+  first:'Entendi a urgência odontológica. Há sangramento intenso, dificuldade para respirar ou risco imediato? Se houver, procure pronto atendimento; não espere a verificação do plano.'},
+ acidentes_pessoais:{label:'Sinistro Acidentes Pessoais',department:'beneficios',team:'Benefícios',
+  first:'Sinto muito pelo acidente. A pessoa acidentada precisa de atendimento médico urgente? Em caso de risco imediato, procure socorro ou ligue SAMU 192.'},
+ viagem:{label:'Sinistro Seguro Viagem',department:'beneficios',team:'Benefícios',
+  first:'Entendi a solicitação de Seguro Viagem. Para verificar com segurança se existe apólice ativa, pode informar CPF ou CNPJ do titular? Em emergência médica, procure atendimento local imediatamente.'},
+ pet:{label:'Sinistro Seguro Pet',department:'backoffice',team:'Backoffice',
+  first:'Sinto muito pelo ocorrido com o pet. Ele precisa de atendimento veterinário imediato? Em caso de risco, procure uma emergência veterinária sem aguardar a consulta do seguro.'}
 }
 function classifyCritical(text){
  const t=fold(text)
@@ -46,8 +62,23 @@ function classifyCritical(text){
   /\b(?:urgente|urgencia|emergencia|internacao|hospital|preciso|acionar|autorizacao|socorro|atendimento)\b/.test(t))return 'saude'
  return null
 }
+function classifyOther(text){
+ const t=fold(text)
+ if(!t||(quoted(t)&&!actuallyHappened(t)))return null
+ const event=/\b(?:acidente|colisao|batida|bateu|bateu|atropel|queda|caiu|roubo|roubad[oa]|furtad[oa]|furto|danific|quebrou|sinistro|incendio|fogo|pane|falha|machuc|doente|adoeceu|urgencia|emergencia|internacao|extraviad[ao]|extravio|bagagem perdida|mala perdida|cancelamento de voo|voo cancelado|afastamento|incapacidade|preciso de atendimento|acionar|acionamento)\b/.test(t)
+ if(!event)return null
+ if(/\b(?:bike|bicicleta|ciclismo|ciclista)\b/.test(t))return 'bike'
+ if(/\b(?:moto|motocicleta|motociclista)\b/.test(t))return 'moto'
+ if(/\b(?:frota|veiculos? utilitarios?|veiculos? da empresa|caminhao da empresa|um dos veiculos da empresa)\b/.test(t))return 'frota'
+ if(/\b(?:equipamento|maquina|maquinario|notebook|computador|equipamento eletronico)\b/.test(t))return 'equipamento'
+ if(/\b(?:pet|animal|cachorro|gato|veterinari[oa])\b/.test(t))return 'pet'
+ if(/\b(?:odonto|odontologico|odontologica|dentario|dente|dentista|trauma dentario)\b/.test(t))return 'odonto'
+ if(/\b(?:acidentes pessoais|seguro ap|dit|diaria por incapacidade|incapacidade temporaria)\b/.test(t))return 'acidentes_pessoais'
+ if(/\b(?:seguro viagem|viagem|bagagem|mala|voo|passageiro)\b/.test(t))return 'viagem'
+ return null
+}
 export function classifyProductIncident(text){
- return classifyCritical(text)
+ return classifyOther(text)||classifyCritical(text)
 }
 export function productIncidentContext(messages){
  const list=Array.isArray(messages)?messages:[]
@@ -77,8 +108,14 @@ export function productIncidentFirstDecision(messages){
  const ctx=productIncidentContext(messages),list=Array.isArray(messages)?messages:[]
  if(!ctx||ctx.start!==list.length-1||!inbound(list.at(-1)))return null
  // Uma segunda descrição do mesmo caso não deve reiniciar a apresentação.
- if(list.slice(0,-1).some(outbound))return null
+ // Apresentação antiga não é triagem do novo evento. Evitar apenas
+ // repetição de pergunta quando já houve orientação específica sobre o caso.
+ if(list.slice(ctx.start+1,-1).some(m=>outbound(m)&&/\b(?:seguranca|feridos|urgencia|veterinaria|equipamento|apolice)\b/.test(fold(m.text))))return null
  return immediate(ctx.profile,ctx,list)
+}
+function fleetUnitKnown(messages,ctx){
+ const text=fold(messages.slice(ctx.start).filter(inbound).map(m=>m.text).join(' '))
+ return /\b(?:veiculo\s*(?:n[ºo.]*)?\s*\d+|unidade\s*(?:n[ºo.]*)?\s*\d+|caminhao\s*(?:n[ºo.]*)?\s*\d+|utilitario\s*(?:n[ºo.]*)?\s*\d+|identificacao interna)\b/.test(text)
 }
 export function productIncidentFollowupDecision(messages){
  const ctx=productIncidentContext(messages),list=Array.isArray(messages)?messages:[],last=list.at(-1)
@@ -95,6 +132,22 @@ export function productIncidentFollowupDecision(messages){
   if(ctx.kind==='saude')return answer('Se houver risco imediato à vida, procure atendimento presencial de urgência ou ligue SAMU 192. Posso encaminhar à equipe de Benefícios com prioridade?')
   return answer('Há indicação de risco. Priorize sua segurança, afaste-se do local e acione Bombeiros 193 ou Polícia 190 conforme a situação. Posso encaminhar à equipe de '+profile.team+' com prioridade?')
  }
+ const symptomsOrRisk=/\b(?:alguem precisa de atendimento medico|ha feridos|ha risco|precisa de atendimento medico|sangramento intenso|risco imediato|equipamento.*risco|pet.*atendimento veterinario|ele precisa de atendimento veterinario|pessoa acidentada precisa|precisa de atendimento veterinario)\b/.test(prev)
+ if(symptomsOrRisk&&ctx.kind!=='saude'){
+  if(isYes(text)||/\b(?:ferido|machucado|sangrando|muito mal|correndo risco|em perigo)\b/.test(text)){
+   const help=ctx.kind==='pet'?'Procure imediatamente atendimento veterinário de emergência.':
+    ctx.kind==='odonto'?'Procure atendimento presencial de urgência se houver sangramento intenso, comprometimento respiratório ou risco imediato.':
+     'Se houver feridos ou risco imediato, priorize o socorro adequado (SAMU 192, Bombeiros 193 ou Polícia 190, conforme o caso).'
+   return answer(help+' Posso encaminhar à equipe de '+profile.team+' com prioridade, sem aguardar a validação documental?')
+  }
+  if(isNo(text)||/\b(?:ninguem ficou ferido|sem feridos|nao precisa de atendimento|pet esta bem|nao ha risco)\b/.test(text)){
+   if(ctx.kind==='frota'&&!fleetUnitKnown(list,ctx))return answer('Qual veículo ou unidade da frota foi afetado? Pode informar uma referência interna, sem precisar compartilhar a placa completa.')
+   return answer(identityPrompt(profile))
+  }
+ }
+ if(ctx.kind==='frota'&&/\b(?:qual veiculo|qual unidade|identificacao interna|referencia interna)\b/.test(prev))
+  return answer(identityPrompt(profile))
+ if(ctx.kind==='viagem'&&/\b(?:cpf|cnpj)\b/.test(prev))return null
  if(ctx.kind==='saude'&&/\b(?:qual e a situacao clinica|qual e a situacao)\b/.test(prev)){
   if(/\b(?:dor no peito|falta de ar|desmai|inconsciente|convulsao|sangramento intenso)\b/.test(text))
    return answer('Essa situação pode exigir socorro imediato. Procure pronto-socorro ou ligue SAMU 192. Posso encaminhar seu atendimento à equipe de Benefícios com prioridade?')
@@ -117,7 +170,15 @@ function matchingPolicy(policy,kind){
   residencial:/\b(?:residencial|habitacional)\b/,
   empresarial:/\b(?:empresarial|comercio|multirrisco)\b/,
   condominio:/\bcondominio\b/,
-  saude:/\b(?:saude|medico|hospitalar|assistencia medica)\b/
+  saude:/\b(?:saude|medico|hospitalar|assistencia medica)\b/,
+  moto:/\b(?:moto|motocicleta|automovel|auto)\b/,
+  frota:/\b(?:frota|auto|veiculo|caminhao)\b/,
+  equipamento:/\b(?:equipamento|maquinas|riscos diversos|patrimonial|eletronico)\b/,
+  bike:/\b(?:bike|bicicleta|ciclismo|riscos diversos)\b/,
+  odonto:/\b(?:odonto|odontologico|odontologia)\b/,
+  acidentes_pessoais:/\b(?:acidentes pessoais|acidentes pessoais coletivo|vida|dit|acidente pessoal)\b/,
+  viagem:/\b(?:viagem|travel)\b/,
+  pet:/\b(?:pet|animal|veterinario)\b/
  }
  return matches[kind]?.test(code)===true
 }
@@ -128,7 +189,8 @@ export function productIncidentVerifiedDecision(messages,policies){
  const status=matched.length===1?'Foi localizado um contrato da categoria indicada na consulta autorizada. ':
   matched.length>1?'Há mais de um contrato dessa categoria; a equipe confirmará qual se aplica. ':
   'A consulta não identificou um contrato dessa categoria; a equipe humana poderá conferir o cadastro. '
- return answer('A identidade foi confirmada pela gestão. '+status+offer(ctx.profile))
+ const caveat=ctx.kind==='acidentes_pessoais'?' A equipe verificará se há cobertura de Diária por Incapacidade Temporária (DIT) na apólice, sem presumir que esteja contratada. ':''
+ return answer('A identidade foi confirmada pela gestão. '+status+caveat+offer(ctx.profile))
 }
 export function enrichProductIncidentHandoff(decision,messages){
  const ctx=productIncidentContext(messages)
