@@ -154,3 +154,29 @@ test('identidade não validada nunca fornece detalhes da apólice no sinistro',a
  assert.doesNotMatch(JSON.stringify(r.res.body),/APOLICE-SECRETA|cobertura garantida/i)
  assert.match(r.res.body.reply,/data de nascimento/i)
 })
+
+
+test('Vida: identidade validada e aceite encaminham para Backoffice',async()=>{
+ const msg='Meu pai faleceu e preciso acionar o Seguro de Vida.'
+ const a=await simulate([inc(msg)])
+ assert.match(a.res.body.reply,/CPF ou CNPJ/i)
+ assert.match(a.res.body.reply,/Backoffice/i)
+ const b=await simulate([inc(msg),out(a.res.body.reply),inc(fakeCpf)],{policies:[{ramo:'Vida'}]})
+ assert.deepEqual(b.calls,['intro_status','identity_context'])
+ assert.match(b.res.body.reply,/Backoffice/i)
+ assert.equal(b.res.body.humanHandoff,false)
+ const c=await simulate([inc(msg),out(a.res.body.reply),inc(fakeCpf),out(b.res.body.reply),inc('Sim')])
+ assert.equal(c.res.body.humanHandoff,true)
+ assert.equal(c.res.body.handoff.department,'backoffice')
+})
+test('Saúde urgente: depois da avaliação clínica, consentimento transfere ao Backoffice',async()=>{
+ const msg='Preciso de internação urgente pelo meu plano de Saúde.'
+ const a=await simulate([inc(msg)])
+ const b=await simulate([inc(msg),out(a.res.body.reply),inc('Ela está com falta de ar e dor no peito')])
+ assert.match(b.res.body.reply,/192|pronto-socorro/i)
+ assert.match(b.res.body.reply,/Backoffice/i)
+ assert.doesNotMatch(b.res.body.reply,/CPF|CNPJ/)
+ const c=await simulate([inc(msg),out(a.res.body.reply),inc('Ela está com falta de ar e dor no peito'),out(b.res.body.reply),inc('Sim')])
+ assert.equal(c.res.body.humanHandoff,true)
+ assert.equal(c.res.body.handoff.department,'backoffice')
+})
