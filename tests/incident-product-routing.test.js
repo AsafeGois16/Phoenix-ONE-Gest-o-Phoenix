@@ -192,3 +192,27 @@ test('consentimento de cada ramo envia fila compatível, sem CPF ou promessas de
   assert.doesNotMatch(JSON.stringify(final.handoff),/CPF|CNPJ|placa|documento do cliente|sinistro aberto/i,id)
  }
 })
+
+
+test('S07/S08/S09: cliente ainda dentro de incêndio recebe ordem de saída e Bombeiros 193, sem CPF',()=>{
+ for(const id of ['S07','S08','S09']){
+  const msg=examples.find(x=>x[0]===id)[2]
+  const first=productIncidentFirstDecision([inc(msg)])
+  const unsafe=productIncidentFollowupDecision([inc(msg),out(first.reply),inc('Não, ainda estamos dentro e há fogo')])
+  assert.match(unsafe.reply,/sai[ar] do local|saia|afaste as pessoas/i,id)
+  assert.match(unsafe.reply,/193/i,id)
+  assert.doesNotMatch(unsafe.reply,/CPF|CNPJ/i,id)
+ }
+})
+test('S04: ameaça ativa direciona segurança pessoal para 190, nunca segurança do carro',()=>{
+ const msg=examples[0][2],first=productIncidentFirstDecision([inc(msg)])
+ const danger=productIncidentFollowupDecision([inc(msg),out(first.reply),inc('Não estou seguro, há perigo agora')])
+ assert.match(danger.reply,/190/i)
+ assert.doesNotMatch(danger.reply,/ve[ií]culo est[aá] em local seguro|CPF|CNPJ/i)
+})
+test('S19: seguro Viagem localizado não é declaração de vigência ativa',()=>{
+ const msg=examples.find(x=>x[0]==='S19')[2]
+ const d=productIncidentVerifiedDecision([inc(msg)],[{ramo:'Viagem',vigencia:'2025-01-01'}])
+ assert.match(d.reply,/confirmar se a vig[eê]ncia/i)
+ assert.doesNotMatch(d.reply,/seu seguro est[aá] ativo|cobertura aprovada/i)
+})
