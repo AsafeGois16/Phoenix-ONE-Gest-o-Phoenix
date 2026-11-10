@@ -10,6 +10,7 @@ import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../serv
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {financialSecondCopyDecision,shouldReuseProtocolDocument,needsVerifiedFinancialLookup} from '../../../server/financial-routing.js'
 import {incidentContext,incidentFirstSafetyDecision,incidentFollowupDecision,incidentVerifiedDecision,enrichConfirmedIncidentHandoff} from '../../../server/incident-routing.js'
+import {productIncidentContext,productIncidentFirstDecision,productIncidentFollowupDecision,productIncidentVerifiedDecision,enrichProductIncidentHandoff} from '../../../server/incident-product-routing.js'
 import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff,resumeQuoteContext} from '../../../server/commercial-intake.js'
 import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
@@ -117,7 +118,7 @@ export default async function handler(req,res){
  const last=body.messages.at(-1)
  // Pedido REAL de inclusão/exclusão durante uma cotação tem prioridade
  // sobre palavras como "cotação" e qualquer hint comercial do Junior.
- if(isAdministrativeMovementRequest(last?.text)||incidentContext(activeMessages))agent='clara'
+ if(isAdministrativeMovementRequest(last?.text)||incidentContext(activeMessages)||productIncidentContext(activeMessages))agent='clara'
  let introTask=null
  const replyToJunior=async payload=>{
   // Only confirmed outbound introductions are stored. A proposal in Sugestão
@@ -150,6 +151,7 @@ export default async function handler(req,res){
   // Não exigir aceite adicional de algo cujo conteúdo a IA não conhece.
   if(!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
   if(!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
+  if(!isAudioOnlyNotice(last))payload=enrichProductIncidentHandoff(payload,activeMessages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
@@ -201,7 +203,9 @@ export default async function handler(req,res){
  const audioDecision=audioHandoffDecision(body)
  if(audioDecision)return replyToJunior(audioDecision)
  // Sinistro ou acidente real: segurança vem antes de nome, CPF ou consulta.
- const immediateSafety=incidentFirstSafetyDecision(activeMessages)
+ const productSafety=productIncidentFirstDecision(activeMessages)
+ if(productSafety)return replyToJunior(productSafety)
+ const immediateSafety=productIncidentContext(activeMessages)?null:incidentFirstSafetyDecision(activeMessages)
  if(immediateSafety)return replyToJunior(immediateSafety)
  // Quando o próprio cliente já apresentou o documento para um serviço,
  // não bloquear a validação para pedir nome nem descartar o documento.
@@ -211,7 +215,7 @@ export default async function handler(req,res){
  // Pedido explícito de atendimento humano é autorização direta para handoff.
  // Não delegar essa decisão ao texto gerado pelo Murilo.
  const directHuman=directAutoReHumanHandoff(body.messages,agent)
- if(directHuman){
+ if(directHuman&&!productIncidentContext(activeMessages)){
   console.info('phoenix_auto_re_handoff',JSON.stringify({source:'explicit_customer_request',department:'patrimonio'}))
   return replyToJunior(directHuman)
  }
@@ -228,8 +232,10 @@ export default async function handler(req,res){
  // Quando há movimentação ainda ativa, a Clara conduz o fluxo verificado.
  const activeAdministrativeIntake=assessBackofficeIntake(activeMessages)
  const confirmedAdministrativeHandoff=Boolean(confirmed?.handoff?.department==='backoffice'&&activeAdministrativeIntake)
- if(confirmed&&!confirmedAdministrativeHandoff)return replyToJunior(enrichConfirmedIncidentHandoff(confirmed,activeMessages))
- const incidentHelp=incidentFollowupDecision(activeMessages)
+ if(confirmed&&!confirmedAdministrativeHandoff)return replyToJunior(enrichProductIncidentHandoff(enrichConfirmedIncidentHandoff(confirmed,activeMessages),activeMessages))
+ const productHelp=productIncidentFollowupDecision(activeMessages)
+ if(productHelp)return replyToJunior(productHelp)
+ const incidentHelp=productIncidentContext(activeMessages)?null:incidentFollowupDecision(activeMessages)
  if(incidentHelp)return replyToJunior(incidentHelp)
  const switchDecision=decideMuriloSwitch(body.messages,agent)
  if(switchDecision)return replyToJunior(switchDecision)
@@ -361,6 +367,7 @@ export default async function handler(req,res){
   const contextNeeded=shouldLookupPersonalData(activeMessages,agent,requiresPersonalLookup(activeMessages))||
    (agent==='clara'&&needsVerifiedFinancialLookup(last.text))||
    (agent==='clara'&&Boolean(incidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')||
+   (agent==='clara'&&Boolean(productIncidentContext(activeMessages))&&findInboundDocument(activeMessages).status==='valid')||
    Boolean(documentContinuation)
   // Um novo assunto não deve reativar a triagem de movimentação; porém, para
   // uma nova consulta financeira no MESMO protocolo, o CPF já digitado ainda
@@ -429,6 +436,10 @@ export default async function handler(req,res){
     ...(v4Enabled?{verified_profile:identity.verified_profile||null}:{})}
    // Sinistro não é consulta de carteira. Mostrar somente confirmação objetiva
    // de uma apólice Auto, sem enumerar franquias, limites, prêmios ou cobertura.
+   if(agent==='clara'&&productIncidentContext(activeMessages)){
+    const productSummary=productIncidentVerifiedDecision(activeMessages,identity.policies||[])
+    if(productSummary)return replyToJunior(productSummary)
+   }
    if(agent==='clara'&&incidentContext(activeMessages)){
     const incidentSummary=incidentVerifiedDecision(activeMessages,identity.policies||[])
     if(incidentSummary)return replyToJunior(incidentSummary)
