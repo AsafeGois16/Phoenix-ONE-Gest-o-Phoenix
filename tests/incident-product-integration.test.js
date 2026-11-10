@@ -141,7 +141,7 @@ test('S19: apólice de Viagem somente após identity verified, nunca pela menç�
  const b=await simulate([inc(msg),out(a.res.body.reply),inc(fakeCpf)],{policies:[{ramo:'Viagem'}]})
  assert.deepEqual(b.calls,['intro_status','identity_context'])
  assert.match(b.res.body.reply,/identidade foi confirmada/i)
- assert.match(b.res.body.reply,/Benef[ií]cios/i)
+ assert.match(b.res.body.reply,/Backoffice/i)
  assert.doesNotMatch(b.res.body.reply,/cobertura garantida|reembolso aprovado/i)
 })
 test('identidade não validada nunca fornece detalhes da apólice no sinistro',async()=>{
