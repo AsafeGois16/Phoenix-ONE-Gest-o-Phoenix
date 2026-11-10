@@ -96,7 +96,7 @@ const agentLast=messages=>[...messages].reverse().find(outbound)?.text||''
 const identityPrompt=profile=>'Para agilizar o atendimento com a equipe de '+profile.team+', pode informar o CPF ou CNPJ do titular do seguro? A identidade será verificada pela gestão do Junior; não é necessário enviar foto do documento.'
 const offer=profile=>'Posso encaminhar seu atendimento à equipe de '+profile.team+' para continuar a avaliação? Nenhum acionamento foi realizado pela IA, e a cobertura depende da análise humana.'
 function serviceSummary(context){
- return 'Atendimento de '+context.profile.label+'. Triagem de segurança e identificação feitas conforme informações disponíveis. Equipe humana deve conferir risco, contrato e cobertura. Nenhum sinistro ou assistência foi acionado pela IA.'
+ return 'Atendimento de '+context.profile.label+'. Verificar situação de segurança e o estado da validação de identidade no sistema Junior. Equipe humana deve conferir o contrato e cobertura. Nenhum sinistro ou assistência foi acionado pela IA.'
 }
 function immediate(profile,ctx,messages){
  const original=fold(messages[ctx.start]?.text)
@@ -126,7 +126,11 @@ export function productIncidentFollowupDecision(messages){
  if(/\b(?:posso encaminhar|posso transferir)\b/.test(prev))return null
  if(unsafe(text)||/\b(?:nao saimos|tem fogo|ainda na pista)\b/.test(text)){
   const help=ctx.kind==='saude'?'Se houver sinais graves, procure o pronto-socorro ou ligue SAMU 192.':
-   'Se houver perigo, mantenha-se afastado e acione o serviço de emergência adequado (190 ou 193 conforme o caso).'
+   ['residencial','empresarial','condominio'].includes(ctx.kind)?
+    'Se houver incêndio ou perigo estrutural, saia do local, afaste as pessoas e acione Bombeiros 193. Não retorne ao imóvel.':
+   ctx.kind==='roubo_auto'?
+    'Priorize sua segurança pessoal; se houver ameaça ou crime em andamento, procure proteção e ligue para a Polícia Militar 190.':
+    'Se houver perigo, mantenha-se afastado e acione o serviço de emergência adequado.'
   return answer(help+' Posso encaminhar à equipe de '+profile.team+' com prioridade?')
  }
  if(emergency(text)&&!/\b(?:sem feridos|ninguem ficou ferido)\b/.test(text)){
@@ -191,7 +195,8 @@ export function productIncidentVerifiedDecision(messages,policies){
  const status=matched.length===1?'Foi localizado um contrato da categoria indicada na consulta autorizada. ':
   matched.length>1?'Há mais de um contrato dessa categoria; a equipe confirmará qual se aplica. ':
   'A consulta não identificou um contrato dessa categoria; a equipe humana poderá conferir o cadastro. '
- const caveat=ctx.kind==='acidentes_pessoais'?' A equipe verificará se há cobertura de Diária por Incapacidade Temporária (DIT) na apólice, sem presumir que esteja contratada. ':''
+ const caveat=ctx.kind==='acidentes_pessoais'?' A equipe verificará se há cobertura de Diária por Incapacidade Temporária (DIT) na apólice, sem presumir que esteja contratada. ':
+  ctx.kind==='viagem'?' A equipe deverá confirmar se a vigência do seguro compreende as datas da ocorrência. ':''
  return answer('A identidade foi confirmada pela gestão. '+status+caveat+offer(ctx.profile))
 }
 export function enrichProductIncidentHandoff(decision,messages){
