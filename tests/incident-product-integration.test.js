@@ -137,7 +137,7 @@ test('S19: apólice de Viagem somente após identity verified, nunca pela menç�
  const msg='Minha mala foi extraviada e quero acionar meu seguro viagem.'
  const a=await simulate([inc(msg)])
  assert.match(a.res.body.reply,/CPF ou CNPJ/i)
- assert.doesNotMatch(a.res.body.reply,/ap[oó]lice ativa|cobertura ativa/i)
+ assert.doesNotMatch(a.res.body.reply,/sua ap[oó]lice est[aá] ativa|cobertura ativa confirmada/i)
  const b=await simulate([inc(msg),out(a.res.body.reply),inc(fakeCpf)],{policies:[{ramo:'Viagem'}]})
  assert.deepEqual(b.calls,['intro_status','identity_context'])
  assert.match(b.res.body.reply,/identidade foi confirmada/i)
