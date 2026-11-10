@@ -9,6 +9,7 @@ const outbound=m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==
 const isYes=t=>/^(?:sim|s|claro|estamos seguros|estou seguro|sim, estamos seguros|sim, estou seguro|isso|pode sim)[.! ]*$/.test(fold(t))
 const isNo=t=>/^(?:nao|n|nao estou|nao estamos|nao estamos seguros|nao estou seguro|ainda nao)[.! ]*$/.test(fold(t))
 const quoted=t=>/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|quanto custa|preco)\b/.test(t)
+const hypothetical=t=>/\b(?:se ocorrer|se acontecer|se houver|caso ocorra|caso aconteca|hipoteticamente)\b/.test(t)&&!/\b(?:aconteceu|ocorreu|houve|sofri|pegou fogo|foi roubado)\b/.test(t)
 const actuallyHappened=t=>/\b(?:aconteceu|ocorreu|houve|sofri|fui|foi|teve|tive|estou|esta|bateu|bateram|colidi|roubaram|furtaram|pegou fogo|ficou doente|machucou|quebrou|caiu|perdeu|extraviad[ao]|sinistro|urgencia|emergencia|preciso de atendimento|preciso acionar)\b/.test(t)
 const emergency=t=>/\b(?:ferid[oa]s?|sangramento intenso|nao respira|desmai|inconsciente|dor no peito|falta de ar|dificuldade para respirar|convulsao|incendio|fogo|chamas|fumaca|explosao|vazamento de gas|risco imediato|em perigo|atropelad|na pista)\b/.test(t)&&
  !/\b(?:sem feridos|ninguem ficou ferido|ninguem se machucou|nao houve feridos)\b/.test(t)
@@ -49,7 +50,7 @@ const PROFILES={
 }
 function classifyCritical(text){
  const t=fold(text)
- if(!t||(quoted(t)&&!actuallyHappened(t)))return null
+ if(!t||hypothetical(t)||(quoted(t)&&!actuallyHappened(t)))return null
  if(/\b(?:roubad[oa]|roubo|furtad[oa]|furto|assalt[oa]|levaram meu carro|roubaram meu carro)\b/.test(t)&&
   PROFILES.roubo_auto.match.test(t)&&!/\b(?:moto|bicicleta|bike|frota)\b/.test(t))return 'roubo_auto'
  if(/\b(?:condominio|predio|portaria|sindico|area comum)\b/.test(t)&&
@@ -58,14 +59,14 @@ function classifyCritical(text){
   /\b(?:incendio|fogo|explosao|alagamento|inundacao|vazamento|roubo|furto|sinistro|danos|desabamento)\b/.test(t))return 'empresarial'
  if(/\b(?:casa|residencia|residencial|imovel|apartamento)\b/.test(t)&&
   /\b(?:incendio|fogo|explosao|fumaca|chamas|sinistro|desabamento)\b/.test(t))return 'residencial'
- if(/\b(?:plano de saude|seguro saude|urgencia medica|emergencia medica|hospital|internacao|pronto.socorro|cirurgia urgente|urgencia de saude)\b/.test(t)&&
-  /\b(?:urgente|urgencia|emergencia|internacao|hospital|preciso|acionar|autorizacao|socorro|atendimento)\b/.test(t))return 'saude'
+ if(/\b(?:plano de saude|seguro saude|saude|urgencia medica|emergencia medica|hospital|internacao|pronto.socorro)\b/.test(t)&&
+  /\b(?:urgente|urgencia|emergencia|internacao|hospital|pronto.socorro|cirurgia urgente|socorro imediato|risco de vida|atendimento emergencial)\b/.test(t))return 'saude'
  return null
 }
 function classifyOther(text){
  const t=fold(text)
- if(!t||(quoted(t)&&!actuallyHappened(t)))return null
- const event=/\b(?:acidente|colisao|batida|bateu|bateu|atropel|queda|caiu|roubo|roubad[oa]|furtad[oa]|furto|danific|quebrou|sinistro|incendio|fogo|pane|falha|machuc|doente|adoeceu|urgencia|emergencia|internacao|extraviad[ao]|extravio|bagagem perdida|mala perdida|cancelamento de voo|voo cancelado|afastamento|incapacidade|preciso de atendimento|acionar|acionamento)\b/.test(t)
+ if(!t||hypothetical(t)||(quoted(t)&&!actuallyHappened(t)))return null
+ const event=/\b(?:acidente|colisao|batida|bateu|bati|atropel|queda|caiu|cai|roubo|roubad[oa]|furtad[oa]|furto|danific|quebrou|sinistro|trauma|incendio|fogo|pane|falha|machuc|doente|adoeceu|urgencia|emergencia|internacao|extraviad[ao]|extravio|bagagem perdida|mala perdida|cancelamento de voo|voo cancelado|afastamento|incapacidade|preciso de atendimento|acionar|acionamento)\b/.test(t)
  if(!event)return null
  if(/\b(?:bike|bicicleta|ciclismo|ciclista)\b/.test(t))return 'bike'
  if(/\b(?:moto|motocicleta|motociclista)\b/.test(t))return 'moto'
@@ -93,7 +94,7 @@ export function productIncidentContext(messages){
 }
 const agentLast=messages=>[...messages].reverse().find(outbound)?.text||''
 const identityPrompt=profile=>'Para agilizar o atendimento com a equipe de '+profile.team+', pode informar o CPF ou CNPJ do titular do seguro? A identidade será verificada pela gestão do Junior; não é necessário enviar foto do documento.'
-const offer=profile=>'Posso encaminhar seu atendimento à equipe de '+profile.team+' para continuar a avaliação? Não houve abertura de sinistro nem confirmação de cobertura pela IA.'
+const offer=profile=>'Posso encaminhar seu atendimento à equipe de '+profile.team+' para continuar a avaliação? Nenhum acionamento foi realizado pela IA, e a cobertura depende da análise humana.'
 function serviceSummary(context){
  return 'Atendimento de '+context.profile.label+'. Triagem de segurança e identificação feitas conforme informações disponíveis. Equipe humana deve conferir risco, contrato e cobertura. Nenhum sinistro ou assistência foi acionado pela IA.'
 }
