@@ -135,13 +135,14 @@ export function productIncidentFollowupDecision(messages){
  }
  const symptomsOrRisk=/\b(?:alguem precisa de atendimento medico|ha feridos|ha risco|precisa de atendimento medico|sangramento intenso|risco imediato|equipamento.*risco|pet.*atendimento veterinario|ele precisa de atendimento veterinario|pessoa acidentada precisa|precisa de atendimento veterinario)\b/.test(prev)
  if(symptomsOrRisk&&ctx.kind!=='saude'){
-  if(isYes(text)||/\b(?:ferido|machucado|sangrando|muito mal|correndo risco|em perigo)\b/.test(text)){
+  const noInjury=/\b(?:ninguem ficou ferido|ninguem se machucou|sem feridos|nao ha feridos|nao,? ninguem|nao tem feridos)\b/.test(text)
+  if(isYes(text)||(!noInjury&&/\b(?:ferido|machucado|sangrando|muito mal|correndo risco|em perigo)\b/.test(text))){
    const help=ctx.kind==='pet'?'Procure imediatamente atendimento veterinário de emergência.':
     ctx.kind==='odonto'?'Procure atendimento presencial de urgência se houver sangramento intenso, comprometimento respiratório ou risco imediato.':
      'Se houver feridos ou risco imediato, priorize o socorro adequado (SAMU 192, Bombeiros 193 ou Polícia 190, conforme o caso).'
    return answer(help+' Posso encaminhar à equipe de '+profile.team+' com prioridade, sem aguardar a validação documental?')
   }
-  if(isNo(text)||/\b(?:ninguem ficou ferido|sem feridos|nao precisa de atendimento|pet esta bem|nao ha risco)\b/.test(text)){
+  if(isNo(text)||noInjury||/\b(?:nao precisa de atendimento|pet esta bem|nao ha risco)\b/.test(text)){
    if(ctx.kind==='frota'&&!fleetUnitKnown(list,ctx))return answer('Qual veículo ou unidade da frota foi afetado? Pode informar uma referência interna, sem precisar compartilhar a placa completa.')
    return answer(identityPrompt(profile))
   }
