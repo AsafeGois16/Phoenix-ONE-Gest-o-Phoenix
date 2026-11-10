@@ -1,3 +1,5 @@
+import {isAdministrativeMovementRequest} from './backoffice-routing.js'
+
 /**
  * Triagem por produto em sinistros e assistências. Contrato Junior v1.2:
  * nunca acionar serviços, confirmar cobertura ou divulgar contrato antes de
@@ -29,7 +31,7 @@ const PROFILES={
   first:'Primeiro, proteja as pessoas: se houver fogo, fumaça ou risco estrutural, evacue e acione Bombeiros 193. Os funcionários e demais pessoas estão em segurança?'},
  condominio:{label:'Sinistro Condomínio',department:'patrimonio',team:'Auto/RE',match:/\b(?:condominio|predio|portaria|area comum|sindico)\b/,
   first:'Priorize os moradores e funcionários: havendo incêndio, fumaça ou perigo estrutural, afaste as pessoas e acione Bombeiros 193. Todos estão em segurança?'},
- saude:{label:'Urgência de Saúde',department:'beneficios',team:'Benefícios',match:/\b(?:saude|hospital|internacao|urgencia medica|emergencia medica|pronto.socorro)\b/,
+ saude:{label:'Urgência de Saúde',department:'backoffice',team:'Backoffice',match:/\b(?:saude|hospital|internacao|urgencia medica|emergencia medica|pronto.socorro)\b/,
   first:'Entendi a urgência. Qual é a situação clínica que precisa de atendimento? Se houver risco imediato à vida, procure pronto-socorro ou SAMU 192 sem aguardar a validação do plano.'},
  moto:{label:'Sinistro Moto',department:'patrimonio',team:'Auto/RE',
   first:'Sinto muito pelo ocorrido com a moto. Alguém precisa de atendimento médico imediato? Se houver feridos ou perigo, procure socorro (SAMU 192 ou Polícia 190, conforme a situação).'},
@@ -39,14 +41,22 @@ const PROFILES={
   first:'Antes de tratar do equipamento, há risco de choque, incêndio ou ferimentos? Não manuseie equipamento danificado ou energizado em situação de perigo.'},
  bike:{label:'Sinistro Bicicleta',department:'patrimonio',team:'Auto/RE',
   first:'Sinto muito pelo ocorrido com a bicicleta. Você se feriu ou precisa de atendimento médico? Se houver risco imediato, procure socorro.'},
- odonto:{label:'Urgência Odontológica',department:'beneficios',team:'Benefícios',
+ odonto:{label:'Urgência Odontológica',department:'backoffice',team:'Backoffice',
   first:'Entendi a urgência odontológica. Há sangramento intenso, dificuldade para respirar ou risco imediato? Se houver, procure pronto atendimento; não espere a verificação do plano.'},
- acidentes_pessoais:{label:'Sinistro Acidentes Pessoais',department:'beneficios',team:'Benefícios',
+ acidentes_pessoais:{label:'Sinistro Acidentes Pessoais',department:'backoffice',team:'Backoffice',
   first:'Sinto muito pelo acidente. A pessoa acidentada precisa de atendimento médico urgente? Em caso de risco imediato, procure socorro ou ligue SAMU 192.'},
- viagem:{label:'Sinistro Seguro Viagem',department:'beneficios',team:'Benefícios',
+ viagem:{label:'Sinistro Seguro Viagem',department:'backoffice',team:'Backoffice',
   first:'Entendi a solicitação de Seguro Viagem. Para verificar com segurança se existe apólice ativa, pode informar CPF ou CNPJ do titular? Em emergência médica, procure atendimento local imediatamente.'},
  pet:{label:'Sinistro Seguro Pet',department:'backoffice',team:'Backoffice',
-  first:'Sinto muito pelo ocorrido com o pet. Ele precisa de atendimento veterinário imediato? Em caso de risco, procure uma emergência veterinária sem aguardar a consulta do seguro.'}
+  first:'Sinto muito pelo ocorrido com o pet. Ele precisa de atendimento veterinário imediato? Em caso de risco, procure uma emergência veterinária sem aguardar a consulta do seguro.'},
+ saude_servico:{label:'Problema no Plano de Saúde',department:'backoffice',team:'Backoffice',
+  first:'Entendi a dificuldade com seu plano de Saúde. Para agilizar a conferência do contrato e o atendimento com o Backoffice, pode informar CPF ou CNPJ do titular? A gestão do Junior fará a validação da identidade.'},
+ odonto_servico:{label:'Problema no Plano Odontológico',department:'backoffice',team:'Backoffice',
+  first:'Entendi a dificuldade com seu plano odontológico. Para agilizar a conferência do contrato com o Backoffice, pode informar CPF ou CNPJ do titular? A gestão do Junior fará a validação da identidade.'},
+ vida:{label:'Sinistro ou Problema de Seguro de Vida',department:'backoffice',team:'Backoffice',
+  first:'Sinto muito pela situação. Para agilizar o atendimento sobre o Seguro de Vida com o Backoffice, pode informar CPF ou CNPJ do titular da apólice? A gestão do Junior fará a validação; não é necessário enviar foto do documento.'},
+ previdencia_servico:{label:'Atendimento de Previdência',department:'backoffice',team:'Backoffice',
+  first:'Entendi a dificuldade com sua Previdência. Para conferir o contrato e encaminhar ao Backoffice, pode informar CPF ou CNPJ do titular? A gestão do Junior fará a validação da identidade.'}
 }
 function classifyCritical(text){
  const t=fold(text)
@@ -78,8 +88,29 @@ function classifyOther(text){
  if(/\b(?:seguro viagem|viagem|bagagem|mala|voo|passageiro)\b/.test(t))return 'viagem'
  return null
 }
+/** Problemas contratuais de Benefícios são serviço (Backoffice), não cotação,
+ * movimentação de dependente nem emissão de boleto. Segurança permanece
+ * prioritária nos eventos clínicos agudos.
+ */
+function classifyBenefitsService(text){
+ const t=fold(text)
+ if(!t||hypothetical(t)||isAdministrativeMovementRequest(text))return null
+ if(/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|contratar um novo plano|quanto custa)\b/.test(t))return null
+ if(/\b(?:boleto|fatura|segunda via|parcela|nota fiscal|vencimento|pagamento)\b/.test(t)&&
+    !/\b(?:negativa|problema com atendimento|autorizacao)\b/.test(t))return null
+ const issue=/\b(?:problema|dificuldade|negativa|negou|negado|recusad[oa]|nao consigo|nao foi autorizado|autorizacao|carencia|rede credenciada|atendimento|consulta|exame|cirurgia|tratamento|terapia|internacao|reembolso|sinistro|acionamento|acionar|falecimento|faleceu|morreu|obito|indenizacao|assistencia funeral|resgate|portabilidade|beneficio negado|sem cobertura)\b/.test(t)
+ if(!issue)return null
+ if(/\b(?:plano de saude|seguro saude|plano medico|plano hospitalar|assistencia medica|hapvida|bradesco saude)\b/.test(t)&&
+    !/\b(?:urgente|urgencia|emergencia|risco de vida|internacao urgente)\b/.test(t))return 'saude_servico'
+ if(/\b(?:odonto|odontologico|odontologia|dentista|plano dental)\b/.test(t)&&
+    !/\b(?:urgente|urgencia|emergencia|trauma dentario|sangramento intenso)\b/.test(t))return 'odonto_servico'
+ if(/\b(?:seguro de vida|apolice de vida|vida individual|vida em grupo|vida empresarial)\b/.test(t))return 'vida'
+ if(/\b(?:previdencia|pgb[l]?|vgbl)\b/.test(t))return 'previdencia_servico'
+ return null
+}
 export function classifyProductIncident(text){
- return classifyOther(text)||classifyCritical(text)
+ if(isAdministrativeMovementRequest(text))return null
+ return classifyOther(text)||classifyCritical(text)||classifyBenefitsService(text)
 }
 export function productIncidentContext(messages){
  const list=Array.isArray(messages)?messages:[]
@@ -102,7 +133,7 @@ function immediate(profile,ctx,messages){
  const original=fold(messages[ctx.start]?.text)
  const severe=emergency(original)
  if(profile===PROFILES.saude&&/\b(?:dor no peito|nao respira|inconsciente|convulsao|falta de ar)\b/.test(original))
-  return answer('Há sinais de possível emergência. Procure pronto atendimento imediatamente ou acione SAMU 192. Posso encaminhar ao setor de Benefícios com prioridade? Não espere a validação documental para buscar socorro.')
+  return answer('Há sinais de possível emergência. Procure pronto atendimento imediatamente ou acione SAMU 192. Posso encaminhar ao setor de Backoffice com prioridade? Não espere a validação documental para buscar socorro.')
  return answer(profile.first)
 }
 export function productIncidentFirstDecision(messages){
@@ -134,7 +165,7 @@ export function productIncidentFollowupDecision(messages){
   return answer(help+' Posso encaminhar à equipe de '+profile.team+' com prioridade?')
  }
  if(emergency(text)&&!/\b(?:sem feridos|ninguem ficou ferido)\b/.test(text)){
-  if(ctx.kind==='saude')return answer('Se houver risco imediato à vida, procure atendimento presencial de urgência ou ligue SAMU 192. Posso encaminhar à equipe de Benefícios com prioridade?')
+  if(ctx.kind==='saude')return answer('Se houver risco imediato à vida, procure atendimento presencial de urgência ou ligue SAMU 192. Posso encaminhar à equipe de Backoffice com prioridade?')
   return answer('Há indicação de risco. Priorize sua segurança, afaste-se do local e acione Bombeiros 193 ou Polícia 190 conforme a situação. Posso encaminhar à equipe de '+profile.team+' com prioridade?')
  }
  const symptomsOrRisk=/\b(?:alguem precisa de atendimento medico|ha feridos|ha risco|precisa de atendimento medico|sangramento intenso|risco imediato|equipamento.*risco|pet.*atendimento veterinario|ele precisa de atendimento veterinario|pessoa acidentada precisa|precisa de atendimento veterinario)\b/.test(prev)
@@ -156,7 +187,7 @@ export function productIncidentFollowupDecision(messages){
  if(ctx.kind==='viagem'&&/\b(?:cpf|cnpj)\b/.test(prev))return null
  if(ctx.kind==='saude'&&/\b(?:qual e a situacao clinica|qual e a situacao)\b/.test(prev)){
   if(/\b(?:dor no peito|falta de ar|desmai|inconsciente|convulsao|sangramento intenso)\b/.test(text))
-   return answer('Essa situação pode exigir socorro imediato. Procure pronto-socorro ou ligue SAMU 192. Posso encaminhar seu atendimento à equipe de Benefícios com prioridade?')
+   return answer('Essa situação pode exigir socorro imediato. Procure pronto-socorro ou ligue SAMU 192. Posso encaminhar seu atendimento à equipe de Backoffice com prioridade?')
   return answer(identityPrompt(profile))
  }
  if(/\b(?:seguranca|em seguranca|estao em seguranca|esta em seguranca|seguro\?|conseguiram sair|todas as pessoas|todos estao)\b/.test(prev)){
@@ -164,7 +195,7 @@ export function productIncidentFollowupDecision(messages){
   if(isNo(text))return answer('Priorize a segurança das pessoas. Se houver perigo imediato, acione o socorro adequado; posso encaminhar à equipe de '+profile.team+' com prioridade?')
  }
  if(needsHuman(text)){
-  if(ctx.kind==='saude'&&/\b(?:urgencia|emergencia)\b/.test(fold(agentLast(list))))return answer('Se houver risco à vida, procure socorro imediato. Posso encaminhar à equipe de Benefícios com prioridade?')
+  if(ctx.kind==='saude'&&/\b(?:urgencia|emergencia)\b/.test(fold(agentLast(list))))return answer('Se houver risco à vida, procure socorro imediato. Posso encaminhar à equipe de Backoffice com prioridade?')
   return answer(identityPrompt(profile))
  }
  return null
@@ -184,7 +215,11 @@ function matchingPolicy(policy,kind){
   odonto:/\b(?:odonto|odontologico|odontologia)\b/,
   acidentes_pessoais:/\b(?:acidentes pessoais|acidentes pessoais coletivo|vida|dit|acidente pessoal)\b/,
   viagem:/\b(?:viagem|travel)\b/,
-  pet:/\b(?:pet|animal|veterinario)\b/
+  pet:/\b(?:pet|animal|veterinario)\b/,
+  saude_servico:/\b(?:saude|medico|hospitalar|assistencia medica)\b/,
+  odonto_servico:/\b(?:odonto|odontologico|odontologia)\b/,
+  vida:/\b(?:vida|vida em grupo|vida individual)\b/,
+  previdencia_servico:/\b(?:previdencia|pgbl|vgbl)\b/
  }
  return matches[kind]?.test(code)===true
 }
