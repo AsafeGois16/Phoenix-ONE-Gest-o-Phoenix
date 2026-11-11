@@ -8,7 +8,7 @@ const origin='https://phoenix-one-ai.vercel.app'
 const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'}
 const out=(status,body)=>new Response(JSON.stringify(body),{status,headers})
 const err=(code,message)=>out(code,{error:message})
-const validAgent=a=>['clara','murilo'].includes(a)
+const validAgent=a=>['clara','murilo','grazy_copy'].includes(a)
 const isUid=s=>typeof s==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 const clean=s=>String(s||'').trim()
 const stringUnder=(s,len)=>typeof s==='string'&&s.length<=len
