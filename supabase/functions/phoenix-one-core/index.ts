@@ -1,5 +1,6 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.49.10'
 import postgres from 'npm:postgres@3.4.5'
+import {chooseGrazySourceId} from './grazy-source-router.mjs'
 const url=Deno.env.get('SUPABASE_URL')||''
 const anon=Deno.env.get('SUPABASE_ANON_KEY')||''
 const dbUrl=Deno.env.get('SUPABASE_DB_URL')||''
@@ -124,6 +125,20 @@ Deno.serve(async req=>{
   }
   if(action==='search'){
     if(!validAgent(body.agent)||typeof body.query!=='string'||!body.query.trim()||body.query.length>800)return err(400,'invalid_query')
+    // Correção isolada da Grazy: quando uma RAG PHX-GC-0N é citada ou o pedido
+    // busca o portfólio empresarial, recuperar TODOS os trechos do documento
+    // publicado, em ordem. Manter ACL, sensibilidade e validade rigorosamente.
+    // Clara/Murilo continuam usando exclusivamente a pesquisa FTS existente.
+    if(body.agent==='grazy_copy'){
+      const sourceCode=chooseGrazySourceId(body.query)
+      if(sourceCode){
+        const documentMatches=await pg.unsafe("select d.id as document_id,d.title as source,c.chunk_index,c.content,1.0::float as rank from phoenix_one.knowledge_chunks c join phoenix_one.knowledge_documents d on d.id=c.document_id join phoenix_one.document_agents da on da.document_id=d.id and da.agent_id='grazy_copy' where d.title like $1 and d.status='published' and d.sensitivity in ('public','internal') and (d.valid_until is null or d.valid_until>=current_date) order by d.version desc,c.chunk_index asc limit 12",[sourceCode+' —%'])
+        if(documentMatches.length)return out(200,{matches:documentMatches,method:'Grazy source-scoped ordered chunks + ACL',sourceCode,vectorIndexed:false})
+        // Se o documento solicitado não está autorizado/disponível, não substituir
+        // silenciosamente por outra fonte como se fosse o documento informado.
+        return out(200,{matches:[],method:'Grazy source-scoped unavailable',sourceCode,vectorIndexed:false})
+      }
+    }
     // Pesquisa natural primeiro. Perguntas longas podem exigir TODAS as palavras,
     // por isso fazemos um segundo passe de termos relevantes quando não há fontes.
     // Nunca relaxar os filtros de documento publicado, sensibilidade ou permissão por agente.
