@@ -53,6 +53,15 @@ test('Migração Grazy não altera prompt, RAG ou estado de Clara/Murilo',async(
  assert.match(migration,/grazy_copy/)
  assert.match(migration,/INSERT INTO phoenix_one\.agents/)
  assert.match(migration,/INSERT INTO phoenix_one\.agent_versions/)
+ const prompt=await file('../prompts/grazy-copy-v1.md')
+ const delim='$grazy_copy_v1_prompt
+ assert.doesNotMatch(migration,/UPDATE\s+phoenix_one\.agent_versions\s+SET\s+active\s*=\s*false/i)
+ assert.doesNotMatch(migration,/UPDATE\s+phoenix_one\.agents\s+SET/i)
+})
+
+ const sections=migration.split(delim)
+ assert.equal(sections.length,3)
+ assert.equal(sections[1],prompt)
  assert.doesNotMatch(migration,/UPDATE\s+phoenix_one\.agent_versions\s+SET\s+active\s*=\s*false/i)
  assert.doesNotMatch(migration,/UPDATE\s+phoenix_one\.agents\s+SET/i)
 })
