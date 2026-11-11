@@ -1,0 +1,58 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
+import {validAgent as validJuniorAgent} from '../server/junior-v1.js'
+
+const file=async(path)=>readFile(new URL(path,import.meta.url),'utf8')
+
+test('Grazy Copy V1 tem prompt separado, completo e explicitamente interno',async()=>{
+ const text=await file('../prompts/grazy-copy-v1.md')
+ assert.match(text,/GRAZY COPY — INTELIGÊNCIA DE COMUNICAÇÃO/)
+ assert.match(text,/PROMPT MESTRE V1\.0/)
+ assert.match(text,/Português do Brasil impecável/)
+ assert.match(text,/Auto, Moto, Frota, Residencial, Empresarial, Saúde, Odonto, Vida/)
+ assert.match(text,/Mensagem 1 — Consultiva/)
+ assert.match(text,/Mensagem 2 — Direta/)
+ assert.match(text,/Mensagem 3 — Relacionamento/)
+ assert.match(text,/NÃO escreva variações destinadas a disfarçar mensagens em massa/i)
+ assert.match(text,/consentimento prévio/i)
+ assert.match(text,/nunca enviar mensagens, operar WhatsApp, disparar campanhas/i)
+ assert.match(text,/Não invente preço, prêmio, franquia/i)
+ assert.match(text,/não significa template aprovado pela plataforma/i)
+ assert.match(text,/não possui ferramenta de envio/i)
+ assert.ok(text.length>5000)
+})
+test('Grazy Copy é disponível no laboratório, mas nunca como agente do Junior',async()=>{
+ const api=await file('../api/phoenix-answer.js')
+ const core=await file('../supabase/functions/phoenix-one-core/index.ts')
+ const ops=await file('../src/Operations.jsx')
+ assert.match(api,/!\\['clara','murilo','grazy_copy'\\]\\.includes\\(agent\\)/)
+ assert.match(api,/agent==='grazy_copy'\\?\\{matches:\\[\\]\\}/)
+ assert.match(api,/authenticated_editorial_lab/)
+ assert.match(core,/\\['clara','murilo','grazy_copy'\\]/)
+ assert.match(ops,/grazy_copy:\\{name:'Grazy Copy'/)
+ assert.match(ops,/selected===key/)
+ assert.match(ops,/agentsInfo\\[a\\]\\.initial/)
+ assert.equal(validJuniorAgent('grazy_copy'),false)
+ assert.equal(validJuniorAgent('clara'),true)
+ assert.equal(validJuniorAgent('murilo'),true)
+})
+test('UI não configura disparos e preserva RAG dos outros agentes',async()=>{
+ const code=await file('../api/phoenix-answer.js')
+ assert.match(code,/agent==='grazy_copy'\\?\\{matches:\\[\\]\\}:await core/)
+ assert.match(code,/guardClaraLabAnswer/)
+ assert.match(code,/ensureMuriloIntro/)
+ const ops=await file('../src/Operations.jsx')
+ assert.match(ops,/Sem integração com disparos ou WhatsApp/)
+ const junior=await file('../server/junior-v1.js')
+ assert.match(junior,/a==='clara'\\|\\|a==='murilo'/)
+})
+test('Migração Grazy não altera prompt, RAG ou estado de Clara/Murilo',async()=>{
+ const migration=await file('../supabase/migrations/20261111_grazy_copy_agent_v1.sql')
+ assert.match(migration,/ADD CONSTRAINT agents_id_check/)
+ assert.match(migration,/grazy_copy/)
+ assert.match(migration,/INSERT INTO phoenix_one\\.agents/)
+ assert.match(migration,/INSERT INTO phoenix_one\\.agent_versions/)
+ assert.doesNotMatch(migration,/UPDATE\\s+phoenix_one\\.agent_versions\\s+SET\\s+active\\s*=\\s*false/i)
+ assert.doesNotMatch(migration,/UPDATE\\s+phoenix_one\\.agents\\s+SET/i)
+})
