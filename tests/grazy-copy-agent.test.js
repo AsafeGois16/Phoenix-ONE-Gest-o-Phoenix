@@ -17,7 +17,7 @@ test('Grazy Copy V1 tem prompt separado, completo e explicitamente interno',asyn
  assert.match(text,/NÃO escreva variações destinadas a disfarçar mensagens em massa/i)
  assert.match(text,/consentimento prévio/i)
  assert.match(text,/nunca enviar mensagens, operar WhatsApp, disparar campanhas/i)
- assert.match(text,/Não invente preço, prêmio, franquia/i)
+ assert.match(text,/(?:Nunca|Não) invente preço, prêmio, franquia/i)
  assert.match(text,/não significa template aprovado pela plataforma/i)
  assert.match(text,/não possui ferramenta de envio/i)
  assert.ok(text.length>5000)
