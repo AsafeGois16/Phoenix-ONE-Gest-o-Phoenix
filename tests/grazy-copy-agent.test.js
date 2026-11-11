@@ -69,3 +69,23 @@ test('Grazy Copy V2 conserva a V1, aplica precisão editorial e isola as RAGs',a
  assert.ok(junior.includes("a==='clara'||a==='murilo'"))
  assert.ok(!junior.includes('grazy_copy'))
 })
+
+
+test('Grazy V3 previne regressões de desconto, gratuidade, versões e perguntas desnecessárias',async()=>{
+ const v1=await file('../prompts/grazy-copy-v1.md')
+ const v2=await file('../prompts/grazy-copy-v2.md')
+ const v3=await file('../prompts/grazy-copy-v3.md')
+ const api=await file('../api/phoenix-answer.js')
+ assert.ok(v1.includes('PROMPT MESTRE V1.0'))
+ assert.ok(v2.includes('PROMPT MESTRE V2.0'))
+ for(const marker of ['PROMPT MESTRE V3.0','COMPLEMENTO V3','NÃO diga "temos descontos especiais"','sem compromisso','NÃO inicie por perguntas','campos editáveis','exatamente uma peça','VALIDAÇÃO NECESSÁRIA']){
+  assert.ok(v3.toLowerCase().includes(marker.toLowerCase()),marker)
+ }
+ assert.ok(api.includes('VERIFICAÇÃO FINAL OBRIGATÓRIA GRAZY'))
+ assert.ok(api.includes('const result=await core(token,\'search\',{agent,query})'))
+ assert.ok(api.includes('guardClaraLabAnswer'))
+ assert.ok(api.includes('ensureMuriloIntro'))
+ assert.equal(validJuniorAgent('grazy_copy'),false)
+ assert.equal(validJuniorAgent('clara'),true)
+ assert.equal(validJuniorAgent('murilo'),true)
+})
