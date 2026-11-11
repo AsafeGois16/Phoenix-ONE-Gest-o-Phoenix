@@ -89,3 +89,29 @@ test('Grazy V3 previne regressões de desconto, gratuidade, versões e perguntas
  assert.equal(validJuniorAgent('clara'),true)
  assert.equal(validJuniorAgent('murilo'),true)
 })
+
+
+test('Grazy V4 melhora GC03, GC05 e GC12 sem prejudicar versões anteriores nem Junior',async()=>{
+ const v1=await file('../prompts/grazy-copy-v1.md')
+ const v2=await file('../prompts/grazy-copy-v2.md')
+ const v3=await file('../prompts/grazy-copy-v3.md')
+ const v4=await file('../prompts/grazy-copy-v4.md')
+ const api=await file('../api/phoenix-answer.js')
+ const junior=await file('../server/junior-v1.js')
+ for(const [previous,version] of [[v1,'V1.0'],[v2,'V2.0'],[v3,'V3.0']]){
+  assert.ok(previous.includes('PROMPT MESTRE '+version))
+  assert.ok(!previous.includes('COMPLEMENTO V4'))
+ }
+ for(const fragment of ['PROMPT MESTRE V4.0','COMPLEMENTO V4','GC03 — Três abordagens','CONSULTIVA','DIRETA','RELACIONAMENTO','GC05 — Fidelidade','Gravamos','não significa publicado','GC12 — Privacidade','[CPF omitido]','[informações clínicas não incluídas]']){
+  assert.ok(v4.toLowerCase().includes(fragment.toLowerCase()),fragment)
+ }
+ assert.ok(api.includes('GC03: três alternativas precisam'))
+ assert.ok(api.includes('GC05: gravamos NÃO significa'))
+ assert.ok(api.includes('GC12: para dados de beneficiária fictícia'))
+ assert.ok(api.includes('guardClaraLabAnswer'))
+ assert.ok(api.includes('ensureMuriloIntro'))
+ assert.ok(api.includes('const result=await core(token,\'search\',{agent,query})'))
+ assert.ok(junior.includes("a==='clara'||a==='murilo'"))
+ assert.ok(!junior.includes('grazy_copy'))
+ assert.equal(validJuniorAgent('grazy_copy'),false)
+})
