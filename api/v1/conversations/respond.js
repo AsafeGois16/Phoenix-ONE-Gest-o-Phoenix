@@ -187,9 +187,11 @@ async function respondValidated(body,res,context=null){
   if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
   // MegaBrain observação OPCIONAL e isolada: desligada por padrão.
   // Não altera a mensagem retornada, os roteamentos nem as operações do Junior.
-  if(!simulation&&body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
+  if(!simulation){
+  if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
    await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
   }
+ }
   const cleanReply=hideIdentifierPlaceholders(redact(safeText(reply,1800)))
    if(simulation)return jsonResponse(res,200,{action:routeType==='direct_commercial'?plan.action:'engine_response',agent:payload.agent,selectedAgent:agent,reply:cleanReply,product:plan?.product||null,logicalTarget:plan?.logicalTarget||null,proposedDepartment:payload.handoff?.department||null,humanHandoff:false,handoff:null,executed:false,previewOnly:true,engineStage:routeType})
    return jsonResponse(res,200,{...payload,reply:cleanReply})
