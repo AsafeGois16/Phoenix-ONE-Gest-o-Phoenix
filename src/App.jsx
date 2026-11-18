@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Operations from './Operations.jsx'
 import IntegrationsAdmin from './IntegrationsAdmin.jsx'
+import OrchestrationPreview from './OrchestrationPreview.jsx'
 import LiveLab from './LiveLab.jsx'
 import {
   Activity, ArrowDownRight, ArrowRight, ArrowUpRight, BookMarked, BookOpen, Bot, BrainCircuit,
@@ -37,9 +38,9 @@ const BASE = {
 }
 const NAV = [
   {group:'ESPAÇO DE TRABALHO',links:[['dashboard','Visão geral',LayoutDashboard],['agents','Agentes de IA',Bot],['knowledge','Knowledge Hub',BookOpen],['memory','Memória & aprendizado',BrainCircuit],['megabrain','MegaBrain',BrainCircuit],['tickets','Tickets',Ticket]]},
-  {group:'INTELIGÊNCIA',links:[['lab','Laboratório RAG',TestTube2],['integrations','Integrações',Network],['architecture','Arquitetura',Layers3]]}
+  {group:'INTELIGÊNCIA',links:[['lab','Laboratório RAG',TestTube2],['orchestration','Orquestração de Agentes',Settings2],['integrations','Integrações',Network],['architecture','Arquitetura',Layers3]]}
 ]
-const TITLES = {dashboard:['Visão geral','Intelligence workspace'],agents:['Agentes de IA','Personalidade e comportamento'],knowledge:['Knowledge Hub','Biblioteca de conhecimento'],memory:['Memória & aprendizado','Curadoria de experiência operacional'],megabrain:['MegaBrain','Memória de protocolos · Somente leitura'],tickets:['Tickets','Atendimentos e resoluções'],lab:['Laboratório RAG','Recuperação de contexto e testes'],integrations:['Integrações','Conectores e permissões'],architecture:['Arquitetura','Estrutura independente e escalável']}
+const TITLES = {dashboard:['Visão geral','Intelligence workspace'],agents:['Agentes de IA','Personalidade e comportamento'],knowledge:['Knowledge Hub','Biblioteca de conhecimento'],memory:['Memória & aprendizado','Curadoria de experiência operacional'],megabrain:['MegaBrain','Memória de protocolos · Somente leitura'],tickets:['Tickets','Atendimentos e resoluções'],lab:['Laboratório RAG','Recuperação de contexto e testes'],orchestration:['Orquestração de Agentes','Modos operacionais · Prévia isolada'],integrations:['Integrações','Conectores e permissões'],architecture:['Arquitetura','Estrutura independente e escalável']}
 const DEFAULT_INTEGRATIONS = [
   {id:'management',name:'Sistema de Gestão Phoenix',detail:'Conector futuro com o sistema do Junior',icon:Database,scope:'Clientes · Contratos · Tickets · Usuários'},
   {id:'whatsapp',name:'4Zapy — no sistema do Junior',detail:'Operado pelo Junior; o Phoenix ONE não acessa o gateway diretamente',icon:MessageCircle,scope:'Somente via API do Junior · Nenhum webhook direto'},
@@ -130,7 +131,7 @@ function Architecture({data}){return <div className="stack"><div className="page
 export default function App(){
  const [page,setPage]=useState('dashboard'),[mobile,setMobile]=useState(false),[collapsed,setCollapsed]=useState(false),[toast,setToast]=useState('')
  const notify=()=>{setToast('Os dados dos agentes e da biblioteca são lidos do banco Phoenix ONE. Integração operacional com Junior exige homologação.');setTimeout(()=>setToast(''),4500)}
- const content=page==='integrations'?<IntegrationsAdmin/>:<Operations page={page} onNavigate={setPage}/>
+ const content=page==='orchestration'?<OrchestrationPreview/>:page==='integrations'?<IntegrationsAdmin/>:<Operations page={page} onNavigate={setPage}/>
  return <div className={'app '+(collapsed?'collapsed':'')}>
  <Sidebar active={page} onChange={p=>{setPage(p);setMobile(false)}} mobile={mobile} onClose={()=>setMobile(false)} collapsed={collapsed} onCollapse={()=>setCollapsed(!collapsed)}/>
  {mobile&&<button className="mobile-overlay" aria-label="Fechar menu" onClick={()=>setMobile(false)}/>}
