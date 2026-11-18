@@ -2,10 +2,10 @@ import React,{useState} from 'react'
 import {createClient} from '@supabase/supabase-js'
 import {ShieldCheck,Database,RefreshCcw,Send} from 'lucide-react'
 
-const ref=import.meta.env.VITE_PHX_ORCH_TEST_REF
-const key=import.meta.env.VITE_PHX_ORCH_TEST_PUBLISHABLE_KEY
-const configured=typeof ref==='string'&&/^[a-z0-9]{20}$/.test(ref)&&ref!=='cxyxrhmpjehrqhwihxul'&&typeof key==='string'&&key.length>0
-const client=configured?createClient('https://'+ref+'.supabase.co',key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}):null
+const url=import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/,'')
+const key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const configured=import.meta.env.VITE_PHX_ORCH_TEST_ENABLED==='true'&&url==='https://cxyxrhmpjehrqhwihxul.supabase.co'&&typeof key==='string'&&key.length>0
+const client=configured?createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}}):null
 const modeLabel=m=>m==='clara_only'?'Somente Clara':'Clara + Murilo'
 const title={delegate:'Delegação ao fluxo existente (sem executá-lo)',reply:'Resposta proposta',mapping_required:'Destino comercial pendente de validação',propose_handoff:'Encaminhamento proposto',blocked:'Operação bloqueada'}
 const errorText={isolated_environment_not_configured:'O ambiente central isolado ainda não foi configurado.',unauthorized:'Conta não autorizada para homologação.',central_store_unavailable:'Não foi possível acessar a persistência central isolada.',invalid_configuration:'Configuração inválida.',invalid_simulation:'Mensagem ou protocolo fictício inválido.'}
@@ -31,7 +31,7 @@ export default function OrchestrationCentralPreview(){
   await run(async()=>{
    const r=await client.auth.signInWithPassword({email,password})
    setPassword('')
-   if(r.error||!r.data.session)throw Error('Não foi possível entrar no projeto de homologação.')
+   if(r.error||!r.data.session)throw Error('Não foi possível entrar com sua conta administrativa.')
    const s=r.data.session
    try{setSettings(await call('get',{},s));setSession(s)}catch(e){await client.auth.signOut({scope:'local'});throw e}
   })
@@ -52,8 +52,8 @@ export default function OrchestrationCentralPreview(){
   })
  }
  return <section className="ops-paper">
-  <div className="orch-section"><Database size={20}/><div><h3>Fase 2 — Configuração central isolada</h3><p>Persistência por revisão, exclusiva de um projeto de teste. O servidor não executa ações no Junior.</p></div></div>
-  {!client?<div className="orch-pending" role="status">Banco isolado ainda não provisionado. A configuração central e o ensaio servidor a servidor estão bloqueados; use o simulador local da Fase 1 enquanto isso.</div>:!session?<form className="orch-form" onSubmit={login}><p>Entre com uma conta administrativa do projeto de homologação separado, não com as credenciais da produção.</p><label htmlFor="orch-test-email">E-mail de teste</label><input id="orch-test-email" type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/><label htmlFor="orch-test-password">Senha de teste</label><input id="orch-test-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/><button className="orch-primary" disabled={busy}>Entrar no ambiente isolado</button></form>:<>
+  <div className="orch-section"><Database size={20}/><div><h3>Fase 2 — Configuração central isolada</h3><p>Persistência por revisão, em schema exclusivo de homologação. O servidor não executa ações no Junior.</p></div></div>
+  {!client?<div className="orch-pending" role="status">Conexão de homologação ainda não habilitada. A configuração central e o ensaio servidor a servidor estão bloqueados; use o simulador local da Fase 1 enquanto isso.</div>:!session?<form className="orch-form" onSubmit={login}><p>Entre com sua conta administrativa autorizada do Phoenix ONE. A sessão deste painel é temporária, com acesso restrito à homologação.</p><label htmlFor="orch-test-email">E-mail de teste</label><input id="orch-test-email" type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/><label htmlFor="orch-test-password">Senha de teste</label><input id="orch-test-password" type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/><button className="orch-primary" disabled={busy}>Entrar no ambiente isolado</button></form>:<>
    <div className="orch-result"><b>Modo central: {modeLabel(settings?.mode)}</b><p>Revisão: {settings?.revision}</p><div className="orch-chips"><button type="button" disabled={busy} onClick={()=>updateMode('clara_only')}>Somente Clara</button><button type="button" disabled={busy} onClick={()=>updateMode('clara_murilo')}>Clara + Murilo</button><button type="button" disabled={busy} onClick={()=>run(async()=>setSettings(await call('get')))}>Recarregar configuração</button><button type="button" disabled={busy} onClick={logout}>Sair</button></div></div>
    <button className="orch-secondary" type="button" disabled={busy} onClick={newProtocol}><RefreshCcw size={15}/> Novo protocolo fictício central</button>
    {pin&&<><p>Modo fixado: <b>{modeLabel(pin.mode)}</b> · revisão {pin.revision}</p><form className="orch-form" onSubmit={simulate}><label htmlFor="orch-central-message">Mensagem fictícia — sem dados pessoais</label><textarea id="orch-central-message" maxLength={500} rows={3} value={message} onChange={e=>setMessage(e.target.value)}/><button className="orch-primary" disabled={busy||!message.trim()}><Send size={15}/> Testar decisão no servidor</button></form></>}
@@ -61,6 +61,6 @@ export default function OrchestrationCentralPreview(){
    {history.length>0&&<div className="orch-history">{history.map((m,i)=><div key={i}><small>{m.author==='contact'?'Cliente fictício':'Resposta simulada'}</small><p>{m.text}</p></div>)}</div>}
   </>}
   {error&&<p className="orch-pending" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
-  <div className="orch-save"><ShieldCheck size={15}/> O acesso exige conta autorizada no projeto isolado, e a API rejeita produção. Sem filas reais e sem chamadas ao modelo.</div>
+  <div className="orch-save"><ShieldCheck size={15}/> O acesso exige conta autorizada no schema de homologação, e a API rejeita produção. Sem filas reais e sem chamadas ao modelo.</div>
  </section>
 }
