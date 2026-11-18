@@ -82,7 +82,7 @@ test('Fase 2: ajuste editorial mantém o simulador homologado',()=>{
  assert.match(previewDecision(r.state,'Sim').reply,/Obrigada pela confirmação/)
 })
 test('Fase 2: isolamento exige preview específico, flag e chave publicável do projeto autorizado',()=>{
- const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'feat/orquestracao-agentes-fase2-preview',PHX_ORCH_TEST_ENABLED:'true',VITE_SUPABASE_URL:'https://cxyxrhmpjehrqhwihxul.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'}
+ const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'feat/orquestracao-agentes-fase3-preview',PHX_ORCH_TEST_ENABLED:'true',VITE_SUPABASE_URL:'https://cxyxrhmpjehrqhwihxul.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'}
  assert.equal(isolatedConfig(env).url,env.VITE_SUPABASE_URL)
  for(const change of [{VERCEL_ENV:'production'},{VERCEL_GIT_COMMIT_REF:'main'},{PHX_ORCH_TEST_ENABLED:'false'},{VITE_SUPABASE_URL:'https://example.com'},{VITE_SUPABASE_PUBLISHABLE_KEY:'sb_secret_fixture'},{VITE_SUPABASE_PUBLISHABLE_KEY:''}]){
   assert.equal(isolatedConfig({...env,...change}),null)
@@ -142,5 +142,5 @@ test('Fase 2: API não configurada responde 503 sem rede e SQL limita acesso',as
  const api=await readFile(new URL('../api/orchestration-central-preview.js',import.meta.url),'utf8')
  assert.match(api,/humanHandoff:false,handoff:null,executed:false/)
  const live=await readFile(new URL('../api/v1/conversations/respond.js',import.meta.url),'utf8')
- assert.doesNotMatch(live,/orchestration-operational|orchestration-central-preview/)
+ assert.match(live,/operational_preview_disabled/);assert.match(live,/runOrchestrationPreview/);assert.doesNotMatch(live,/orchestration-central-preview/)
 })
