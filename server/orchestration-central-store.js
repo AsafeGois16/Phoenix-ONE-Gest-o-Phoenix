@@ -2,7 +2,7 @@ import {createClient} from '@supabase/supabase-js'
 import {MODES} from './orchestration-preview.js'
 
 const PRODUCTION_REF='cxyxrhmpjehrqhwihxul'
-const BRANCH='feat/orquestracao-agentes-fase2-preview'
+const BRANCH='feat/orquestracao-agentes-fase3-preview'
 export const uuidOk=v=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v)
 // Usa apenas a chave publicável existente e o JWT do administrador.
 export function isolatedConfig(env){
