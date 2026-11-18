@@ -5,7 +5,7 @@
  * O adaptador de produção permanece desabilitado até homologação Junior.
  */
 import {MODES,TARGETS,identifyOrchestrationProducts} from './orchestration-preview.js'
-import {classifyConversationIntent,selectConversationAgent} from './agent-routing.js'
+import {classifyConversationIntent} from './agent-routing.js'
 import {activeMovementHistory,assessBackofficeIntake,detectBackofficeStatusRequest,isStandaloneNewRequest} from './backoffice-routing.js'
 import {incidentContext} from './incident-routing.js'
 import {productIncidentContext} from './incident-product-routing.js'
@@ -40,10 +40,11 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
  if(isStandaloneNewRequest(text))return delegate('clara','new_topic')
  const previous=messages.at(-2)
  const delivered=previous?.direction==='outbound'&&previous.author==='agent'&&typeof previous.text==='string'?previous.text:''
- const prior=identifyOrchestrationProducts(delivered)
+ const offeredProduct=delivered.match(/^Posso encaminhar sua solicitação de (.+?) à equipe de /u)?.[1]||''
+ const prior=identifyOrchestrationProducts(offeredProduct)
  // Só uma oferta canônica realmente entregue no turno imediatamente anterior
  // pode ser usada para confirmar. Nunca confiar em texto do cliente como oferta.
- const offered=prior.length===1&&fold(delivered)===fold(offer(prior[0][0],prior[0][1]))?prior[0]:null
+ const offered=prior.length===1&&offeredProduct===prior[0][0]&&fold(delivered)===fold(offer(prior[0][0],prior[0][1]))?prior[0]:null
  const asked=fold(delivered)===fold(clarify)
  if(refusal.test(t)||negated.test(t)){
   if(offered||asked)return reply('Tudo bem, não farei o encaminhamento. Em que mais posso ajudar?')
