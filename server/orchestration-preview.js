@@ -44,8 +44,9 @@ const products=[
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const yes=/^(?:sim|sim[,. ]+pode|pode|pode sim|pode encaminhar|pode transferir|autorizo|confirmo|claro|tudo bem|ok|por favor)[!., ]*$/
 const no=/^(?:nao|nao obrigado|nao obrigada|prefiro nao|agora nao|nao quero)[!., ]*$/
-const directHuman=t=>/\b(?:quero falar|preciso falar|me encaminhe|me transfira|pode encaminhar|pode transferir)\b.{0,100}\b(?:comercial|consultor|atendente|humano|especialista)\b/.test(t)
-const emergency=t=>/\b(?:incendio|fogo|ferid[oa]s?|socorro|emergencia|urgencia|acidente|roubad[oa]|alagad[oa]|ransomware)\b/.test(t)&&!/\b(?:cotacao|cotar|contratar|cobertura para|seguro contra)\b/.test(t)
+const directHuman=t=>/\b(?:quero falar|preciso falar|posso falar|gostaria de falar|me encaminhe|me transfira|pode encaminhar|pode transferir)\b.{0,100}\b(?:comercial|consultor|atendente|humano|especialista)\b/.test(t)
+const actualDanger=t=>/\b(?:ha feridos|tem feridos|esta ferid[oa]|nao respira|inconsciente|dor no peito|falta de ar|pegou fogo|esta pegando fogo|preciso de socorro|socorro agora|sofri (?:um |uma )?acidente|acabei de sofrer|meu carro foi roubado|houve um principio de incendio|houve (?:um |uma )?(?:acidente|incendio)|fui assaltad[oa])\b/.test(t)
+const emergency=t=>actualDanger(t)||/\b(?:incendio|fogo|ferid[oa]s?|socorro|emergencia|urgencia|acidente|roubad[oa]|alagad[oa]|ransomware)\b/.test(t)&&!/\b(?:cotacao|cotar|contratar|cobertura para|seguro contra)\b/.test(t)
 const service=t=>/\b(?:sinistro|reembolso|boleto|fatura|carteirinha|negativa|autorizacao|internacao|cirurgia|segunda via|cancelamento|cancelar|guincho|movimentacao)\b/.test(t)
 const newTopic=t=>/^(?:outro assunto|tenho outra duvida|quero falar de outro assunto)[.! ]*$/.test(t)
 function identify(text){
@@ -76,7 +77,7 @@ export function previewDecision(state,message){
  if(current.phase==='closed')return result(current,'protocol_closed','Inicie um novo protocolo fictício para simular outro atendimento.')
  // Segurança e demandas operacionais precedem toda oferta comercial.
  if(emergency(t))return result(current,'safety_first','Prioridade à segurança. Este cenário deve seguir o fluxo de urgência e atendimento humano já existente.',reset)
- if(isAdministrativeMovementRequest(message)||service(t)||classifyConversationIntent(message)==='service'&&!directHuman(t))
+ if(isAdministrativeMovementRequest(message)||(service(t)&&classifyConversationIntent(message)!=='sales')||classifyConversationIntent(message)==='service'&&!directHuman(t))
   return result(current,'existing_service','Clara mantém o fluxo existente de relacionamento, identificação segura e encaminhamento operacional.',reset)
  if(newTopic(t))return result(current,'new_topic','Claro! Em que posso ajudar?',reset)
  if(current.phase==='offer_human'||current.phase==='offer_murilo'){
@@ -88,7 +89,7 @@ export function previewDecision(state,message){
     return {...result(current,'murilo_qualification','Murilo assume a qualificação comercial existente nesta simulação.',{phase:'murilo'}),agent:'murilo'}
   }
  }
- if(current.phase==='murilo'&&current.mode===MODES.CLARA_MURILO&&classifyConversationIntent(message)!=='sales')
+ if(current.phase==='murilo'&&current.mode===MODES.CLARA_MURILO)
   return {...result(current,'murilo_qualification','Murilo mantém a qualificação comercial existente nesta simulação.'),agent:'murilo'}
  const found=identify(message)
  const sales=classifyConversationIntent(message)==='sales'||directHuman(t)&&/\bcomercial\b/.test(t)||
