@@ -83,3 +83,18 @@ test('Fase 3: endpoint HTTP do Junior bloqueado na branch dedicada, antes da aut
   if(oldBranch===undefined)delete process.env.VERCEL_GIT_COMMIT_REF;else process.env.VERCEL_GIT_COMMIT_REF=oldBranch
  }
 })
+
+test('Fase 3: F3-07 acolhimento feminino nas duas entradas, aceite e limite seguro',async()=>{
+ const first=await run([user(auto)],both)
+ const history=[user(auto),bot(first.data.reply),user('Me chamo Alex')]
+ const named=await run(history,both)
+ assert.equal(named.status,200);assert.equal(named.data.agent,'clara')
+ assert.match(named.data.reply,/Obrigada, Alex!/);assert.match(named.data.reply,/Murilo/)
+ assert.doesNotMatch(named.data.reply,/Obrigado|Sou a Clara/)
+ assert.equal(named.data.humanHandoff,false)
+ const accepted=await run([...history,bot(named.data.reply),user('Sim')],both)
+ assert.equal(accepted.status,200);assert.equal(accepted.data.selectedAgent,'murilo')
+ assert.equal(accepted.data.action,'engine_boundary');assert.equal(accepted.data.executed,false)
+ const direct=await run([user('Me chamo Alex. Gostaria de cotar um seguro para meu carro.')],both)
+ assert.equal(direct.status,200);assert.match(direct.data.reply,/Obrigada, Alex!/);assert.doesNotMatch(direct.data.reply,/Obrigado/)
+})
