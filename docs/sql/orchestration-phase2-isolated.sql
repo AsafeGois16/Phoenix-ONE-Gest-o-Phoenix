@@ -1,9 +1,20 @@
--- PROPOSTA FASE 2. EXECUTAR APENAS EM PROJETO SUPABASE DE HOMOLOGAÇÃO ISOLADO.
+-- FASE 2: schema isolado de homologação no projeto existente. Não usar para operação real.
 -- Não é migration automática. Sem dados de clientes, mensagens ou prompts.
 begin;
 create schema phx_orch_test;
 revoke all on schema phx_orch_test from public, anon, authenticated;
-grant usage on schema phx_orch_test to service_role;
+grant usage on schema phx_orch_test to authenticated, service_role;
+create table phx_orch_test.allowed_admins (
+ user_id uuid primary key
+);
+-- Lista de acesso de homologação, sem alterar a tabela de origem.
+insert into phx_orch_test.allowed_admins(user_id)
+ select user_id from phoenix_one.admin_users where role in ('admin','owner');
+alter table phx_orch_test.allowed_admins enable row level security;
+revoke all on phx_orch_test.allowed_admins from public, anon, authenticated;
+grant select on phx_orch_test.allowed_admins to authenticated,service_role;
+create policy orch_admin_self on phx_orch_test.allowed_admins for select to authenticated
+ using (user_id=(select auth.uid()));
 create table phx_orch_test.settings (
  id boolean primary key default true check(id),
  mode text not null check(mode in ('clara_murilo','clara_only')),
@@ -29,18 +40,34 @@ alter table phx_orch_test.protocol_modes enable row level security;
 revoke all on all tables in schema phx_orch_test from public, anon, authenticated;
 grant select,update on phx_orch_test.settings to service_role;
 grant select,insert on phx_orch_test.revisions,phx_orch_test.protocol_modes to service_role;
+grant select on phx_orch_test.allowed_admins to authenticated;
+grant select,update on phx_orch_test.settings to authenticated;
+grant select,insert on phx_orch_test.revisions,phx_orch_test.protocol_modes to authenticated;
+create policy orch_settings_read on phx_orch_test.settings for select to authenticated
+ using (exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())));
+create policy orch_settings_write on phx_orch_test.settings for update to authenticated
+ using (exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())))
+ with check (exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())));
+create policy orch_revisions_read on phx_orch_test.revisions for select to authenticated
+ using (exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())));
+create policy orch_revisions_write on phx_orch_test.revisions for insert to authenticated
+ with check (actor=(select auth.uid()) and exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())));
+create policy orch_pins_read on phx_orch_test.protocol_modes for select to authenticated
+ using (exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())));
+create policy orch_pins_write on phx_orch_test.protocol_modes for insert to authenticated
+ with check (exists(select 1 from phx_orch_test.allowed_admins a where a.user_id=(select auth.uid())));
 
 create function public.phx_orch_test_get() returns jsonb
 language sql stable security invoker set search_path = ''
 as $$ select jsonb_build_object('mode',mode,'revision',revision)
-       from phx_orch_test.settings where id $$;
+       from phx_orch_test.settings where id $;
 
 create function public.phx_orch_test_set(p_mode text,p_expected_revision bigint,p_actor uuid) returns jsonb
 language plpgsql security invoker set search_path = ''
 as $$
 declare cur phx_orch_test.settings%rowtype;
 begin
- if p_mode is null or p_mode not in ('clara_murilo','clara_only') or p_actor is null or p_expected_revision is null then
+ if p_mode is null or p_mode not in ('clara_murilo','clara_only') or p_actor is null or p_actor is distinct from auth.uid() or p_expected_revision is null then
   raise exception 'invalid_configuration' using errcode='22023';
  end if;
  select * into strict cur from phx_orch_test.settings where id for update;
@@ -75,8 +102,8 @@ end $$;
 
 revoke all on function public.phx_orch_test_get() from public,anon,authenticated;
 revoke all on function public.phx_orch_test_set(text,bigint,uuid) from public,anon,authenticated;
-revoke all on function public.phx_orch_test_pin(uuid,boolean) from public,anon,authenticated;
-grant execute on function public.phx_orch_test_get() to service_role;
-grant execute on function public.phx_orch_test_set(text,bigint,uuid) to service_role;
-grant execute on function public.phx_orch_test_pin(uuid,boolean) to service_role;
+revoke all on function public.phx_orch_test_pin(uuid,boolean) from public,anon,authenticated,service_role;
+grant execute on function public.phx_orch_test_get() to authenticated;
+grant execute on function public.phx_orch_test_set(text,bigint,uuid) to authenticated;
+grant execute on function public.phx_orch_test_pin(uuid,boolean) to authenticated;
 commit;
