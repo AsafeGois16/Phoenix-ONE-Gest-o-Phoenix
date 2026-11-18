@@ -60,7 +60,7 @@ create policy orch_pins_write on phx_orch_test.protocol_modes for insert to auth
 create function public.phx_orch_test_get() returns jsonb
 language sql stable security invoker set search_path = ''
 as $$ select jsonb_build_object('mode',mode,'revision',revision)
-       from phx_orch_test.settings where id $;
+       from phx_orch_test.settings where id $$;
 
 create function public.phx_orch_test_set(p_mode text,p_expected_revision bigint,p_actor uuid) returns jsonb
 language plpgsql security invoker set search_path = ''
@@ -100,8 +100,8 @@ begin
  return jsonb_build_object('protocol_ref',p_protocol_ref,'mode',chosen,'revision',rev);
 end $$;
 
-revoke all on function public.phx_orch_test_get() from public,anon,authenticated;
-revoke all on function public.phx_orch_test_set(text,bigint,uuid) from public,anon,authenticated;
+revoke all on function public.phx_orch_test_get() from public,anon,authenticated,service_role;
+revoke all on function public.phx_orch_test_set(text,bigint,uuid) from public,anon,authenticated,service_role;
 revoke all on function public.phx_orch_test_pin(uuid,boolean) from public,anon,authenticated,service_role;
 grant execute on function public.phx_orch_test_get() to authenticated;
 grant execute on function public.phx_orch_test_set(text,bigint,uuid) to authenticated;
