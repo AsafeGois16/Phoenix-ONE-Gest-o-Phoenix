@@ -20,8 +20,9 @@ export default async function handler(req,res){
  if(!cfg)return send(res,503,{error:'isolated_environment_not_configured'})
  if(req.method!=='POST')return send(res,405,{error:'method_not_allowed'})
  try{
-  const connection=isolatedClient()
-  const actor=await authorizedAdmin(connection.client,cfg.admins,req.headers.authorization)
+  const connection=isolatedClient(process.env,req.headers.authorization)
+  if(!connection)return send(res,401,{error:'unauthorized'})
+  const actor=await authorizedAdmin(connection.client,req.headers.authorization)
   if(!actor)return send(res,401,{error:'unauthorized'})
   const store=centralStore(connection.client),body=req.body||{}
   if(body.action==='get')return send(res,200,await store.get())
