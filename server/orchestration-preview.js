@@ -49,7 +49,7 @@ const actualDanger=t=>/\b(?:ha feridos|tem feridos|esta ferid[oa]|nao respira|in
 const emergency=t=>actualDanger(t)||/\b(?:incendio|fogo|ferid[oa]s?|socorro|emergencia|urgencia|acidente|roubad[oa]|alagad[oa]|ransomware)\b/.test(t)&&!/\b(?:cotacao|cotar|contratar|cobertura para|seguro contra)\b/.test(t)
 const service=t=>/\b(?:sinistro|reembolso|boleto|fatura|carteirinha|negativa|autorizacao|internacao|cirurgia|segunda via|cancelamento|cancelar|guincho|movimentacao)\b/.test(t)
 const newTopic=t=>/^(?:outro assunto|tenho outra duvida|quero falar de outro assunto)[.! ]*$/.test(t)
-function identify(text){
+export function identifyOrchestrationProducts(text){
  // "Frota de carros" e "plano de saúde empresarial" não são dois produtos.
  const t=fold(text),found=products.filter(p=>p[2].test(t))
  if(found.some(p=>p[0]==='Frota'))return found.filter(p=>p[0]!=='Auto'&&p[0]!=='Moto')
@@ -82,16 +82,16 @@ export function previewDecision(state,message){
  if(newTopic(t))return result(current,'new_topic','Claro! Em que posso ajudar?',reset)
  if(current.phase==='offer_human'||current.phase==='offer_murilo'){
   if(no.test(t))return result(current,'declined','Tudo bem, não farei o encaminhamento. Em que mais posso ajudar?',reset)
-  if(yes.test(t)||directHuman(t)&&identify(t).length===0){
+  if(yes.test(t)||directHuman(t)&&identifyOrchestrationProducts(t).length===0){
    if(current.phase==='offer_human'&&current.mode===MODES.CLARA_ONLY&&TARGETS[current.target])
-    return {...result(current,'propose_handoff','Obrigado pela confirmação. Vou solicitar o encaminhamento à equipe responsável.',{phase:'closed'}),proposedTarget:current.target}
+    return {...result(current,'propose_handoff','Obrigada pela confirmação. Vou solicitar o encaminhamento à equipe responsável.',{phase:'closed'}),proposedTarget:current.target}
    if(current.phase==='offer_murilo'&&current.mode===MODES.CLARA_MURILO)
     return {...result(current,'murilo_qualification','Murilo assume a qualificação comercial existente nesta simulação.',{phase:'murilo'}),agent:'murilo'}
   }
  }
  if(current.phase==='murilo'&&current.mode===MODES.CLARA_MURILO)
   return {...result(current,'murilo_qualification','Murilo mantém a qualificação comercial existente nesta simulação.'),agent:'murilo'}
- const found=identify(message)
+ const found=identifyOrchestrationProducts(message)
  const sales=classifyConversationIntent(message)==='sales'||directHuman(t)&&/\bcomercial\b/.test(t)||
   /\b(?:quero|gostaria|tenho interesse)\b.{0,50}\b(?:plano de saude|seguro|odonto)\b/.test(t)
  const clarifying=current.phase==='clarify_product'
