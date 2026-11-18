@@ -81,19 +81,19 @@ test('Fase 2: ajuste editorial mantém o simulador homologado',()=>{
  const r=previewDecision(newPreviewProtocol(MODES.CLARA_ONLY),auto)
  assert.match(previewDecision(r.state,'Sim').reply,/Obrigada pela confirmação/)
 })
-test('Fase 2: isolamento exige preview, branch, flag, ref não produtivo e admin autorizado',()=>{
- const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'feat/orquestracao-agentes-fase2-preview',PHX_ORCH_TEST_ENABLED:'true',PHX_ORCH_TEST_REF:'abcdefghijklmnopqrst',PHX_ORCH_TEST_SERVICE_ROLE_KEY:'fixture-key',PHX_ORCH_TEST_ADMIN_IDS:actor}
- assert.equal(isolatedConfig(env).url,'https://abcdefghijklmnopqrst.supabase.co')
- for(const change of [{VERCEL_ENV:'production'},{VERCEL_GIT_COMMIT_REF:'main'},{PHX_ORCH_TEST_ENABLED:'false'},{PHX_ORCH_TEST_REF:'cxyxrhmpjehrqhwihxul'},{PHX_ORCH_TEST_REF:'example.com'},{PHX_ORCH_TEST_ADMIN_IDS:''},{PHX_ORCH_TEST_SERVICE_ROLE_KEY:''}]){
+test('Fase 2: isolamento exige preview específico, flag e chave publicável do projeto autorizado',()=>{
+ const env={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'feat/orquestracao-agentes-fase2-preview',PHX_ORCH_TEST_ENABLED:'true',VITE_SUPABASE_URL:'https://cxyxrhmpjehrqhwihxul.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'}
+ assert.equal(isolatedConfig(env).url,env.VITE_SUPABASE_URL)
+ for(const change of [{VERCEL_ENV:'production'},{VERCEL_GIT_COMMIT_REF:'main'},{PHX_ORCH_TEST_ENABLED:'false'},{VITE_SUPABASE_URL:'https://example.com'},{VITE_SUPABASE_PUBLISHABLE_KEY:'sb_secret_fixture'},{VITE_SUPABASE_PUBLISHABLE_KEY:''}]){
   assert.equal(isolatedConfig({...env,...change}),null)
  }
 })
-test('Fase 2: autorização exige usuário realmente validado e presente na allowlist',async()=>{
- const client={auth:{getUser:async token=>({data:{user:{id:actor}},error:token==='valid'?null:{message:'invalid'}})}}
- assert.equal(await authorizedAdmin(client,[actor],'Bearer valid'),actor)
- assert.equal(await authorizedAdmin(client,[],'Bearer valid'),null)
- assert.equal(await authorizedAdmin(client,[actor],'Bearer invalid'),null)
- assert.equal(await authorizedAdmin(client,[actor],'Basic valid'),null)
+test('Fase 2: autorização requer sessão validada e permissão RLS do schema',async()=>{
+ const client={auth:{getUser:async token=>({data:{user:{id:actor}},error:token==='valid'?null:{message:'invalid'}})},rpc:async()=>({data:{mode:'clara_murilo',revision:1}})}
+ assert.equal(await authorizedAdmin(client,'Bearer valid'),actor)
+ assert.equal(await authorizedAdmin({...client,rpc:async()=>({data:null})},'Bearer valid'),null)
+ assert.equal(await authorizedAdmin(client,'Bearer invalid'),null)
+ assert.equal(await authorizedAdmin(client,'Basic valid'),null)
 })
 test('Fase 2: persistência central usa RPCs específicos e não aceita revisão falsa ou pin divergente',async()=>{
  const calls=[],client={rpc:async(name,args)=>{calls.push([name,args]);return {data:{mode:'clara_murilo',revision:1, ...(name.endsWith('_pin')?{protocol_ref:protocol}:{})},error:null}}}
