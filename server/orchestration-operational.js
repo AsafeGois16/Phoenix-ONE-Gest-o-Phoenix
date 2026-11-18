@@ -40,12 +40,14 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
  if(isStandaloneNewRequest(text))return delegate('clara','new_topic')
  const previous=messages.at(-2)
  const delivered=previous?.direction==='outbound'&&previous.author==='agent'&&typeof previous.text==='string'?previous.text:''
- const offeredProduct=delivered.match(/^Posso encaminhar sua solicitação de (.+?) à equipe de /u)?.[1]||''
+ // A apresentação única do handler pode anteceder a oferta canônica.
+ const offerText=delivered.replace(/^Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance\. 💙\s*/u,'')
+ const offeredProduct=offerText.match(/^Posso encaminhar sua solicitação de (.+?) à equipe de /u)?.[1]||''
  const prior=identifyOrchestrationProducts(offeredProduct)
  // Só uma oferta canônica realmente entregue no turno imediatamente anterior
  // pode ser usada para confirmar. Nunca confiar em texto do cliente como oferta.
- const offered=prior.length===1&&offeredProduct===prior[0][0]&&fold(delivered)===fold(offer(prior[0][0],prior[0][1]))?prior[0]:null
- const asked=fold(delivered)===fold(clarify)
+ const offered=prior.length===1&&offeredProduct===prior[0][0]&&fold(offerText)===fold(offer(prior[0][0],prior[0][1]))?prior[0]:null
+ const asked=fold(offerText)===fold(clarify)
  if(refusal.test(t)||negated.test(t)){
   if(offered||asked)return reply('Tudo bem, não farei o encaminhamento. Em que mais posso ajudar?')
   return delegate('clara','no_commercial_consent')
