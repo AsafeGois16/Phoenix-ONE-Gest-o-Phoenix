@@ -16,7 +16,7 @@ const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLo
 const yes=/^(?:sim|sim[, ]+pode|pode|pode sim|pode encaminhar|pode transferir|confirmo|autorizo|tudo bem|pode ser|com certeza)[!. ]*$/
 const refusal=/^(?:nao|prefiro nao|agora nao|nem pensar|dispenso)\b/
 const negated=/\b(?:nao (?:quero|preciso|gostaria|pode|autorizo)|sem encaminhar|nao me transfira|nao me encaminhe)\b/
-const direct=/^(?:por favor[, ]+)?(?:quero falar com|preciso falar com|gostaria de falar com|me encaminhe (?:ao|para o|para a)|me transfira (?:ao|para o|para a))\s+(?:(?:a |o )?(?:equipe|setor|departamento) (?:do |de )?)?(?:comercial|consultor(?:a)? humano(?:a)?)\b/
+const direct=/^(?:por favor[, ]+)?(?:quero falar com|preciso falar com|gostaria de falar com|me encaminhe (?:ao|para o|para a)|me transfira (?:ao|para o|para a))\s+(?:a |o )?(?:(?:equipe|setor|departamento) (?:do |de )?)?(?:comercial|consultor(?:a)? humano(?:a)?)\b/
 const urgent=/\b(?:nao respira|inconsciente|dor no peito|falta de ar|ha feridos|tem feridos|pegou fogo|esta pegando fogo|preciso de socorro|socorro agora|sofri (?:um |uma )?acidente|meu carro foi roubado|houve (?:um principio de )?incendio)\b/
 const clarify='Qual produto de seguro ou benefício você deseja avaliar?'
 const offer=(product,target)=>'Posso encaminhar sua solicitação de '+product+' à equipe de '+TARGETS[target]+' para continuar o atendimento?'
