@@ -2,6 +2,7 @@ import React,{useState} from 'react'
 import {ArrowRight,Settings2,ShieldCheck,FlaskConical,RefreshCcw,Send} from 'lucide-react'
 import {MODES,DEFAULT_MODE,TARGETS,readPreviewMode,savePreviewMode,newPreviewProtocol,previewDecision} from '../server/orchestration-preview.js'
 import './orchestration-preview.css'
+import OrchestrationCentralPreview from './OrchestrationCentralPreview.jsx'
 
 const label=mode=>mode===MODES.CLARA_ONLY?'Somente Clara':'Clara + Murilo'
 const samples=[
@@ -64,6 +65,7 @@ export default function OrchestrationPreview(){
    {last&&<div className="orch-result" role="status"><b>{decisions[last.decision]||last.decision}</b><div className="orch-result-grid"><div><small>Agente</small><strong>{last.agent==='murilo'?'Murilo':'Clara'}</strong></div><div><small>Produto</small><strong>{last.state.product||'Não definido'}</strong></div><div><small>Destino lógico</small><strong>{TARGETS[last.proposedTarget]||'Sem transferência'}</strong></div></div><p>{last.reply}</p><small>Transferência real: não executada.</small></div>}
    {history.length>0&&<div className="orch-history"><h4>Histórico local da simulação</h4>{history.map((h,i)=><div key={i}><small>Cliente fictício</small><p>{h.text}</p><small>{h.decision.agent==='clara'?'Clara':'Murilo'} · {decisions[h.decision.decision]||h.decision.decision}</small><p>{h.decision.reply}</p></div>)}</div>}
   </section>
-  <section className="ops-paper"><h3>Limites da Fase 1</h3><p>Prompts e RAGs intocados. A opção Somente Clara não faz a qualificação do Murilo. A vinculação das filas reais, configuração central e ativação da API operacional ficam para uma próxima fase, após homologação.</p></section>
+  <section className="ops-paper"><h3>Limites do simulador local</h3><p>Prompts e RAGs intocados. A opção Somente Clara não faz a qualificação do Murilo. O simulador local não altera a configuração central. A integração com filas reais permanece desativada.</p></section>
+  <OrchestrationCentralPreview/>
  </div>
 }
