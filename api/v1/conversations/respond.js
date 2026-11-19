@@ -21,6 +21,8 @@ import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHisto
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
+import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
+
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
 const formatSchema={
@@ -105,6 +107,7 @@ function isSimpleGreeting(text){
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store')
  if(req.method!=='POST')return jsonResponse(res,405,{error:'method_not_allowed'})
+ if(process.env.VERCEL_ENV==='preview'&&process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase3-preview')return jsonResponse(res,503,{error:'operational_preview_disabled'})
  if(!process.env.PHOENIX_ONE_TOKEN)return jsonResponse(res,503,{error:'integration_token_not_configured'})
  if(!authenticateJunior(req))return jsonResponse(res,401,{error:'unauthorized'})
  const body=req.body
@@ -112,15 +115,28 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'invalid_contract_payload'}))
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
+ return respondValidated(body,res)
+}
+// Entrada interna de teste; o pin nunca é lido do payload Junior.
+export async function runOrchestrationPreview(body,pin,res){
+ if(!checkPayload(body))return jsonResponse(res,400,{error:'invalid_contract_payload'})
+ return respondValidated(body,res,{pin,previewOnly:true})
+}
+async function respondValidated(body,res,context=null){
+ const simulation=context?.previewOnly===true
+ const plan=context?operationalRouting({pin:context.pin,body,verifiedRoutes:LEGACY_COMMERCIAL_ROUTES}):null
+ const claraOnly=context?.pin?.mode==='clara_only'
+ if(plan?.action==='blocked')return jsonResponse(res,409,{error:plan.reason})
  // Reaberturas e retornos do Backoffice devem iniciar um novo assunto;
  // histórico completo continua disponível no Junior, sem reviver triagem encerrada.
  const activeMessages=activeMovementHistory(body.messages)
- let agent=selectAgent({...body,messages:activeMessages})
+ let agent=claraOnly?'clara':selectAgent({...body,messages:activeMessages})
  const last=body.messages.at(-1)
  // Pedido REAL de inclusão/exclusão durante uma cotação tem prioridade
  // sobre palavras como "cotação" e qualquer hint comercial do Junior.
  if(isAdministrativeMovementRequest(last?.text)||incidentContext(activeMessages)||productIncidentContext(activeMessages))agent='clara'
  let introTask=null
+ let routeType='legacy'
  const replyToJunior=async payload=>{
   // Only confirmed outbound introductions are stored. A proposal in Sugestão
   // mode must not be treated as delivered until Junior reports it in history.
@@ -152,11 +168,11 @@ export default async function handler(req,res){
   // Não exigir aceite adicional de algo cujo conteúdo a IA não conhece.
   // Benefícios: Saúde, Odonto, Vida e correlatos têm Backoffice como fila humana.
   // Não remapear áudios: o destino do áudio sem transcrição vem do Junior.
-  if(!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
-  if(!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
-  if(!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
-  if(!isAudioOnlyNotice(last))payload=enrichProductIncidentHandoff(payload,activeMessages)
-  if(!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
+  if(routeType!=='direct_commercial'&&!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
+  if(routeType!=='direct_commercial'&&!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
+  if(routeType!=='direct_commercial'&&!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
+  if(routeType!=='direct_commercial'&&!isAudioOnlyNotice(last))payload=enrichProductIncidentHandoff(payload,activeMessages)
+  if(routeType!=='direct_commercial'&&!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
@@ -171,10 +187,14 @@ export default async function handler(req,res){
   if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
   // MegaBrain observação OPCIONAL e isolada: desligada por padrão.
   // Não altera a mensagem retornada, os roteamentos nem as operações do Junior.
+  if(!simulation){
   if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
    await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
   }
-  return jsonResponse(res,200,{...payload,reply:hideIdentifierPlaceholders(redact(safeText(reply,1800)))})
+ }
+  const cleanReply=hideIdentifierPlaceholders(redact(safeText(reply,1800)))
+   if(simulation)return jsonResponse(res,200,{action:routeType==='direct_commercial'?plan.action:'engine_response',agent:payload.agent,selectedAgent:agent,reply:cleanReply,product:plan?.product||null,logicalTarget:plan?.logicalTarget||null,proposedDepartment:payload.handoff?.department||null,proposedHandoff:routeType==='direct_commercial'&&payload.humanHandoff===true?{department:payload.handoff.department,...(payload.handoff.intent==='nova_cotacao'?{intent:'nova_cotacao'}:{}),reason:payload.handoff.reason,summary:payload.handoff.summary}:null,humanHandoff:false,handoff:null,executed:false,previewOnly:true,engineStage:routeType})
+   return jsonResponse(res,200,{...payload,reply:cleanReply})
  }
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
@@ -190,7 +210,7 @@ export default async function handler(req,res){
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const observed=observedAgentIntroductions(body.messages)
- introTask=bridge('intro_status',{
+ introTask=simulation?Promise.resolve({blocked:false,clara_apresentada:observed.clara,murilo_apresentado:observed.murilo}):bridge('intro_status',{
   conversationId:body.conversation_id,protocolo:body.protocolo,
   observedClara:observed.clara,observedMurilo:observed.murilo
  },AbortSignal.timeout(2800)).catch(e=>{
@@ -215,6 +235,11 @@ export default async function handler(req,res){
  // Quando o próprio cliente já apresentou o documento para um serviço,
  // não bloquear a validação para pedir nome nem descartar o documento.
  const documentArrival=documentContinuationState(activeMessages,agent)
+ // Nova venda identificada não percorre a qualificação legada.
+ if(plan&&plan.action!=='delegate'&&!documentArrival&&!introState?.blocked){
+   routeType='direct_commercial'
+   return replyToJunior({agent:'clara',reply:plan.reply,humanHandoff:plan.humanHandoff===true,handoff:plan.handoff||null})
+ }
  const intake=introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
@@ -265,7 +290,8 @@ export default async function handler(req,res){
      reply:document.status==='multiple'?'Para sua segurança, informe apenas um CPF ou CNPJ do titular do plano.':'O documento informado não passou na validação de formato. Pode conferir e enviar novamente o CPF ou CNPJ do titular?',
      humanHandoff:false,handoff:null})
    const proof=extractVerificationProof(activeMessages,document.type)
-   let verification
+   if(simulation)return jsonResponse(res,200,{action:'engine_boundary',reason:'identity_verification_required',agent:'clara',selectedAgent:agent,humanHandoff:false,handoff:null,executed:false,previewOnly:true})
+    let verification
    try{
      verification=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
    }catch{verification={status:'unavailable'}}
@@ -307,6 +333,7 @@ export default async function handler(req,res){
    console.info('phoenix_backoffice_intake',JSON.stringify({category:backoffice.type,stage:backoffice.stage||'status_handoff',handoff:shouldTransfer}))
    return replyToJunior({agent:'clara',reply:backoffice.reply,humanHandoff:shouldTransfer,handoff:shouldTransfer?{department:backoffice.department,reason:backoffice.reason,summary:backoffice.summary}:null})
  }
+ if(simulation)return jsonResponse(res,200,{action:'engine_boundary',reason:'model_or_identity_context_not_called',agent,selectedAgent:agent,humanHandoff:false,handoff:null,executed:false,previewOnly:true})
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)
  const start=performance.now()
  const timing={knowledgeMs:0,identityMs:0,modelMs:0}
@@ -318,7 +345,7 @@ export default async function handler(req,res){
   // O bridge deve receber a intenção efetiva do histórico (e não somente
   // a palavra solta da última mensagem), para carregar o prompt do Murilo.
   const lastIntent=classifyConversationIntent(last.text)
-  const effectiveIntent=lastIntent!=='neutral'?lastIntent:
+  const effectiveIntent=claraOnly?'service':lastIntent!=='neutral'?lastIntent:
     hasExplicitConversationIntent(activeMessages)?(agent==='murilo'?'sales':'service'):'neutral'
   const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:effectiveIntent,suggestedAgent:agent}
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
@@ -465,7 +492,8 @@ export default async function handler(req,res){
   if(resultKnowledge.error)throw resultKnowledge.error
   const knowledge=resultKnowledge.data
   // Intenção explícita tem prioridade; na continuidade neutra o estado preservado por protocolo decide.
-  if(!hasExplicitConversationIntent(activeMessages)&&(knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
+  if(claraOnly&&knowledge.agent!=='clara')return jsonResponse(res,503,{error:'orchestration_agent_mismatch'})
+   if(!claraOnly&&!hasExplicitConversationIntent(activeMessages)&&(knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
     agent=knowledge.agent
     console.info('phoenix_agent_orchestration',JSON.stringify({event:'agent_continuity',agent}))
   }
