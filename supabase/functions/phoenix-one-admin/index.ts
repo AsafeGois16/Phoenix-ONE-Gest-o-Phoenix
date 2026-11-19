@@ -65,7 +65,7 @@ Deno.serve(async req=>{
        await tx.unsafe("select pg_advisory_xact_lock(hashtext('phoenix-orchestration-pilot'))")
        const old=(await tx.unsafe("select mode,revision,cutoff::text from phoenix_one.orchestration_pilot_settings where id=true"))[0]
        if(!old||old.revision!==request.revision)return null
-       return (await tx.unsafe("update phoenix_one.orchestration_pilot_settings set mode=$1,revision=revision+1,cutoff=case when $1='clara_only' and cutoff is null then (now() at time zone 'America/Sao_Paulo')::date+1 else cutoff end where id=true returning mode,revision,cutoff::text",[request.mode]))[0]
+       return (await tx.unsafe("update phoenix_one.orchestration_pilot_settings set mode=$1,revision=revision+1,cutoff=null where id=true and revision=$2 returning mode,revision,cutoff::text",[request.mode,request.revision]))[0]
      })
      if(!result)return respond(409,{error:'pilot_revision_conflict'})
      return respond(200,result)

@@ -1,6 +1,7 @@
 import {protocolBase} from './orchestration-protocol-strategy.js'
 // Global selection on the existing API. Explicit false is emergency rollback.
-// The default for protocols is still dual, stored by the authenticated Bridge.
+// The authenticated Bridge reads the current global mode on every request.
+// No fixed protocol pin or date cutoff is used in the official operation.
 export async function resolvePilotMode(body,env,bridge,observed={}){
  if(env.VERCEL_ENV!=='production'||env.PHX_ORCHESTRATION_PILOT_ENABLED==='false')return null
  if(body.mode==='desligado'||body.messages?.at(-1)?.direction!=='inbound'||body.messages?.at(-1)?.author!=='contact'||!body.messages.at(-1)?.text?.trim())return null

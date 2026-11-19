@@ -57,7 +57,7 @@ Deno.serve(async request=>{
   if(data.action==='orchestration_pilot_pin'){
    const ticket=data.protocolo,conversation=data.conversationId
    if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}(-[1-9]\d*)?$/.test(ticket)||typeof data.observedClara!=='boolean'||typeof data.observedMurilo!=='boolean')return reply(400,{error:'invalid_pilot_protocol'})
-   const base=ticket.slice(0,13),day=base.slice(0,8)
+   const base=ticket.slice(0,13)
    const result=await pg.begin(async tx=>{
     await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-orchestration:'+base])
     await tx.unsafe('select pg_advisory_xact_lock(hashtext($1))',['phoenix-one:'+ticket])
@@ -65,18 +65,10 @@ Deno.serve(async request=>{
     const previous=(await tx.unsafe("select conversation_id::text,stage from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1",[ticket]))[0]
     if(previous&&previous.conversation_id!==conversation)return {blocked:true,reason:'protocol_conversation_mismatch'}
     if(['assigned','resolved'].includes(previous?.stage))return {blocked:true,reason:'protocol_not_with_agent'}
-    let pin=(await tx.unsafe("select mode,revision from phoenix_one.orchestration_pilot_pins where base=$1",[base]))[0]
-    if(!pin){
-     const settings=(await tx.unsafe("select mode,revision,cutoff::text from phoenix_one.orchestration_pilot_settings where id=true for share"))[0]
-     if(!settings)throw Error('pilot_settings_missing')
-     const afterCutoff=Boolean(settings.cutoff&&day>=settings.cutoff.replaceAll('-',''))
-     const historical=Boolean(previous)||(await tx.unsafe("select 1 from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 limit 1",[base])).length>0
-     const eligible=afterCutoff&&ticket===base&&!historical&&!data.observedMurilo&&!data.observedClara
-     pin={mode:eligible?settings.mode:'clara_murilo',revision:eligible?settings.revision:1}
-     // Before the first cutoff, date guarantees legacy behavior. Only persist
-     // post-cutoff pins (including unknown derived bases) indefinitely.
-     if(afterCutoff)await tx.unsafe("insert into phoenix_one.orchestration_pilot_pins(base,mode,revision) values($1,$2,$3)",[base,pin.mode,pin.revision])
-    }
+    // Global real-time mode: one committed snapshot per request, including open
+    // and derived protocols. Historical pins remain untouched for rollback/audit.
+    const pin=(await tx.unsafe("select mode,revision from phoenix_one.orchestration_pilot_settings where id=true for share"))[0]
+    if(!pin||!['clara_only','clara_murilo'].includes(pin.mode)||!Number.isSafeInteger(pin.revision)||pin.revision<1)throw Error('pilot_settings_missing')
     const saved=await tx.unsafe("insert into phoenix_one.protocol_agent_state(source_system,external_ticket_id,conversation_id,clara_apresentada,murilo_apresentado,expires_at) values('junior_management',$1,$2::uuid,$3,$4,now()+interval '7 days') on conflict(source_system,external_ticket_id) do update set clara_apresentada=phoenix_one.protocol_agent_state.clara_apresentada or excluded.clara_apresentada,murilo_apresentado=phoenix_one.protocol_agent_state.murilo_apresentado or excluded.murilo_apresentado,updated_at=now(),expires_at=now()+interval '7 days' returning clara_apresentada,murilo_apresentado",[ticket,conversation,data.observedClara,data.observedMurilo])
     return {...pin,blocked:false,clara_apresentada:saved[0].clara_apresentada,murilo_apresentado:saved[0].murilo_apresentado}
    })
