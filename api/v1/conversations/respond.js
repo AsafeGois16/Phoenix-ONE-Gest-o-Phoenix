@@ -116,7 +116,7 @@ export default async function handler(req,res){
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
  let pin=null
- try{pin=await resolvePilotMode(body,process.env,bridge)}catch{return jsonResponse(res,503,{error:'orchestration_pilot_unavailable'})}
+ try{pin=await resolvePilotMode(body,process.env,bridge,observedAgentIntroductions(body.messages))}catch{return jsonResponse(res,503,{error:'orchestration_pilot_unavailable'})}
  return respondValidated(body,res,pin)
 }
 export async function respondValidated(body,res,pin=null){
@@ -204,7 +204,7 @@ export async function respondValidated(body,res,pin=null){
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const observed=observedAgentIntroductions(body.messages)
- introTask=bridge('intro_status',{
+ introTask=pin?.intro?Promise.resolve(pin.intro):bridge('intro_status',{
   conversationId:body.conversation_id,protocolo:body.protocolo,
   observedClara:observed.clara,observedMurilo:observed.murilo
  },AbortSignal.timeout(2800)).catch(e=>{
