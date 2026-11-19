@@ -192,7 +192,9 @@ export async function respondValidated(body,res,pin=null){
   if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
    await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
   }
-  return jsonResponse(res,200,{...payload,reply:hideIdentifierPlaceholders(redact(safeText(reply,1800)))})
+  // Optional metadata from the validated server snapshot, not the model or caller.
+  // If no strategy was consulted, omit it rather than presenting stale information.
+  return jsonResponse(res,200,{...payload,reply:hideIdentifierPlaceholders(redact(safeText(reply,1800))),...(['clara_only','clara_murilo'].includes(pin?.mode)?{strategy:pin.mode}:{})})
  }
  if(body.mode==='desligado'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'mode_disabled',agent}))
