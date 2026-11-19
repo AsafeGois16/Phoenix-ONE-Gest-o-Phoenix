@@ -38,6 +38,7 @@ export default function IntegrationsAdmin(){
        [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[checking,setChecking]=useState(false),
        [profile,setProfile]=useState(null),[url,setUrl]=useState(''),[scopes,setScopes]=useState([]),
        [notice,setNotice]=useState(''),[noticeError,setNoticeError]=useState(false),[testConversation,setTestConversation]=useState(''),[apiToken,setApiToken]=useState(''),[showApiToken,setShowApiToken]=useState(false)
+ const [pilot,setPilot]=useState(null),[pilotBusy,setPilotBusy]=useState(false)
  const ready=Boolean(client)
  const adminEndpoint=useMemo(()=>supaUrl?supaUrl+'/functions/v1/phoenix-one-admin':'',[])
  const setFeedback=(message,error=false)=>{setNotice(message);setNoticeError(error)}
@@ -53,6 +54,7 @@ export default function IntegrationsAdmin(){
    setChecking(true)
    try{
       const status=await call('status',{},s)
+      setPilot(await call('orchestration_pilot_status',{},s).catch(()=>null))
       setProfile(status);setUrl(status.connection.apiBaseUrl||'');setScopes(status.connection.scopes||'')
       setFeedback('')
    }catch(e){setProfile(null);setFeedback(translate(e.message),true)}
@@ -90,6 +92,12 @@ export default function IntegrationsAdmin(){
      setFeedback(data.ok?'Teste concluído: '+data.note:translate(data.reason||data.error),!data.ok)
    }catch(e){setFeedback(translate(e.message),true)}finally{setChecking(false)}
  }
+ const setPilotMode=async mode=>{
+   if(!pilot)return
+   setPilotBusy(true)
+   try{setPilot(await call('orchestration_pilot_set',{mode,revision:pilot.revision}));setFeedback('Estratégia registrada. A liberação depende do número de teste autorizado no servidor.')}
+   catch(e){setFeedback(translate(e.message),true)}finally{setPilotBusy(false)}
+ }
  const state=profile?.connection?.state||'disabled'
  const credentialsSaved=Boolean(profile?.connection?.apiBaseUrl&&profile?.secretConfigured)
  const verifiedConnection=Boolean(profile?.connection?.lastTestAt&&['testing','active'].includes(state))
@@ -111,6 +119,7 @@ export default function IntegrationsAdmin(){
    !profile?<div className="one-int-panel"><h3>Validando permissão</h3><p>Você está autenticado, mas o serviço ainda não confirmou sua função de administrador.</p><button className="one-int-secondary" onClick={()=>reload()} disabled={checking}><RefreshCcw size={16}/> Revalidar</button><button className="one-int-secondary" onClick={logout}>Sair</button></div>:
    <>
     <div className="one-int-adminbar"><span><UserRound size={16}/> Administração autorizada no Phoenix ONE</span><div><button className="one-int-secondary" onClick={()=>reload()} disabled={checking}><RefreshCcw size={15}/> Atualizar</button><button className="one-int-secondary" onClick={logout}>Sair</button></div></div>
+    {pilot&&<div className="one-int-panel"><h3>Orquestração de agentes — piloto</h3><p>Somente para o número autorizado no servidor. Protocolos existentes preservam sua estratégia. Primeira ativação a partir da meia-noite de Brasília.</p><p>Modo: <strong>{pilot.mode==='clara_only'?'Somente Clara':'Clara + Murilo'}</strong> · revisão {pilot.revision} · corte {pilot.cutoff||'não definido'}</p><div><button type="button" className="one-int-secondary" disabled={pilotBusy||pilot.mode==='clara_murilo'} onClick={()=>setPilotMode('clara_murilo')}>Clara + Murilo</button> <button type="button" className="one-int-secondary" disabled={pilotBusy||pilot.mode==='clara_only'} onClick={()=>setPilotMode('clara_only')}>Somente Clara</button></div></div>}
     <form className="one-int-panel one-int-form" onSubmit={save}>
        <div className="one-int-heading"><div><h3>Conector · Sistema de Gestão do Junior</h3><p>Insira a URL da função do Junior e seu PHOENIX_ONE_API_TOKEN em campo protegido. A chave ficará somente no Vault criptografado do Supabase.</p></div><span className={'one-int-state'+(verifiedConnection?' is-tested':credentialsSaved?' is-configured':'')}>{connectionLabel}</span></div>
        <label>URL base da API HTTPS<input value={url} type="url" maxLength={255} onChange={e=>setUrl(e.target.value)} placeholder="https://SEU-PROJETO.supabase.co/functions/v1/phoenix-one-api/v1"/></label>

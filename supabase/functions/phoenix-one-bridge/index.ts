@@ -54,6 +54,24 @@ Deno.serve(async request=>{
   if(!await authenticate(token))return reply(401,{error:'bridge_unauthorized'})
   const data=await request.json().catch(()=>null)
   if(!data||typeof data!=='object')return reply(400,{error:'invalid_json'})
+  if(data.action==='orchestration_pilot_pin'){
+   const ticket=data.protocolo,conversation=data.conversationId
+   if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}(-[1-9]\d*)?$/.test(ticket))return reply(400,{error:'invalid_pilot_protocol'})
+   const base=ticket.slice(0,13),day=base.slice(0,8)
+   const result=await pg.begin(async tx=>{
+    await tx.unsafe("select pg_advisory_xact_lock(hashtext('phoenix-orchestration-pilot'))")
+    const settings=(await tx.unsafe("select mode,revision,cutoff::text from phoenix_one.orchestration_pilot_settings where id=true"))[0]
+    if(!settings)throw Error('pilot_settings_missing')
+    const old=(await tx.unsafe("select mode,revision from phoenix_one.orchestration_pilot_pins where base=$1",[base]))[0]
+    if(old)return {mode:old.mode,revision:old.revision}
+    const historical=(await tx.unsafe("select 1 from phoenix_one.protocol_agent_state where source_system='junior_management' and external_ticket_id=$1 limit 1",[base])).length>0
+    const eligible=ticket===base&&!historical&&settings.cutoff&&day>=settings.cutoff.replaceAll('-','')
+    const mode=eligible?settings.mode:'clara_murilo',revision=eligible?settings.revision:1
+    await tx.unsafe("insert into phoenix_one.orchestration_pilot_pins(base,mode,revision) values($1,$2,$3)",[base,mode,revision])
+    return {mode,revision}
+   })
+   return reply(200,result)
+  }
   if(data.action==='intro_status'){
    const ticket=data.protocolo,conversation=data.conversationId
    if(!uuid(conversation)||typeof ticket!=='string'||!/^\d{8}-\d{4}(?:-[1-9]\d*)?$/.test(ticket)||

@@ -54,6 +54,22 @@ Deno.serve(async req=>{
    if(!['admin','owner'].includes(matched[0].role))return respond(403,{error:'admin_permission_required'})
    const request=await req.json().catch(()=>({}))
    const action=request.action
+   if(action==='orchestration_pilot_status'){
+     const row=(await sql.unsafe("select mode,revision,cutoff::text from phoenix_one.orchestration_pilot_settings where id=true"))[0]
+     if(!row)return respond(503,{error:'pilot_not_configured'})
+     return respond(200,row)
+   }
+   if(action==='orchestration_pilot_set'){
+     if(!['clara_only','clara_murilo'].includes(request.mode)||!Number.isSafeInteger(request.revision))return respond(400,{error:'invalid_pilot_settings'})
+     const result=await sql.begin(async tx=>{
+       await tx.unsafe("select pg_advisory_xact_lock(hashtext('phoenix-orchestration-pilot'))")
+       const old=(await tx.unsafe("select mode,revision,cutoff::text from phoenix_one.orchestration_pilot_settings where id=true"))[0]
+       if(!old||old.revision!==request.revision)return null
+       return (await tx.unsafe("update phoenix_one.orchestration_pilot_settings set mode=$1,revision=revision+1,cutoff=case when $1='clara_only' and cutoff is null then (now() at time zone 'America/Sao_Paulo')::date+1 else cutoff end where id=true returning mode,revision,cutoff::text",[request.mode]))[0]
+     })
+     if(!result)return respond(409,{error:'pilot_revision_conflict'})
+     return respond(200,result)
+   }
    if(action==='status'){
      const list=await sql.unsafe("select provider,state,api_base_url,granted_scopes,last_sync_at,updated_at from phoenix_one.integration_connections where provider='junior_management'")
      const rec=list[0]||{}

@@ -193,3 +193,41 @@ test('cliente informa que NÃO está em local seguro: nunca avançar para identi
   assert.doesNotMatch(result.reply,/CPF|CNPJ|informar documento/i,reply)
  }
 })
+
+
+test('F4-06: expressões coloquiais de colisão real acionam segurança',()=>{
+ for(const text of ['Acabei de bater meu carro. Preciso de ajuda.','Bati o carro.','Colidi com outro veículo.','Sofri uma batida.','Bateram no meu carro.','Um veículo bateu no meu carro.']){
+  assert.equal(isIncidentReport(text),true,text)
+  const d=incidentFirstSafetyDecision([inc(text)])
+  assert.equal(d.agent,'clara');assert.equal(d.humanHandoff,false)
+  assert.match(d.reply,/local seguro/i);assert.doesNotMatch(d.reply,/CPF|CNPJ/)
+ }
+})
+test('F4-06: hipótese de colisão ou negação não é novo sinistro',()=>{
+ for(const text of ['Quero cotar seguro Auto se eu bater meu carro.','Se baterem no meu carro, quanto custa o seguro?','Não acabei de bater meu carro.','Não bateram no meu carro.']){
+  assert.equal(isIncidentReport(text),false,text)
+ }
+})
+test('F4-06: pessoas seguras, veículo ainda não confirmado: perguntar somente sobre veículo',()=>{
+ const text='Acabei de bater meu carro. Preciso de ajuda.'
+ const first=incidentFirstSafetyDecision([inc(text)])
+ const history=[inc(text),out(first.reply),inc('Sim, todos estão em segurança e ninguém ficou ferido.')]
+ const second=incidentFollowupDecision(history)
+ assert.match(second.reply,/Que bom que todos estão em segurança\. O veículo também está em local seguro\?/)
+ assert.doesNotMatch(second.reply,/CPF|CNPJ|Você e o veículo/)
+ const third=incidentFollowupDecision([...history,out(second.reply),inc('Sim')])
+ assert.match(third.reply,/CPF ou CNPJ do titular/);assert.equal(third.handoff,null)
+})
+test('F4-06: confirmação conjunta não repete pergunta; condição insegura não avança',()=>{
+ const text='Acabei de bater meu carro.'
+ const first=incidentFirstSafetyDecision([inc(text)])
+ for(const answer of ['Todos estão em segurança e o veículo está em local seguro.','Sim, todos estão em segurança e o carro está fora da pista.']){
+  const d=incidentFollowupDecision([inc(text),out(first.reply),inc(answer)])
+  assert.match(d.reply,/CPF ou CNPJ/,answer)
+ }
+ for(const answer of ['Todos estão em segurança, mas o veículo não está em local seguro.','Todos estão em segurança, mas o carro ainda está na pista.','Todos estão em segurança, mas há uma pessoa ferida.']){
+  const d=incidentFollowupDecision([inc(text),out(first.reply),inc(answer)])
+  assert.doesNotMatch(d.reply,/CPF|CNPJ/,answer)
+  assert.match(d.reply,/segurança|socorro|prioridade/i,answer)
+ }
+})

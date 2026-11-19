@@ -21,6 +21,8 @@ import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHisto
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
+import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
+import {resolvePilotMode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
 const formatSchema={
@@ -105,6 +107,7 @@ function isSimpleGreeting(text){
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store')
  if(req.method!=='POST')return jsonResponse(res,405,{error:'method_not_allowed'})
+ if(process.env.VERCEL_ENV==='preview'&&process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-integracao-atual')return jsonResponse(res,503,{error:'operational_preview_disabled'})
  if(!process.env.PHOENIX_ONE_TOKEN)return jsonResponse(res,503,{error:'integration_token_not_configured'})
  if(!authenticateJunior(req))return jsonResponse(res,401,{error:'unauthorized'})
  const body=req.body
@@ -112,10 +115,20 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'invalid_contract_payload'}))
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
+ let pin=null
+ try{pin=await resolvePilotMode(body,process.env,bridge)}catch{return jsonResponse(res,503,{error:'orchestration_pilot_unavailable'})}
+ return respondValidated(body,res,pin)
+}
+export async function respondValidated(body,res,pin=null){
+ const claraOnly=pin?.mode==='clara_only'
+ const lastMessage=body.messages.at(-1)
+ const plan=claraOnly&&body.mode!=='desligado'&&lastMessage?.direction==='inbound'&&lastMessage?.author==='contact'?operationalRouting({pin,body,verifiedRoutes:LEGACY_COMMERCIAL_ROUTES}):null
+ if(plan?.action==='blocked')return jsonResponse(res,409,{error:plan.reason})
+ let directCommercial=false
  // Reaberturas e retornos do Backoffice devem iniciar um novo assunto;
  // histórico completo continua disponível no Junior, sem reviver triagem encerrada.
  const activeMessages=activeMovementHistory(body.messages)
- let agent=selectAgent({...body,messages:activeMessages})
+ let agent=claraOnly?'clara':selectAgent({...body,messages:activeMessages})
  const last=body.messages.at(-1)
  // Pedido REAL de inclusão/exclusão durante uma cotação tem prioridade
  // sobre palavras como "cotação" e qualquer hint comercial do Junior.
@@ -124,6 +137,7 @@ export default async function handler(req,res){
  const replyToJunior=async payload=>{
   // Only confirmed outbound introductions are stored. A proposal in Sugestão
   // mode must not be treated as delivered until Junior reports it in history.
+  if(claraOnly&&payload?.agent!=='clara')return jsonResponse(res,503,{error:'orchestration_agent_mismatch'})
   const saved=introTask?await introTask:null
   if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
   // Defesa final: Murilo nunca pode enviar movimentação diretamente a humano.
@@ -152,11 +166,11 @@ export default async function handler(req,res){
   // Não exigir aceite adicional de algo cujo conteúdo a IA não conhece.
   // Benefícios: Saúde, Odonto, Vida e correlatos têm Backoffice como fila humana.
   // Não remapear áudios: o destino do áudio sem transcrição vem do Junior.
-  if(!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
-  if(!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
-  if(!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
-  if(!isAudioOnlyNotice(last))payload=enrichProductIncidentHandoff(payload,activeMessages)
-  if(!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
+  if(!directCommercial&&!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
+  if(!directCommercial&&!isAudioOnlyNotice(last))payload=enforceHumanHandoffConsent(payload,body.messages)
+  if(!directCommercial&&!isAudioOnlyNotice(last))payload=enrichConfirmedIncidentHandoff(payload,body.messages)
+  if(!directCommercial&&!isAudioOnlyNotice(last))payload=enrichProductIncidentHandoff(payload,activeMessages)
+  if(!directCommercial&&!isAudioOnlyNotice(last))payload=routeBenefitsToBackoffice(payload,activeMessages)
   payload=guardCommercialQuoteClosing(payload,body.messages)
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
@@ -203,6 +217,7 @@ export default async function handler(req,res){
  // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
  // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
  const introState=await introTask
+ if(claraOnly&&(!introState||introState.blocked))return jsonResponse(res,503,{error:'orchestration_pilot_state_unavailable'})
  // A última mensagem é apenas um aviso de áudio não transcrito.
  // Responder de forma determinística, sem modelo, RAG ou inferência de assunto.
  const audioDecision=audioHandoffDecision(body)
@@ -215,6 +230,10 @@ export default async function handler(req,res){
  // Quando o próprio cliente já apresentou o documento para um serviço,
  // não bloquear a validação para pedir nome nem descartar o documento.
  const documentArrival=documentContinuationState(activeMessages,agent)
+ if(plan&&plan.action!=='delegate'&&!documentArrival&&!introState?.blocked){
+   directCommercial=true
+   return replyToJunior({agent:'clara',reply:plan.reply,humanHandoff:plan.humanHandoff===true,handoff:plan.handoff||null})
+ }
  const intake=introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
@@ -318,7 +337,7 @@ export default async function handler(req,res){
   // O bridge deve receber a intenção efetiva do histórico (e não somente
   // a palavra solta da última mensagem), para carregar o prompt do Murilo.
   const lastIntent=classifyConversationIntent(last.text)
-  const effectiveIntent=lastIntent!=='neutral'?lastIntent:
+  const effectiveIntent=claraOnly?'service':lastIntent!=='neutral'?lastIntent:
     hasExplicitConversationIntent(activeMessages)?(agent==='murilo'?'sales':'service'):'neutral'
   const memoryParams={conversationId:body.conversation_id,protocolo:body.protocolo,intent:effectiveIntent,suggestedAgent:agent}
   const query=scrubVerificationProof(scrubDocuments(redact(last.text))).slice(0,850)
@@ -464,8 +483,9 @@ export default async function handler(req,res){
   const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await bridge(knowledgeAction,{agent,query:query||'atendimento',...memoryParams},controller.signal)}
   if(resultKnowledge.error)throw resultKnowledge.error
   const knowledge=resultKnowledge.data
+  if(claraOnly&&knowledge.agent!=='clara')return jsonResponse(res,503,{error:'orchestration_agent_mismatch'})
   // Intenção explícita tem prioridade; na continuidade neutra o estado preservado por protocolo decide.
-  if(!hasExplicitConversationIntent(activeMessages)&&(knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
+  if(!claraOnly&&!hasExplicitConversationIntent(activeMessages)&&(knowledge.agent==='clara'||knowledge.agent==='murilo')&&knowledge.agent!==agent){
     agent=knowledge.agent
     console.info('phoenix_agent_orchestration',JSON.stringify({event:'agent_continuity',agent}))
   }

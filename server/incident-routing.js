@@ -18,11 +18,24 @@ const towRequest=t=>/\b(?:preciso|necessito|quero|chamar|solicitar|acionar)\b.{0
 const noTow=t=>/\b(?:nao preciso|sem necessidade|dispenso|nao quero|sem)\b.{0,55}\b(?:guincho|reboque|assistencia)\b/.test(fold(t))
 const safeConfirmed=t=>/\b(?:estou|estamos|carro|veiculo|local|lugar|esta|ficou)\b.{0,48}\b(?:segur[oa]|protegido|fora da via|fora da pista|estacionado)\b/.test(fold(t))||
  /\b(?:em local seguro|fora da pista|fora da via)\b/.test(fold(t))
+// Pessoas em segurança não confirmam automaticamente a posição do veículo.
+const peopleSafe=t=>/\b(?:todos(?:\s+nos)?|todas as pessoas|as pessoas|nos|eu|os ocupantes)\s+(?:estao|estamos|estou|esta|ficaram|ficou|sa[io])\s+(?:bem|em seguranca|seguros?|seguras?)\b/.test(fold(t))
+const vehicleSafe=t=>/\b(?:carro|veiculo|auto)\b.{0,40}\b(?:em local seguro|em seguranca|local seguro|fora da (?:via|pista)|estacionado em local seguro)\b/.test(fold(t))
+const vehicleUnsafe=t=>/\b(?:carro|veiculo|auto)\b.{0,40}\b(?:nao (?:esta|ficou) (?:em (?:um )?local seguro|em seguranca|seguro)|(?:ainda )?esta (?:na pista|na via|em local perigoso)|nao (?:saiu|foi retirado) da (?:pista|via))\b/.test(fold(t))
 const isQuote=t=>/\b(?:cotacao|cotar|orcamento|simulacao|simular|contratar|quanto custa|preco de)\b/.test(fold(t))
+// Relatos coloquiais de colisão efetivamente ocorrida. Não confundir
+// hipótese de cobertura ou negação com acidente. A regra original permanece.
+const colloquialCollision=t=>{
+ const value=fold(t)
+ if(/\b(?:se|caso|quando|medo de|risco de|posso|poderia|imagina|hipoteticamente)\s+(?:eu\s+)?(?:bater|bata|bateu|baterem|bateram|colidir|colida)\b/.test(value)||
+    /\bnao\s+(?:acabei de\s+)?(?:bater|bati|bateu|bateram|colidi)\b/.test(value))return false
+ return /\bacabei de bater\b.{0,45}\b(?:carro|veiculo|auto)\b/.test(value)||
+  /\b(?:bateram|bateu)\s+(?:(?:no|na|em|contra)\s+)(?:o\s+)?(?:meu|minha|nosso|nossa)\s+(?:carro|veiculo|auto)\b/.test(value)
+}
 export function isIncidentReport(text){
  const t=fold(text)
  if(!t)return false
- const explicit=/\b(?:sofri|tive|aconteceu|acabei de sofrer|estive envolvid[oa] em|bati|colidi|colidiram|roubaram|furtaram)\b.{0,120}\b(?:colisao|acidente|batida|carro|veiculo|auto|moto|sinistro|roubo|furto)\b/.test(t)||
+ const explicit=colloquialCollision(t)||/\b(?:sofri|tive|aconteceu|acabei de sofrer|estive envolvid[oa] em|bati|colidi|colidiram|roubaram|furtaram)\b.{0,120}\b(?:colisao|acidente|batida|carro|veiculo|auto|moto|sinistro|roubo|furto)\b/.test(t)||
   /\b(?:colisao|batida|acidente|roubo|furto)\b.{0,90}\b(?:meu carro|meu veiculo|automovel|meu auto|veiculo)\b/.test(t)
  const service=/\b(?:abrir|acionar|comunicar|registrar|dar entrada|preciso de|quero abrir)\b.{0,85}\b(?:sinistro|meu seguro auto|seguro do carro|seguro auto|guincho por acidente)\b/.test(t)
  // Perguntas hipotéticas sobre a cotação NÃO são sinistros reais.
@@ -55,7 +68,7 @@ function note(messages){
  const words=customer.map(m=>fold(m.text)).join(' ')
  const original=fold(lastReport(messages))
  const kind=/\b(?:roubo|furto|roubaram|furtaram)\b/.test(original)?'roubo/furto':
-  /\b(?:colisao|batida|bati|colidi|acidente)\b/.test(original)?'colisão/acidente':'acionamento de Sinistros Auto'
+  (colloquialCollision(original)||/\b(?:colisao|batida|bati|colidi|acidente)\b/.test(original))?'colisão/acidente':'acionamento de Sinistros Auto'
  const injuries=noInjuries(words)?'Cliente informou inicialmente ausência de feridos. ':'' 
  const tow=towRequest(words)&&!noTow(words)?'Cliente mencionou possível necessidade de assistência/guincho; verificar condições e disponibilidade. ':''
  return 'Cliente solicita atendimento de Sinistros Auto por '+kind+'. '+injuries+tow+
@@ -112,10 +125,12 @@ export function incidentFollowupDecision(messages){
  if(pureYes(text)&&/\b(?:encaminhar|transferir|equipe auto|sinistros auto)\b/.test(prior))return null
  const answeringSafety=/\blocal seguro\b/.test(prior)||/\best[aá] em seguranca\b/.test(prior)
  if(answeringSafety){
-  if(pureNo(text)||/\b(?:nao\s+(?:estou|estamos|esta|ficou|e)\s+(?:(?:em|num|no)\s+)?(?:um\s+)?local\s+seguro|nao\s+(?:estou|estamos|esta|ficou)\s+seguros?|ainda\s+(?:estou|estamos|esta)\s+(?:na|no)\s+(?:pista|via)|ainda\s+na\s+pista|em\s+risco|perigo)\b/.test(normal)){
+  if(vehicleUnsafe(text)||pureNo(text)||/\b(?:nao\s+(?:estou|estamos|esta|ficou|e)\s+(?:(?:em|num|no)\s+)?(?:um\s+)?local\s+seguro|nao\s+(?:estou|estamos|esta|ficou)\s+seguros?|ainda\s+(?:estou|estamos|esta)\s+(?:na|no)\s+(?:pista|via)|ainda\s+na\s+pista|em\s+risco|perigo)\b/.test(normal)){
    return base('Priorize sua segurança e acione o socorro local se houver risco. Posso encaminhar você ao Auto/RE com prioridade?')
   }
-  if(safeConfirmed(text)||pureYes(text))return base('Que bom que estão em segurança. '+identificationQuestion)
+  if(peopleSafe(text)&&!vehicleSafe(text)&&!/^que bom que todos estao em seguranca\. o veiculo tambem esta em local seguro\?/.test(prior))
+   return base('Que bom que todos estão em segurança. O veículo também está em local seguro?')
+  if(safeConfirmed(text)||pureYes(text)||vehicleSafe(text))return base('Que bom que estão em segurança. '+identificationQuestion)
   return base('Entendi. Você e o veículo estão em local seguro?')
  }
  // Resposta a uma pergunta antiga sobre guincho: não criar outra rodada
