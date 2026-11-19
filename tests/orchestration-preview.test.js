@@ -100,15 +100,16 @@ test('Mudança do seletor não altera modo do protocolo existente; novo protocol
  const newProtocol=newPreviewProtocol(nextPreference)
  assert.equal(ask(newProtocol,'Quero cotar seguro auto.').decision,'offer_human')
 })
-test('Prévia não é acoplada às rotas do Junior nem ao banco de produção',async()=>{
- const [live,ui,core]=await Promise.all([
+test('Piloto integrado não usa estado local do simulador nem habilita API na prévia',async()=>{
+ const [live,gate,core]=await Promise.all([
   readFile(new URL('../api/v1/conversations/respond.js',import.meta.url),'utf8'),
-  readFile(new URL('../src/OrchestrationPreview.jsx',import.meta.url),'utf8'),
+  readFile(new URL('../server/orchestration-pilot.js',import.meta.url),'utf8'),
   readFile(new URL('../server/orchestration-preview.js',import.meta.url),'utf8')
  ])
- assert.doesNotMatch(live,/orchestration-preview/)
- assert.doesNotMatch(ui,/\bfetch\s*\(|supabase\.|\/api\/v1\//)
+ assert.match(live,/operational_preview_disabled/)
+ assert.match(live,/resolvePilotMode\(body,process\.env,bridge\)/)
+ assert.doesNotMatch(live,/localStorage|readPreviewMode/)
+ assert.match(gate,/VERCEL_ENV!=='production'/)
+ assert.match(gate,/body\.contact\?\.phone_e164!==phone/)
  assert.doesNotMatch(core,/\bfetch\s*\(|supabase\.|process\.env/)
- assert.match(ui,/newPreviewProtocol\(mode\)/)
- assert.match(ui,/Nova|Novo protocolo/)
 })
