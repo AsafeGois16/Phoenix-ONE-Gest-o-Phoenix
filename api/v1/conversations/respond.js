@@ -21,7 +21,7 @@ import {assessBackofficeIntake,detectBackofficeStatusRequest,activeMovementHisto
 import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/verified-movement.js'
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
-import {operationalRouting} from '../../../server/orchestration-operational.js'
+import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
 
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
@@ -124,7 +124,7 @@ export async function runOrchestrationPreview(body,pin,res){
 }
 async function respondValidated(body,res,context=null){
  const simulation=context?.previewOnly===true
- const plan=context?operationalRouting({pin:context.pin,body}):null
+ const plan=context?operationalRouting({pin:context.pin,body,verifiedRoutes:LEGACY_COMMERCIAL_ROUTES}):null
  const claraOnly=context?.pin?.mode==='clara_only'
  if(plan?.action==='blocked')return jsonResponse(res,409,{error:plan.reason})
  // Reaberturas e retornos do Backoffice devem iniciar um novo assunto;
@@ -193,7 +193,7 @@ async function respondValidated(body,res,context=null){
   }
  }
   const cleanReply=hideIdentifierPlaceholders(redact(safeText(reply,1800)))
-   if(simulation)return jsonResponse(res,200,{action:routeType==='direct_commercial'?plan.action:'engine_response',agent:payload.agent,selectedAgent:agent,reply:cleanReply,product:plan?.product||null,logicalTarget:plan?.logicalTarget||null,proposedDepartment:payload.handoff?.department||null,humanHandoff:false,handoff:null,executed:false,previewOnly:true,engineStage:routeType})
+   if(simulation)return jsonResponse(res,200,{action:routeType==='direct_commercial'?plan.action:'engine_response',agent:payload.agent,selectedAgent:agent,reply:cleanReply,product:plan?.product||null,logicalTarget:plan?.logicalTarget||null,proposedDepartment:payload.handoff?.department||null,proposedHandoff:routeType==='direct_commercial'&&payload.humanHandoff===true?{department:payload.handoff.department,...(payload.handoff.intent==='nova_cotacao'?{intent:'nova_cotacao'}:{}),reason:payload.handoff.reason,summary:payload.handoff.summary}:null,humanHandoff:false,handoff:null,executed:false,previewOnly:true,engineStage:routeType})
    return jsonResponse(res,200,{...payload,reply:cleanReply})
  }
  if(body.mode==='desligado'){

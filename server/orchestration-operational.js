@@ -18,6 +18,11 @@ const refusal=/^(?:nao|prefiro nao|agora nao|nem pensar|dispenso)\b/
 const negated=/\b(?:nao (?:quero|preciso|gostaria|pode|autorizo)|sem encaminhar|nao me transfira|nao me encaminhe)\b/
 const direct=/^(?:por favor[, ]+)?(?:quero falar com|preciso falar com|gostaria de falar com|me encaminhe (?:ao|para o|para a)|me transfira (?:ao|para o|para a))\s+(?:a |o )?(?:(?:equipe|setor|departamento) (?:do |de )?)?(?:comercial|consultor(?:a)? humano(?:a)?)\b/
 const urgent=/\b(?:nao respira|inconsciente|dor no peito|falta de ar|ha feridos|tem feridos|pegou fogo|esta pegando fogo|preciso de socorro|socorro agora|sofri (?:um |uma )?acidente|meu carro foi roubado|houve (?:um principio de )?incendio)\b/
+// Mapa acordado com Junior (proposta somente; execução permanece bloqueada).
+export const LEGACY_COMMERCIAL_ROUTES=Object.freeze(Object.fromEntries(
+ ['Auto','Moto','Frota','Residencial','Empresarial','Saúde','Odonto','Vida','Viagem','Pet','Bike','Cyber','Equipamentos','Responsabilidade Civil','Garantia','Fiança Locatícia','Previdência','Rural'].map(product=>[product,Object.freeze({verified:true,department:['Auto','Moto','Frota','Residencial','Empresarial'].includes(product)?'patrimonio':'comercial'})])
+))
+const quoteWords=t=>/\b(?:cotacao|cotar|orcamento|simular|simulacao|contratar|quanto custa|preco de|novo seguro)\b/.test(fold(t))
 const clarify='Qual produto de seguro ou benefício você deseja avaliar?'
 const offer=(product,target)=>'Posso encaminhar sua solicitação de '+product+' à equipe de '+TARGETS[target]+' para continuar o atendimento?'
 const reply=(text,extra={})=>({action:'reply',agent:'clara',reply:text,humanHandoff:false,handoff:null,...extra})
@@ -61,10 +66,15 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
   // A configuração operacional futura é por PRODUTO, não por fallback genérico.
   // Somente códigos do contrato já existente podem ser liberados neste candidato.
   const route=verifiedRoutes[product]
+  // Evidência de cotação no turno atual ou na cadeia imediatamente anterior
+  // de oferta/clarificação comercial. Não inferir de recados, agente ou hint.
+  const earlier=messages.slice(-5).filter(m=>m.direction==='inbound'&&m.author==='contact')
+  const isQuote=quoteWords(text)||((offered||asked)&&earlier.some(m=>quoteWords(m.text)&&!negated.test(fold(m.text))))
+  const intentField=target==='auto_re'&&route?.department==='patrimonio'&&isQuote?{intent:'nova_cotacao'}:{}
   if(!route||route.verified!==true||!['patrimonio','comercial'].includes(route.department))
    return reply('Obrigada pela confirmação. O destino comercial ainda precisa ser validado pela nossa equipe.',{action:'mapping_required',product,logicalTarget:target})
   return {action:'propose_handoff',agent:'clara',reply:'Obrigada pela confirmação. Vou solicitar seu encaminhamento à equipe comercial responsável.',
-   product,logicalTarget:target,humanHandoff:true,handoff:{department:route.department,
+   product,logicalTarget:target,humanHandoff:true,handoff:{department:route.department,...intentField,
    reason:'Solicitação comercial autorizada pelo cliente',summary:'Interesse em '+product+'. Encaminhamento comercial direto; nenhuma cotação ou transferência executada pelo Phoenix ONE.'}}
  }
  if(offered&&products.length===0&&yes.test(t))return propose(offered)

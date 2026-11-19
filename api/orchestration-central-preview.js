@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import {isolatedConfig,isolatedClient,authorizedAdmin,centralStore,uuidOk} from '../server/orchestration-central-store.js'
+import {resolveFixtureProtocol} from '../server/orchestration-protocol-strategy.js'
 import {runOrchestrationPreview} from './v1/conversations/respond.js'
 
 export const config={maxDuration:15}
@@ -31,14 +32,15 @@ export default async function handler(req,res){
    return send(res,row.conflict?409:200,row)
   }
   if(body.action==='new_protocol')return send(res,200,await store.pin(randomUUID(),true))
+  if(body.action==='resolve_fixture')return send(res,200,await resolveFixtureProtocol(store,body.fixtureProtocol))
   if(body.action==='decide'){
-   if(!uuidOk(body.protocolRef)||!validHistory(body.messages))return send(res,400,{error:'invalid_simulation'})
+   if((!body.fixtureProtocol&&!uuidOk(body.protocolRef))||!validHistory(body.messages))return send(res,400,{error:'invalid_simulation'})
    // No client-supplied mode, revision, map, stage, real protocol or contact.
    // Data are fictitious; no message is stored. Unknown IDs get legacy default.
-   const pin=await store.pin(body.protocolRef,false)
+   const pin=body.fixtureProtocol?await resolveFixtureProtocol(store,body.fixtureProtocol):await store.pin(body.protocolRef,false)
    // Adaptador de teste: os identificadores e o modo operacional são sintéticos.
    // O handler usa exatamente os guardas determinísticos, sem consultar o Junior.
-   const fixture={conversation_id:pin.protocol_ref,protocolo:'20990101-0001',mode:'sugestao',
+   const fixture={conversation_id:pin.protocol_ref,protocolo:pin.protocol||'20990101-0001',mode:'sugestao',
     contact:{kind:'lead'},messages:body.messages.map(m=>({direction:m.direction,author:m.author,type:'texto',text:m.text}))}
    let status=500,result=null
    const capture={setHeader(){},status(n){status=n;return this},json(value){result=value;return value}}
