@@ -105,6 +105,7 @@ function isSimpleGreeting(text){
  return /^(?:(?:oi|ola|opa|bom dia|boa tarde|boa noite|e ai)[!?., ]*)$/.test(simplified)
 }
 export default async function handler(req,res){
+ if(process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase5-joint')return res.status(503).json({error:'joint_environment_not_ready'})
  res.setHeader('Cache-Control','no-store')
  if(req.method!=='POST')return jsonResponse(res,405,{error:'method_not_allowed'})
  if(process.env.VERCEL_ENV==='preview'&&process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase3-preview')return jsonResponse(res,503,{error:'operational_preview_disabled'})
@@ -122,7 +123,17 @@ export async function runOrchestrationPreview(body,pin,res){
  if(!checkPayload(body))return jsonResponse(res,400,{error:'invalid_contract_payload'})
  return respondValidated(body,res,{pin,previewOnly:true})
 }
+// Internal candidate only; do not expose over HTTP until isolated provisioning.
+export async function runOrchestrationJoint(body,pin,runtime,res){
+ if(!checkPayload(body)||!runtime||!['bridge','identity','model'].every(k=>typeof runtime[k]==='function'))return jsonResponse(res,400,{error:'invalid_joint_context'})
+ if(body.mode==='desligado'||body.messages.at(-1)?.direction!=='inbound'||body.messages.at(-1)?.author!=='contact')
+  return jsonResponse(res,200,{agent:'clara',reply:'',humanHandoff:false,handoff:null})
+ return respondValidated(body,res,{pin,runtime})
+}
 async function respondValidated(body,res,context=null){
+ const joint=Boolean(context?.runtime)
+ const callBridge=joint?context.runtime.bridge:bridge
+ const callIdentity=joint?context.runtime.identity:juniorIdentityContext
  const simulation=context?.previewOnly===true
  const plan=context?operationalRouting({pin:context.pin,body,verifiedRoutes:LEGACY_COMMERCIAL_ROUTES}):null
  const claraOnly=context?.pin?.mode==='clara_only'
@@ -144,6 +155,7 @@ async function respondValidated(body,res,context=null){
   if(saved?.blocked)return jsonResponse(res,503,{error:saved.reason||'protocol_not_with_agent'})
   // Defesa final: Murilo nunca pode enviar movimentação diretamente a humano.
   // Trocar o agente de resposta NÃO atribui fila nem executa exclusão.
+  if(joint&&claraOnly&&payload?.agent!=='clara')return jsonResponse(res,503,{error:'joint_agent_mismatch'})
   if(payload?.agent==='murilo'&&payload?.humanHandoff===true&&
       payload?.handoff?.department==='backoffice'){
     console.info('phoenix_admin_handoff_guard',JSON.stringify({action:'route_to_clara_before_human'}))
@@ -187,10 +199,12 @@ async function respondValidated(body,res,context=null){
   if(isMurilo)reply=ensureMuriloIntro(reply,body.messages,last?.text||'',seen)
   // MegaBrain observação OPCIONAL e isolada: desligada por padrão.
   // Não altera a mensagem retornada, os roteamentos nem as operações do Junior.
+  if(!joint){
   if(!simulation){
   if(body.mode==='automatico'&&last?.direction==='inbound'&&last?.author==='contact'&&reply.trim()){
    await shadowObserveMegaBrain({conversationId:body.conversation_id,protocolo:body.protocolo,messages:activeMessages,reply,agent:payload.agent,humanHandoff:payload.humanHandoff})
   }
+ }
  }
   const cleanReply=hideIdentifierPlaceholders(redact(safeText(reply,1800)))
    if(simulation)return jsonResponse(res,200,{action:routeType==='direct_commercial'?plan.action:'engine_response',agent:payload.agent,selectedAgent:agent,reply:cleanReply,product:plan?.product||null,logicalTarget:plan?.logicalTarget||null,proposedDepartment:payload.handoff?.department||null,proposedHandoff:routeType==='direct_commercial'&&payload.humanHandoff===true?{department:payload.handoff.department,...(payload.handoff.intent==='nova_cotacao'?{intent:'nova_cotacao'}:{}),reason:payload.handoff.reason,summary:payload.handoff.summary}:null,humanHandoff:false,handoff:null,executed:false,previewOnly:true,engineStage:routeType})
@@ -210,19 +224,21 @@ async function respondValidated(body,res,context=null){
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const observed=observedAgentIntroductions(body.messages)
- introTask=simulation?Promise.resolve({blocked:false,clara_apresentada:observed.clara,murilo_apresentado:observed.murilo}):bridge('intro_status',{
+ introTask=simulation?Promise.resolve({blocked:false,clara_apresentada:observed.clara,murilo_apresentado:observed.murilo}):callBridge('intro_status',{
   conversationId:body.conversation_id,protocolo:body.protocolo,
   observedClara:observed.clara,observedMurilo:observed.murilo
  },AbortSignal.timeout(2800)).catch(e=>{
   // O bloqueio operacional da gestão não é uma falha transitória de memória:
   // nunca responder com IA se o protocolo já foi atribuído a humano/encerrado.
   if(['assigned_to_human','protocol_resolved','protocol_not_open','ticket_resolved'].includes(e?.message))return {blocked:true,reason:e.message}
+  if(joint)return {blocked:true,reason:'joint_state_unavailable'}
   console.info('phoenix_intro_memory_unavailable',e?.name||'network_error')
   return null
  })
  // A Clara coleta o nome de tratamento antes da passagem ao Murilo.
  // Esta etapa não cria ticket, não muda departamento e não bloqueia urgências.
  const introState=await introTask
+ if(joint&&introState?.blocked)return jsonResponse(res,503,{error:'joint_protocol_blocked'})
  // A última mensagem é apenas um aviso de áudio não transcrito.
  // Responder de forma determinística, sem modelo, RAG ou inferência de assunto.
  const audioDecision=audioHandoffDecision(body)
@@ -293,7 +309,7 @@ async function respondValidated(body,res,context=null){
    if(simulation)return jsonResponse(res,200,{action:'engine_boundary',reason:'identity_verification_required',agent:'clara',selectedAgent:agent,humanHandoff:false,handoff:null,executed:false,previewOnly:true})
     let verification
    try{
-     verification=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
+     verification=await callIdentity(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
    }catch{verification={status:'unavailable'}}
    if(verification.status==='verification_required'&&['birth_date','cep'].includes(verification.method)&&
      (verification.attemptsLeft===null||verification.attemptsLeft>0)){
@@ -352,7 +368,7 @@ async function respondValidated(body,res,context=null){
   // Cotação do MESMO carro: refazer consulta na gestão só se a identidade
   // for novamente confirmada para este protocolo; não reutilizar o CPF como
   // prova, nem copiar apólices/marcas do histórico do outro agente sem validação.
-  const v4Enabled=process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'
+  const v4Enabled=!joint&&process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'
   // No ref is ever taken from chat history or the model. The management
   // system may attach this to its authenticated server-side response request.
   const trustedRef=v4Enabled&&validVerificationRef(body.verification_ref)?body.verification_ref:null
@@ -360,7 +376,7 @@ async function respondValidated(body,res,context=null){
   if(autoReuse){
    const priorDocument=findInboundDocument(activeMessages)
    if(priorDocument.status==='valid'||trustedRef){
-    const verifiedAuto=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),
+    const verifiedAuto=await callIdentity(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),
       v4Enabled?{v4:true,verificationRef:trustedRef,purpose:'quote',productCode:'auto'}:{})
     if(verifiedAuto.status==='verified'){
      const summary=summarizeVerifiedAutoForQuote(verifiedAuto.policies)
@@ -378,7 +394,7 @@ async function respondValidated(body,res,context=null){
   if(requestedV41Product&&requestedV41Product!=='auto'){
    const priorDocument=findInboundDocument(activeMessages)
    if(trustedRef||priorDocument.status==='valid'){
-    const verifiedProduct=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),{
+    const verifiedProduct=await callIdentity(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),{
      v4:true,verificationRef:trustedRef,purpose:'quote',productCode:requestedV41Product
     })
     if(verifiedProduct.status==='verified'){
@@ -426,12 +442,12 @@ async function respondValidated(body,res,context=null){
    // Sem prova, evita recuperar a biblioteca caso o Junior ainda solicite validação.
    if(proof){
      const started=performance.now()
-     knowledgeTask=bridge('context',{agent,query:query||'atendimento',...memoryParams},controller.signal)
+     knowledgeTask=callBridge('context',{agent,query:query||'atendimento',...memoryParams},controller.signal)
        .then(data=>{timing.knowledgeMs=Math.round(performance.now()-started);return {data}})
        .catch(error=>({error}))
    }
    const identityStarted=performance.now()
-   const identity=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,controller.signal,
+   const identity=await callIdentity(body.conversation_id,body.protocolo,document,proof,controller.signal,
     v4Enabled?{v4:true,verificationRef:trustedRef,purpose:'service'}:{})
    timing.identityMs=Math.round(performance.now()-identityStarted)
    if(trustedRef&&['verification_required','verification_expired'].includes(identity.status)){
@@ -484,11 +500,11 @@ async function respondValidated(body,res,context=null){
      return replyToJunior({agent,reply:(verifiedGreeting(identity.verified_profile)+(overview||'A validação foi concluída, mas o sistema não retornou apólices ou parcelas para essa consulta. Posso verificar outra informação ou encaminhar à equipe para conferência?')).slice(0,1800),humanHandoff:false,handoff:null})
    }
   }
-  if(!process.env.OPENAI_API_KEY)return jsonResponse(res,503,{error:'openai_not_configured'})
+  if(!joint&&!process.env.OPENAI_API_KEY)return jsonResponse(res,503,{error:'openai_not_configured'})
   const startedKnowledge=performance.now()
   const knowledgeAction=isSimpleGreeting(last.text)?'prompt_only':'context'
   path=management?'verified_lookup':knowledgeAction==='prompt_only'?'greeting':'general'
-  const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await bridge(knowledgeAction,{agent,query:query||'atendimento',...memoryParams},controller.signal)}
+  const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await callBridge(knowledgeAction,{agent,query:query||'atendimento',...memoryParams},controller.signal)}
   if(resultKnowledge.error)throw resultKnowledge.error
   const knowledge=resultKnowledge.data
   // Intenção explícita tem prioridade; na continuidade neutra o estado preservado por protocolo decide.
@@ -504,7 +520,7 @@ async function respondValidated(body,res,context=null){
   const name=redact(safeText(body.contact.display_name,80))
   // V3: consulta apenas categorias e apenas com consentimento administrativo
   // independente para a conversa; nunca altera lógica de identidade ou roteamento.
-  const megabrainHint=await readMegaBrainHint({
+  const megabrainHint=joint?null:await readMegaBrainHint({
    conversationId:body.conversation_id,protocolo:body.protocolo,agent,mode:body.mode
   })
   const situation=[
@@ -522,9 +538,10 @@ async function respondValidated(body,res,context=null){
     ...(megabrainHint?[megabrainHint]:[])
   ].join('\n')
   const modelStarted=performance.now()
-  const result=await fetch('https://api.openai.com/v1/responses',{
+  const requestModel=joint?context.runtime.model:options=>fetch('https://api.openai.com/v1/responses',options)
+  const result=await requestModel({
     method:'POST',signal:controller.signal,
-    headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
+    headers:joint?{'Content-Type':'application/json'}:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
     body:JSON.stringify({
       model:process.env.PHOENIX_ONE_JUNIOR_MODEL||'gpt-4.1-mini',
       instructions:knowledge.prompt+'\n\n---\n'+criticalInstructions+'\n\n'+situation,

@@ -3,6 +3,7 @@ import {validJuniorProtocol} from '../../server/protocol-contract.js'
 export const config={api:{bodyParser:false}}
 const types=new Set(['ticket.assigned.v1','ticket.updated.v1','ticket.returned_to_agent.v1','ticket.resolved.v1'])
 export default async function handler(req,res){
+ if(process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase5-joint')return res.status(503).json({error:'joint_environment_not_ready'})
  res.setHeader('Cache-Control','no-store')
  if(req.method!=='POST')return jsonResponse(res,405,{error:'method_not_allowed'})
  const secret=process.env.PHOENIX_ONE_WEBHOOK_SECRET

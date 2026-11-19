@@ -16,6 +16,7 @@ function validHistory(messages){
   messages.at(-1).direction==='inbound'
 }
 export default async function handler(req,res){
+ if(process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase5-joint')return res.status(503).json({error:'joint_environment_not_ready'})
  // Never enabled on production, main, or an unconfigured preview.
  const cfg=isolatedConfig(process.env)
  if(!cfg)return send(res,503,{error:'isolated_environment_not_configured'})

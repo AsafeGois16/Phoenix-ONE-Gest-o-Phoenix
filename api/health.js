@@ -1,6 +1,7 @@
 /** Health of the deployed app, NOT a live database credentialed probe.
  * No client data, keys, service status of Junior, or operational integrations are exposed. */
 export default function handler(req,res) {
+ if(process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase5-joint')return res.status(200).json({service:'phoenix-one-joint',mode:'preparation_only',operational:false})
   if (req.method !== 'GET') return res.status(405).json({error:'method_not_allowed'})
   res.setHeader('Cache-Control','no-store')
   return res.status(200).json({

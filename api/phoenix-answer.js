@@ -28,6 +28,7 @@ const safety=[
  'Murilo: em sua primeira resposta, apresente-se pelo nome e pela função comercial. Na primeira conversa de cotação residencial, comece pelo tipo de imóvel e pela cidade; não solicite endereço completo, CEP, número ou documentos na abertura. Faça perguntas progressivas e não alegue que registrou uma cotação sem API confirmada.'
 ].join('\n')
 export default async function handler(req,res){
+ if(process.env.VERCEL_GIT_COMMIT_REF==='feat/orquestracao-agentes-fase5-joint')return res.status(503).json({error:'joint_environment_not_ready'})
  res.setHeader('Cache-Control','no-store')
  if(req.method!=='POST')return res.status(405).json({error:'method_not_allowed'})
  if(req.headers.origin!==ORIGIN || (req.headers['x-forwarded-host']||req.headers.host)!=='phoenix-one-ai.vercel.app')return res.status(403).json({error:'origin_not_allowed'})
