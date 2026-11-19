@@ -83,3 +83,26 @@ test('V1.4: cotação com pergunta de produto mantém marcador; oferta sem cota�
  const unrelated=route([user(auto),bot('Encerramos aquele assunto.'),user('Quero falar sobre seguro de carro.'),bot(offered),user('Sim')])
  assert.notEqual(unrelated.handoff?.intent,'nova_cotacao')
 })
+
+
+test('F4-06: motor nos dois modos prioriza colisão coloquial e confirmação contextual',async()=>{
+ const oldFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error('NETWORK_FORBIDDEN')}
+ try{
+  for(const pin of [only,dual]){
+   const run=async messages=>{let result,status;await runOrchestrationPreview(body(messages,{agent_hint:'murilo'}),pin,{setHeader(){},status(n){status=n;return this},json(x){result=x;return x}});assert.equal(status,200);assert.equal(result.selectedAgent,'clara');assert.equal(result.humanHandoff,false);assert.equal(result.handoff,null);assert.equal(result.proposedHandoff,null);assert.equal(result.executed,false);return result}
+   const history=[user('Acabei de bater meu carro. Preciso de ajuda.')]
+   const first=await run(history);assert.match(first.reply,/local seguro/);assert.doesNotMatch(first.reply,/CPF|CNPJ/)
+   history.push(bot(first.reply),user('Sim, todos estão em segurança e ninguém ficou ferido.'))
+   const second=await run(history);assert.match(second.reply,/O veículo também está em local seguro/);assert.doesNotMatch(second.reply,/CPF|CNPJ|Sou a Clara/)
+   const third=await run([...history,bot(second.reply),user('Sim')]);assert.match(third.reply,/CPF ou CNPJ do titular/);assert.doesNotMatch(third.reply,/Sou a Clara/)
+   const both=await run([history[0],bot(first.reply),user('Todos estão em segurança e o veículo está em local seguro.')]);assert.match(both.reply,/CPF ou CNPJ/)
+  }
+ }finally{globalThis.fetch=oldFetch}
+})
+test('F4-06: colisão durante cotação interrompe proposta comercial',()=>{
+ const offer=route([user(auto)])
+ for(const text of ['Acabei de bater meu carro. Preciso de ajuda.','Bateram no meu carro.']){
+  const r=route([user(auto),bot(offer.reply),user(text)])
+  assert.equal(r.action,'delegate');assert.equal(r.agent,'clara');assert.equal(r.handoff,undefined)
+ }
+})
