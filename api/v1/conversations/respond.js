@@ -22,7 +22,7 @@ import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/v
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
-import {resolvePilotMode} from '../../../server/orchestration-pilot.js'
+import {resolvePilotMode,orchestrationErrorCode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
 const formatSchema={
@@ -116,7 +116,11 @@ export default async function handler(req,res){
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
  let pin=null
- try{pin=await resolvePilotMode(body,process.env,bridge,observedAgentIntroductions(body.messages))}catch{return jsonResponse(res,503,{error:'orchestration_pilot_unavailable'})}
+ try{pin=await resolvePilotMode(body,process.env,bridge,observedAgentIntroductions(body.messages))}catch(e){
+  const reason=orchestrationErrorCode(e)
+  console.warn('phoenix_orchestration_unavailable',JSON.stringify({reason}))
+  return jsonResponse(res,503,{error:reason==='protocol_not_with_agent'?'protocol_not_with_agent':'orchestration_pilot_unavailable'})
+ }
  return respondValidated(body,res,pin)
 }
 export async function respondValidated(body,res,pin=null){
