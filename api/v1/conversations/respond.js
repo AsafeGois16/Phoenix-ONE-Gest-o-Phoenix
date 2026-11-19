@@ -1,4 +1,4 @@
-import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
+import {authenticateJunior,bridge as productionBridge,juniorIdentityContext as productionIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
 import {validJuniorProtocol} from '../../../server/protocol-contract.js'
 import {isAudioOnlyNotice,audioHandoffDecision} from '../../../server/audio-handoff.js'
 import {shadowObserveMegaBrain} from '../../../server/megabrain-observation.js'
@@ -132,8 +132,8 @@ export async function runOrchestrationJoint(body,pin,runtime,res){
 }
 async function respondValidated(body,res,context=null){
  const joint=Boolean(context?.runtime)
- const callBridge=joint?context.runtime.bridge:bridge
- const callIdentity=joint?context.runtime.identity:juniorIdentityContext
+ const bridge=joint?context.runtime.bridge:productionBridge
+ const juniorIdentityContext=joint?context.runtime.identity:productionIdentityContext
  const simulation=context?.previewOnly===true
  const plan=context?operationalRouting({pin:context.pin,body,verifiedRoutes:LEGACY_COMMERCIAL_ROUTES}):null
  const claraOnly=context?.pin?.mode==='clara_only'
@@ -224,7 +224,7 @@ async function respondValidated(body,res,context=null){
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
  const observed=observedAgentIntroductions(body.messages)
- introTask=simulation?Promise.resolve({blocked:false,clara_apresentada:observed.clara,murilo_apresentado:observed.murilo}):callBridge('intro_status',{
+ introTask=simulation?Promise.resolve({blocked:false,clara_apresentada:observed.clara,murilo_apresentado:observed.murilo}):bridge('intro_status',{
   conversationId:body.conversation_id,protocolo:body.protocolo,
   observedClara:observed.clara,observedMurilo:observed.murilo
  },AbortSignal.timeout(2800)).catch(e=>{
@@ -309,7 +309,7 @@ async function respondValidated(body,res,context=null){
    if(simulation)return jsonResponse(res,200,{action:'engine_boundary',reason:'identity_verification_required',agent:'clara',selectedAgent:agent,humanHandoff:false,handoff:null,executed:false,previewOnly:true})
     let verification
    try{
-     verification=await callIdentity(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
+     verification=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,AbortSignal.timeout(13000))
    }catch{verification={status:'unavailable'}}
    if(verification.status==='verification_required'&&['birth_date','cep'].includes(verification.method)&&
      (verification.attemptsLeft===null||verification.attemptsLeft>0)){
@@ -376,7 +376,7 @@ async function respondValidated(body,res,context=null){
   if(autoReuse){
    const priorDocument=findInboundDocument(activeMessages)
    if(priorDocument.status==='valid'||trustedRef){
-    const verifiedAuto=await callIdentity(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),
+    const verifiedAuto=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),
       v4Enabled?{v4:true,verificationRef:trustedRef,purpose:'quote',productCode:'auto'}:{})
     if(verifiedAuto.status==='verified'){
      const summary=summarizeVerifiedAutoForQuote(verifiedAuto.policies)
@@ -394,7 +394,7 @@ async function respondValidated(body,res,context=null){
   if(requestedV41Product&&requestedV41Product!=='auto'){
    const priorDocument=findInboundDocument(activeMessages)
    if(trustedRef||priorDocument.status==='valid'){
-    const verifiedProduct=await callIdentity(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),{
+    const verifiedProduct=await juniorIdentityContext(body.conversation_id,body.protocolo,priorDocument,null,AbortSignal.timeout(7000),{
      v4:true,verificationRef:trustedRef,purpose:'quote',productCode:requestedV41Product
     })
     if(verifiedProduct.status==='verified'){
@@ -442,12 +442,12 @@ async function respondValidated(body,res,context=null){
    // Sem prova, evita recuperar a biblioteca caso o Junior ainda solicite validação.
    if(proof){
      const started=performance.now()
-     knowledgeTask=callBridge('context',{agent,query:query||'atendimento',...memoryParams},controller.signal)
+     knowledgeTask=bridge('context',{agent,query:query||'atendimento',...memoryParams},controller.signal)
        .then(data=>{timing.knowledgeMs=Math.round(performance.now()-started);return {data}})
        .catch(error=>({error}))
    }
    const identityStarted=performance.now()
-   const identity=await callIdentity(body.conversation_id,body.protocolo,document,proof,controller.signal,
+   const identity=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,controller.signal,
     v4Enabled?{v4:true,verificationRef:trustedRef,purpose:'service'}:{})
    timing.identityMs=Math.round(performance.now()-identityStarted)
    if(trustedRef&&['verification_required','verification_expired'].includes(identity.status)){
@@ -504,7 +504,7 @@ async function respondValidated(body,res,context=null){
   const startedKnowledge=performance.now()
   const knowledgeAction=isSimpleGreeting(last.text)?'prompt_only':'context'
   path=management?'verified_lookup':knowledgeAction==='prompt_only'?'greeting':'general'
-  const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await callBridge(knowledgeAction,{agent,query:query||'atendimento',...memoryParams},controller.signal)}
+  const resultKnowledge=knowledgeTask?await knowledgeTask: {data:await bridge(knowledgeAction,{agent,query:query||'atendimento',...memoryParams},controller.signal)}
   if(resultKnowledge.error)throw resultKnowledge.error
   const knowledge=resultKnowledge.data
   // Intenção explícita tem prioridade; na continuidade neutra o estado preservado por protocolo decide.

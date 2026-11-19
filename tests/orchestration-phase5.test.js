@@ -46,7 +46,7 @@ test('F5: contrato operacional candidato Clara para patrimonio com intent',async
 test('F5: modelo mock, RAG fictícia, identidade fixture e bloqueio sem rede',async()=>{
  const calls=[]
  const rt=makeJointRuntime(cfg,store,pin,async(url,opts)=>{calls.push({url,data:JSON.parse(opts.body)});return {ok:true,json:async()=>({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({reply:'Como posso ajudar?',humanHandoff:false,handoff:null})}]}]})}})
- const res=response();await runOrchestrationJoint(body([user('Olá')]),pin,rt,res);assert.equal(res.code,200)
+ const res=response();await runOrchestrationJoint(body([user('O que é franquia?')]),pin,rt,res);assert.equal(res.code,200)
  assert.equal(calls.length,1);assert.equal(calls[0].url,'https://api.openai.com/v1/responses');assert.equal(calls[0].data.store,false)
  const skipped=response();await runOrchestrationJoint(body([user('Olá')],{mode:'desligado'}),pin,rt,skipped);assert.equal(skipped.data.humanHandoff,false);assert.equal(calls.length,1)
  assert.equal((await rt.bridge('context',{agent:'clara'})).sources.every(s=>s.title.startsWith('[TESTE]')),true)
