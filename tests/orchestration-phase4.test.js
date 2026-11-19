@@ -61,7 +61,7 @@ test('V1.4: data anterior e histórico anterior garantem legado; base ausente co
  for(const protocol of ['20990101-0001','20990101-0001-1','20990103-0004-2'])assert.equal((await resolveFixtureProtocol(s,protocol)).mode,'clara_murilo')
  assert.equal((await resolveProtocolStrategy(s,{protocol:'20990102-0005',activationDate:'20990102',knownBeforeActivation:true})).mode,'clara_murilo')
  assert.throws(()=>protocolBase('20990230-0001'),/invalid_protocol/)
- await assert.rejects(resolveFixtureProtocol(s,'20261119-0001'),/invalid_protocol/)
+ assert.throws(()=>resolveFixtureProtocol(s,'20261119-0001'),/invalid_protocol/)
 })
 test('V1.4: motor monta proposta, mas contrato externo em ensaio permanece bloqueado',async()=>{
  const oldFetch=globalThis.fetch;globalThis.fetch=async()=>{throw Error('NETWORK_FORBIDDEN')}
@@ -71,4 +71,15 @@ test('V1.4: motor monta proposta, mas contrato externo em ensaio permanece bloqu
   assert.equal(next.selectedAgent,'clara');assert.equal(next.proposedHandoff.intent,'nova_cotacao');assert.equal(next.proposedHandoff.department,'patrimonio')
   assert.equal(next.humanHandoff,false);assert.equal(next.handoff,null);assert.equal(next.executed,false)
  }finally{globalThis.fetch=oldFetch}
+})
+
+test('V1.4: cotação com pergunta de produto mantém marcador; oferta sem cotação não reutiliza assunto remoto',()=>{
+ const initial='Gostaria de fazer uma cotação.'
+ const question=route([user(initial)])
+ const named=route([user(initial),bot(question.reply),user('Seguro empresarial.')])
+ const next=route([user(initial),bot(question.reply),user('Seguro empresarial.'),bot(named.reply),user('Sim')])
+ assert.equal(next.handoff?.intent,'nova_cotacao')
+ const offered=route([user(auto)]).reply
+ const unrelated=route([user(auto),bot('Encerramos aquele assunto.'),user('Quero falar sobre seguro de carro.'),bot(offered),user('Sim')])
+ assert.notEqual(unrelated.handoff?.intent,'nova_cotacao')
 })

@@ -48,7 +48,7 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
  // A apresentação única do handler pode anteceder a oferta canônica.
  const offerText=delivered.replace(/^Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance\. 💙\s*/u,'')
  const offeredProduct=offerText.match(/^Posso encaminhar sua solicitação de (.+?) à equipe de /u)?.[1]||''
- const prior=identifyOrchestrationProducts(offeredProduct)
+ const prior=identifyOrchestrationProducts('seguro '+offeredProduct)
  // Só uma oferta canônica realmente entregue no turno imediatamente anterior
  // pode ser usada para confirmar. Nunca confiar em texto do cliente como oferta.
  const offered=prior.length===1&&offeredProduct===prior[0][0]&&fold(offerText)===fold(offer(prior[0][0],prior[0][1]))?prior[0]:null
@@ -68,8 +68,10 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
   const route=verifiedRoutes[product]
   // Evidência de cotação no turno atual ou na cadeia imediatamente anterior
   // de oferta/clarificação comercial. Não inferir de recados, agente ou hint.
-  const earlier=messages.slice(-5).filter(m=>m.direction==='inbound'&&m.author==='contact')
-  const isQuote=quoteWords(text)||((offered||asked)&&earlier.some(m=>quoteWords(m.text)&&!negated.test(fold(m.text))))
+  const contactQuote=m=>m?.direction==='inbound'&&m.author==='contact'&&quoteWords(m.text)&&!negated.test(fold(m.text))
+  const precedingClarification=m=>m?.direction==='outbound'&&m.author==='agent'&&fold(String(m.text||'').replace(/^Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance\. 💙\s*/u,''))===fold(clarify)
+  const isQuote=quoteWords(text)||((offered||asked)&&contactQuote(messages.at(-3)))||
+   (Boolean(offered)&&messages.at(-3)?.direction==='inbound'&&messages.at(-3)?.author==='contact'&&precedingClarification(messages.at(-4))&&contactQuote(messages.at(-5)))
   const intentField=target==='auto_re'&&route?.department==='patrimonio'&&isQuote?{intent:'nova_cotacao'}:{}
   if(!route||route.verified!==true||!['patrimonio','comercial'].includes(route.department))
    return reply('Obrigada pela confirmação. O destino comercial ainda precisa ser validado pela nossa equipe.',{action:'mapping_required',product,logicalTarget:target})
