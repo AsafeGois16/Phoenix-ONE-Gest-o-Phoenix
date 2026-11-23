@@ -64,7 +64,7 @@ export default function LargeMediaUploadProbe({session,onClose}){
      <span>Autorizo usar este arquivo fictício exclusivamente para verificar o upload e sua exclusão, sem transcrição.</span>
     </label>
     <p className="ops-muted"><ShieldCheck size={15}/> Bucket privado, acesso por usuário, blocos de 6 MB, retomada pelo mesmo arquivo.</p>
-    {status!=='idle'&&<KnowledgeProgress value={['uploading','connecting','paused'].includes(status)?{label:status==='paused'?'Envio pausado':'Enviando ao Supabase...',done:loaded,total:file?.size||1,active:status!=='paused',note:'Percentual de bytes confirmados pelo armazenamento.':{label:status==='validated_and_removed'?'Upload validado e arquivo excluído':status==='cleanup_failed'?'Falha na limpeza':status==='failed'?'Falha no upload':status,done:1,total:1,active:false,error:['cleanup_failed','failed'].includes(status)}}/>}
+    {status!=='idle'&&<KnowledgeProgress value={['uploading','connecting','paused'].includes(status)?{label:status==='paused'?'Envio pausado':'Enviando ao Supabase...',done:loaded,total:file?.size||1,active:status!=='paused',note:'Percentual de bytes confirmados pelo armazenamento.'}:{label:status==='validated_and_removed'?'Upload validado e arquivo excluído':status==='cleanup_failed'?'Falha na limpeza':status==='failed'?'Falha no upload':status,done:1,total:1,active:false,error:['cleanup_failed','failed'].includes(status)}}/>}
     {error&&<div className="ops-notice" role="alert">{error}</div>}
     {result&&status==='validated_and_removed'&&<p className="ops-muted">Teste concluído: {result.bytes.toLocaleString('pt-BR')} bytes enviados e removidos. Nenhum conteúdo foi cadastrado.</p>}
    </div>
