@@ -10,3 +10,6 @@ Vídeos do YouTube: tenta ler captionTracks da página pública e recuperar tran
 Cada material registra, no texto indexável, URL original, tipo de fonte, data UTC de importação e indicação de revisão humana. A tabela knowledge_documents mantém a estrutura atual; nesta fase source_kind permanece "text" para preservar o contrato e o processo de publicação vigente. Não se cria nova fonte de dados operacional nem se muda a RAG, os prompts, o MegaBrain ou o sistema do Junior.
 ## Etapa futura
 Agendar verificações de atualização somente após aprovação explícita. Necessitará persistir URL, hash/revisão, cadence, alertas e fluxo de aprovação de diffs; nada disso é ativado na v1.
+
+## Correção de compatibilidade Node.js 24 (23/11/2026)
+A função HTTPS mantém o IP público verificado fixo até a conexão e agora adapta o callback DNS para a resposta em lista exigida quando o runtime solicita `{all:true}`; com `autoSelectFamily:false` e `family:4`, também atende à assinatura tradicional. Antes da correção, o site público phoenixseg.com.br falhava com `ERR_INVALID_IP_ADDRESS`. Teste de requisição real no preview corrigido: HTTP 200 e 197420 bytes; teste automatizado adicional verifica ambas as assinaturas do resolver. Não foram alteradas permissões ou publicação dos conhecimentos, nem configurações do Junior ou dos agentes.
