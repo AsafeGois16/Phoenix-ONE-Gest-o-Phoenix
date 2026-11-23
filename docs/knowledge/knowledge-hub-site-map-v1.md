@@ -23,3 +23,6 @@
 
 ## Monitoramento futuro
 Sem cron, agendamento ou atualização periódica. Acompanhamento contínuo dependerá de novo projeto e autorização separada.
+
+## Verificação real em preview — 23/11/2026
+A descoberta pontual de https://phoenixseg.com.br/ identificou 80 URLs (limite configurado), em 12 requisições e 5723 ms, incluindo os hosts phoenixseg.com.br e lp.phoenixseg.com.br, com zero falhas na consulta. O teste de rede foi removido do build final. Para consultar mais páginas, mapear áreas e subdomínios separadamente.

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "node scripts/test-build.mjs && node scripts/probe-site-map.mjs && vite build",
+    "build": "node scripts/test-build.mjs && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test:route": "node --test tests/agent-routing.test.js"
   },

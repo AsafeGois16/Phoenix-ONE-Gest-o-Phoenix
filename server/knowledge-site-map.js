@@ -62,7 +62,7 @@ export function titleFromUrl(url){
 const decodeURIComponentSafe=value=>{try{return decodeURIComponent(value)}catch{return value}}
 export function parseSitemap(xml,base,scope){
  const indexes=[],pages=[]
- if(typeof xml!=='string'||!/^\s*(?:<\?xml[\s\S]*?\?>\s*)?<(?:sitemapindex|urlset)\b/i.test(xml))return {indexes,pages}
+ if(typeof xml!=='string'||!/^\s*(?:<\?[^?]+\?>\s*)*<(?:sitemapindex|urlset)\b/i.test(xml))return {indexes,pages}
  const index=/\<sitemapindex\b/i.test(xml.slice(0,160))
  for(const m of xml.matchAll(/<loc\b[^>]*>([\s\S]*?)<\/loc>/gi)){
   if(indexes.length+pages.length>=1000)break

@@ -82,3 +82,8 @@ test('UI exige revisão e confirmação antes de criar documentos',()=>{
  assert.match(ui,/create_document/);assert.match(ui,/result.status!=='review'/)
  assert.doesNotMatch(api,/create_document|publish_document|insert into|setInterval/)
 })
+test('sitemap WordPress com declaração XML e stylesheet é indexado',()=>{
+ const xml='<?xml version="1.0" encoding="UTF-8"?>\n<?xml-stylesheet type="text/xsl" href="//phoenixseg.com.br/sitemap.xsl"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>https://phoenixseg.com.br/page-sitemap.xml</loc></sitemap></sitemapindex>'
+ const r=parseSitemap(xml,root,'phoenixseg.com.br')
+ assert.deepEqual(r.indexes,['https://phoenixseg.com.br/page-sitemap.xml'])
+})
