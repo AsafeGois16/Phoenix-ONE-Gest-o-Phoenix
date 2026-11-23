@@ -67,7 +67,7 @@ export async function transcribeLargeLocalFile(file,{
   try{duration=Number(JSON.parse(probeText).format.duration)}catch{throw new WorkerError('invalid_probe_output')}
   const plan=segmentPlan(duration)
   work=await mkdtemp(join(workspaceRoot,'phoenix-media-'))
-  onProgress({stage:'chunking',completed:0,total:plan.length})
+  await onProgress({stage:'chunking',completed:0,total:plan.length})
   const parts=[]
   for(const seg of plan){
    if(signal?.aborted)throw new WorkerError('job_cancelled')
@@ -75,13 +75,13 @@ export async function transcribeLargeLocalFile(file,{
    await runCommand('ffmpeg',ffmpegSegmentArgs(file,seg,dest),{timeoutMs:180000,signal})
    const bytes=await readFile(dest)
    if(bytes.length<1000||bytes.length>SEGMENT_MAX_BYTES)throw new WorkerError('segment_size_invalid')
-   onProgress({stage:'transcribing',completed:seg.index,total:plan.length})
+   await onProgress({stage:'transcribing',completed:seg.index,total:plan.length})
    const result=await transcribe(new Blob([bytes],{type:'audio/mpeg'}),{
     filename:'segment.mp3',apiKey,language
    })
    if(typeof result?.text!=='string'||result.text.trim().length<10)throw new WorkerError('segment_transcription_empty')
    parts.push({index:seg.index,startMs:Math.round(seg.startSec*1000),endMs:Math.round(seg.endSec*1000),text:result.text})
-   onProgress({stage:'transcribing',completed:seg.index+1,total:plan.length})
+   await onProgress({stage:'transcribing',completed:seg.index+1,total:plan.length})
   }
   const text=assembleTranscript(parts)
   return {text,segments:parts.length,durationSeconds:duration,reviewRequired:true,published:false,
