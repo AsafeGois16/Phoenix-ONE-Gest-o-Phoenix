@@ -3,9 +3,10 @@ import {createClient} from '@supabase/supabase-js'
 import MegaBrain from './MegaBrain.jsx'
 import KnowledgeSiteMap from './KnowledgeSiteMap.jsx'
 import KnowledgeProgress from './KnowledgeProgress.jsx'
+import KnowledgeTranscription from './KnowledgeTranscription.jsx'
 import {labGuardFeedback} from './lab-guard-feedback.js'
 import {ragConversationTxt} from './rag-conversation-export.js'
-import {Activity,ArrowRight,BookOpen,BrainCircuit,Check,CheckCircle2,ChevronRight,Clock3,Database,Download,FileText,FolderOpen,History,KeyRound,Layers3,Lock,Plus,RefreshCcw,Save,Search,Send,ShieldCheck,Sparkles,Ticket,Upload,Link2,UserRound,Users,X} from 'lucide-react'
+import {Activity,ArrowRight,BookOpen,BrainCircuit,Check,CheckCircle2,ChevronRight,Clock3,Database,Download,FileText,FolderOpen,History,KeyRound,Layers3,Lock,Plus,RefreshCcw,Save,Search,Send,ShieldCheck,Sparkles,Ticket,Upload,Link2,AudioLines,UserRound,Users,X} from 'lucide-react'
 
 const url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const supa=url&&key?createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}}):null
@@ -45,7 +46,7 @@ function readKnowledgeBytes(file,onProgress){
 }
 function KnowledgePanel({data,call,refresh,session}){
  const [hubProgress,setHubProgress]=useState(null)
- const [filter,setFilter]=useState(''),[agent,setAgent]=useState('todos'),[selected,setSelected]=useState(null),[document,setDocument]=useState(null),[editor,setEditor]=useState(null),[newOpen,setNewOpen]=useState(false),[linkOpen,setLinkOpen]=useState(false),[mapOpen,setMapOpen]=useState(false),[sourceLink,setSourceLink]=useState(''),[manualTranscript,setManualTranscript]=useState(''),[linkError,setLinkError]=useState(''),[form,setForm]=useState({title:'',category:'Procedimentos',sensitivity:'internal',agents:['clara'],content:''}),[busy,setBusy]=useState(false),[msg,setMsg]=useState('')
+ const [filter,setFilter]=useState(''),[agent,setAgent]=useState('todos'),[selected,setSelected]=useState(null),[document,setDocument]=useState(null),[editor,setEditor]=useState(null),[newOpen,setNewOpen]=useState(false),[linkOpen,setLinkOpen]=useState(false),[mapOpen,setMapOpen]=useState(false),[transcribeOpen,setTranscribeOpen]=useState(false),[sourceLink,setSourceLink]=useState(''),[manualTranscript,setManualTranscript]=useState(''),[linkError,setLinkError]=useState(''),[form,setForm]=useState({title:'',category:'Procedimentos',sensitivity:'internal',agents:['clara'],content:''}),[busy,setBusy]=useState(false),[msg,setMsg]=useState('')
  const list=data.documents.filter(d=>(agent==='todos'||d.agents.includes(agent))&&(d.title+' '+d.category).toLowerCase().includes(filter.toLowerCase()))
  const openDoc=async d=>{setSelected(d);setEditor({...d});setDocument(null);setMsg('');try{const v=await call('document_detail',{id:d.id});setDocument(v)}catch(e){setMsg(errorText(e.message))}}
  const create=async(e)=>{e.preventDefault();setBusy(true);setMsg('');setHubProgress({label:'Cadastrando conhecimento em revisão...',active:true,note:'Aguarde a confirmação do banco de dados.'});try{const r=await call('create_document',form);setMsg('Conhecimento cadastrado em revisão ('+r.chunks+' trechos).');setHubProgress({label:'Documento cadastrado em revisão',done:1,total:1,active:false,note:'A publicação continua dependendo de aprovação humana.'});setNewOpen(false);setForm({title:'',category:'Procedimentos',sensitivity:'internal',agents:['clara'],content:''});await refresh()}catch(e){setMsg(errorText(e.message));setHubProgress({label:'Falha ao cadastrar conhecimento',error:true,active:false})}finally{setBusy(false)}}
@@ -62,25 +63,6 @@ function KnowledgePanel({data,call,refresh,session}){
    setForm(x=>({...x,title:file.name,content,category:'Documentos'}));setHubProgress({label:'Arquivo pronto para revisão: '+file.name,done:1,total:1,active:false,note:'Ainda não foi salvo no banco.'});setNewOpen(true);setMsg('Texto extraído de '+file.name+'. Revise e vincule os agentes antes de cadastrar.')
  }catch(e){setMsg(errorText(e.message));setHubProgress({label:'Falha ao importar '+file.name,error:true,active:false})}finally{setBusy(false)}}
 
- const transcribeMedia=async(e)=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;setBusy(true);setMsg('');setHubProgress({label:'Enviando '+file.name+' para transcrição...',done:0,total:file.size||1,active:true,note:'Progresso do envio; o Whisper não fornece porcentagem de transcrição.'});try{
-   if(file.size>4*1024*1024)throw Error('media_too_large')
-   if(!/\.(mp3|mp4|mpeg|mpga|m4a|wav|webm)$/i.test(file.name))throw Error('unsupported_media_format')
-   const data=await new Promise((resolve,reject)=>{
-     const xhr=new XMLHttpRequest()
-     xhr.open('POST','/api/phoenix-transcribe')
-     xhr.setRequestHeader('Authorization','Bearer '+session.access_token)
-     xhr.setRequestHeader('X-File-Name',file.name)
-     xhr.upload.onprogress=event=>{if(event.lengthComputable)setHubProgress({label:'Enviando '+file.name+'...',done:event.loaded,total:event.total,active:true,note:'Progresso de envio ao servidor.'})}
-     xhr.upload.onload=()=>setHubProgress({label:'Transcrevendo '+file.name+' com Whisper...',active:true,note:'A transcrição não fornece percentual disponível nesta etapa.'})
-     xhr.onerror=()=>reject(Error('transcription_unavailable'))
-     xhr.onload=()=>{let result;try{result=JSON.parse(xhr.responseText)}catch{result={error:'transcription_unavailable'}};if(xhr.status<200||xhr.status>=300)reject(Error(result.error||'transcription_unavailable'));else resolve(result)}
-     xhr.send(file)
-   })
-   if(data.reviewRequired!==true||typeof data.content!=='string'||data.content.length<30)throw Error('transcription_unavailable')
-   setForm(x=>({...x,title:data.title.slice(0,180),category:'Documentos',content:data.content}))
-   setNewOpen(true);setMsg('Transcrição automática pronta. Revise o conteúdo antes de cadastrar; nada foi publicado.')
-   setHubProgress({label:'Transcrição pronta para revisão',done:1,total:1,active:false,note:'Somente após aprovação o conteúdo será disponibilizado aos agentes.'})
- }catch(err){setMsg(errorText(err.message));setHubProgress({label:'Falha ao transcrever '+file.name,error:true,active:false})}finally{setBusy(false)}}
  const importSource=async(e)=>{e.preventDefault();setBusy(true);setLinkError('');setHubProgress({label:'Consultando a página ou as legendas...',active:true,note:'O servidor não informa porcentagem durante a consulta.'});try{
    const resp=await fetch('/api/phoenix-import-source',{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({url:sourceLink.trim()}),cache:'no-store'})
    const data=await resp.json().catch(()=>({error:'source_import_unavailable'}))
@@ -99,15 +81,21 @@ function KnowledgePanel({data,call,refresh,session}){
    setLinkOpen(false);setNewOpen(true);setManualTranscript('')
    setMsg('Transcrição recebida para revisão. Confira o vídeo e o texto antes do cadastro.');setHubProgress({label:'Transcrição preparada para revisão',done:1,total:1,active:false})
  }catch(err){setLinkError(errorText(err.message))}}
+ const prepareTranscription=({title,content,category})=>{
+  setForm({title,content,category:category||'Aprendizado supervisionado',sensitivity:'internal',agents:['clara']})
+  setTranscribeOpen(false);setNewOpen(true)
+  setHubProgress({label:'Transcrição pronta para revisão',done:1,total:1,active:false,note:'Nenhum conhecimento foi publicado ou registrado automaticamente.'})
+  setMsg('Transcrição obtida. Confira o conteúdo, as informações pessoais e os agentes antes de cadastrar.')
+ }
  const savePermissions=async()=>{setBusy(true);setHubProgress({label:'Atualizando permissões do documento...',active:true});try{await call('update_document',{id:editor.id,category:editor.category,sensitivity:editor.sensitivity,agents:editor.agents});setMsg('Permissões atualizadas. Documento voltou para revisão.');setHubProgress({label:'Permissões atualizadas',done:1,total:1,active:false});await refresh()}catch(e){setMsg(errorText(e.message));setHubProgress({label:'Falha ao atualizar permissões',error:true,active:false})}finally{setBusy(false)}}
  const changeStatus=async status=>{setBusy(true);setHubProgress({label:status==='published'?'Publicando o documento...':'Atualizando status do documento...',active:true});try{await call('publish_document',{id:selected.id,status});setMsg('Status salvo: '+status);setHubProgress({label:'Status salvo: '+status,done:1,total:1,active:false});await refresh();setSelected(null)}catch(e){setMsg(errorText(e.message));setHubProgress({label:'Falha ao atualizar status',error:true,active:false})}finally{setBusy(false)}}
- return <div className="ops-stack"><div className="ops-heading"><div><h2>Knowledge Hub</h2><p>Biblioteca real de procedimentos, documentos, arquivos e conhecimento por agente.</p></div><div className="ops-actions"><label className="ops-btn secondary ops-file"><Upload size={15}/> Importar PDF, DOCX ou texto<input hidden type="file" accept=".pdf,.docx,.txt,.md,.csv,.json" onChange={importFile}/></label><label className="ops-btn secondary ops-file"><Upload size={15}/> Transcrever áudio ou vídeo (Whisper)<input hidden type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm" disabled={busy} onChange={transcribeMedia}/></label><Btn secondary onClick={()=>{setLinkOpen(true);setLinkError('')}}><Link2 size={15}/> Importar site ou vídeo</Btn><Btn secondary onClick={()=>setMapOpen(true)}><FolderOpen size={15}/> Mapear site completo</Btn><Btn onClick={()=>setNewOpen(true)}><Plus size={15}/> Novo conhecimento</Btn></div></div>
+ return <div className="ops-stack"><div className="ops-heading"><div><h2>Knowledge Hub</h2><p>Biblioteca real de procedimentos, documentos, arquivos e conhecimento por agente.</p></div><div className="ops-actions"><label className="ops-btn secondary ops-file"><Upload size={15}/> Importar PDF, DOCX ou texto<input hidden type="file" accept=".pdf,.docx,.txt,.md,.csv,.json" onChange={importFile}/></label><Btn secondary onClick={()=>setTranscribeOpen(true)}><AudioLines size={15}/> Transcrever áudio ou vídeo</Btn><Btn secondary onClick={()=>{setLinkOpen(true);setLinkError('')}}><Link2 size={15}/> Importar site ou vídeo</Btn><Btn secondary onClick={()=>setMapOpen(true)}><FolderOpen size={15}/> Mapear site completo</Btn><Btn onClick={()=>setNewOpen(true)}><Plus size={15}/> Novo conhecimento</Btn></div></div>
  {hubProgress&&<KnowledgeProgress value={hubProgress}/>}
  <div className="ops-metrics"><div><strong>{data.documents.length}</strong><span>Documentos cadastrados</span></div><div><strong>{data.documents.filter(d=>d.status==='published').length}</strong><span>Publicados</span></div><div><strong>{data.documents.filter(d=>d.status==='review').length}</strong><span>Em revisão</span></div><div><strong>{data.stats.chunks||0}</strong><span>Trechos disponíveis</span></div></div>
  <div className="ops-paper"><div className="ops-toolbar"><label><Search size={17}/><input placeholder="Pesquisar na biblioteca…" value={filter} onChange={e=>setFilter(e.target.value)}/></label><select value={agent} onChange={e=>setAgent(e.target.value)}><option value="todos">Todos os agentes</option><option value="clara">Clara</option><option value="murilo">Murilo</option><option value="grazy_copy">Grazy Copy</option></select><Btn secondary onClick={refresh}><RefreshCcw size={14}/></Btn></div>
  <div className="ops-document-list">{list.map(d=><button key={d.id} onClick={()=>openDoc(d)} className="ops-document"><span className="ops-file-icon"><FileText size={19}/></span><span className="ops-document-desc"><strong>{d.title}</strong><small>{d.category} · {d.source_kind.toUpperCase()} · v{d.version} · {d.chunks} trechos</small></span><span className="ops-doc-agents">{d.agents.map(a=><span key={a}>{agentsInfo[a]?.initial||'?'}</span>)}</span><span className={'ops-tag '+(d.status==='published'?'good':'warn')}>{d.status==='published'?'Publicado':d.status==='review'?'Revisão':'Arquivado'}</span><ChevronRight size={16}/></button>)}{!list.length&&<p className="ops-muted">Nenhum documento encontrado.</p>}</div></div>
  {msg&&<div className="ops-notice">{msg}</div>}
- {mapOpen&&<KnowledgeSiteMap session={session} call={call} refresh={refresh} onClose={()=>setMapOpen(false)}/>} {linkOpen&&<div className="ops-modal-back"><form className="ops-modal" onSubmit={importSource}><div className="ops-modal-title"><h3>Importar site ou vídeo</h3><button type="button" onClick={()=>setLinkOpen(false)}><X size={18}/></button></div><div className="ops-scroll">
+ {mapOpen&&<KnowledgeSiteMap session={session} call={call} refresh={refresh} onClose={()=>setMapOpen(false)}/>} {transcribeOpen&&<KnowledgeTranscription session={session} onClose={()=>setTranscribeOpen(false)} onReady={prepareTranscription}/>}  {linkOpen&&<div className="ops-modal-back"><form className="ops-modal" onSubmit={importSource}><div className="ops-modal-title"><h3>Importar site ou vídeo</h3><button type="button" onClick={()=>setLinkOpen(false)}><X size={18}/></button></div><div className="ops-scroll">
   <label>Endereço HTTPS público<input type="url" value={sourceLink} onChange={e=>setSourceLink(e.target.value)} required maxLength={2048} placeholder="https://site-oficial.com.br/pagina ou https://www.youtube.com/watch?v=..."/></label>
   <p className="ops-muted">Importa somente o conteúdo disponível agora. Não monitora alterações. Para vídeos do YouTube, tenta recuperar legendas acessíveis; não analisa áudio ou imagens.</p>
   <label>Se a legenda não estiver acessível: cole a transcrição do vídeo (opcional)<textarea rows={6} value={manualTranscript} onChange={e=>setManualTranscript(e.target.value)} placeholder="Cole aqui a transcrição, para revisão humana antes de cadastrar..."/></label>
