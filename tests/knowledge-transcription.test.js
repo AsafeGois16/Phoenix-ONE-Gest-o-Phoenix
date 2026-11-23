@@ -38,7 +38,8 @@ test('Transcrição: usa endpoint oficial com modelo atual, sem expor prompt ou 
   assert.equal(url,'https://api.openai.com/v1/audio/transcriptions')
   assert.equal(opts.headers.Authorization,'Bearer fixture')
   assert.equal(opts.body.get('model'),'gpt-transcribe')
-  assert.equal(opts.body.get('language'),'pt')
+  assert.equal(opts.body.get('languages[]'),'pt')
+  assert.equal(opts.body.has('language'),false)
   assert.equal(opts.body.get('response_format'),'json')
   const media=opts.body.get('file')
   assert.equal(media.name,'recording.mp3');assert.equal(media.type,'audio/mpeg')
@@ -51,6 +52,7 @@ test('Transcrição: usa endpoint oficial com modelo atual, sem expor prompt ou 
 test('Transcrição: omite indicação de idioma quando automática',async()=>{
  const r=await transcribeMedia(data(),{filename:'audio.mp3',apiKey:'fixture',fetcher:async(url,opts)=>{
   assert.equal(opts.body.has('language'),false)
+  assert.equal(opts.body.has('languages[]'),false)
   return {ok:true,json:async()=>({text:'The Phoenix Insurance company offers professional insurance brokerage services to customers.'})}
  }})
  assert.ok(r.text.includes('Phoenix'))
@@ -61,6 +63,35 @@ test('Transcrição: erros conhecidos sem vazamento de dados sensíveis',async()
  }
  await assert.rejects(transcribeMedia(data(),{filename:'audio.mp3',apiKey:'',fetcher:async()=>{throw Error('should not be called')}}),/transcription_not_configured/)
  await assert.rejects(transcribeMedia(data(),{filename:'audio.mp3',apiKey:'fixture',fetcher:async()=>{throw new Error('Private provider trace with secrets')}}),e=>e.message==='transcription_service_unavailable')
+})
+test('Transcrição: Whisper legado mantém parâmetro singular de idioma',async()=>{
+ await transcribeMedia(data(),{filename:'audio.mp3',apiKey:'fixture',language:'pt',model:'whisper-1',fetcher:async(url,opts)=>{
+  assert.equal(opts.body.get('language'),'pt')
+  assert.equal(opts.body.has('languages[]'),false)
+  return {ok:true,json:async()=>({text:'Este é um áudio de teste válido com algumas palavras para transcrição.'})}
+ }})
+})
+test('Transcrição: rejeição do arquivo é classificada sem expor mensagem do provedor',async()=>{
+ const fetcher=async()=>({
+  ok:false,status:400,
+  headers:{get:name=>name==='x-request-id'?'req_test123':null},
+  json:async()=>({error:{type:'invalid_request_error',code:'invalid_file_format',param:'file',message:'Áudio confidencial com dados privados'}})
+ })
+ await assert.rejects(transcribeMedia(data(),{filename:'audio.mpeg',apiKey:'fixture',fetcher}),e=>{
+  assert.equal(e.message,'transcription_media_rejected')
+  assert.equal(e.status,422)
+  assert.deepEqual(e.details,{
+   providerStatus:400,providerType:'invalid_request_error',
+   providerCode:'invalid_file_format',providerParam:'file',
+   providerRequestId:'req_test123',extension:'mpeg',model:'gpt-transcribe'
+  })
+  assert.equal(JSON.stringify(e.details).includes('confidencial'),false)
+  return true
+ })
+})
+test('Transcrição: erro de parâmetros é distinto da rejeição do áudio',async()=>{
+ const fetcher=async()=>({ok:false,status:400,json:async()=>({error:{type:'invalid_request_error',param:'languages'}})})
+ await assert.rejects(transcribeMedia(data(),{filename:'audio.mpeg',apiKey:'fixture',fetcher}),e=>e.message==='transcription_provider_request_rejected'&&e.details.providerParam==='languages')
 })
 test('Transcrição: rota privada rejeita GET e origem incorreta sem armazenar áudio',async()=>{
  const res=()=>({code:200,setHeader(){},status(n){this.code=n;return this},json(x){this.body=x;return x}})
