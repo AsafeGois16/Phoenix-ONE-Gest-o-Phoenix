@@ -18,7 +18,7 @@ export const mediaExtension=name=>{
  return extensions.has(ext)?ext:null
 }
 export const mediaContentType=ext=>extensions.get(ext)||null
-const uid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const uid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export function validOwnedPath(path,userId){
  if(typeof path!=='string'||path.length>130||typeof userId!=='string'||!uid.test(userId))return null
  const match=path.match(/^([0-9a-f-]{36})\/([0-9a-f-]{36})\.([a-z0-9]{3,5})$/i)

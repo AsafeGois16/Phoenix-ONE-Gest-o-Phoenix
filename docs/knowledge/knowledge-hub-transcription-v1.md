@@ -14,7 +14,7 @@ O painel Phoenix ONE ganha o botão **Transcrever áudio ou vídeo**:
 ## Segurança e limites
 - Bucket privado phoenix-hub-transcription-temp, com tamanho máximo de 24 MB e tipos MIME permitidos.
 - RLS em storage.objects com INSERT/SELECT/DELETE restritos a usuário autenticado autorizado na tabela phoenix_one.admin_users e caminho privado auth.uid()/uuid.ext. Não permite upsert e não publica URLs.
-- Função storage.phoenix_hub_transcription_editor com SECURITY DEFINER, busca totalmente qualificada e schema storage fora da Data API pública.
+- Função privada phoenix_hub_access.phoenix_hub_transcription_editor com SECURITY DEFINER, busca totalmente qualificada e schema phoenix_hub_access não exposto à Data API pública.
 - API Vercel confere Origin/Host, token, papel, propriedade do arquivo e formato binário. Nenhum envio é feito ao sistema do Junior.
 - O modelo pode errar coberturas, nomes, valores ou condições contratuais. Revisão humana e autorização para tratar dados pessoais são obrigatórias.
 - Arquivos acima de 24 MB devem ser comprimidos ou divididos; longos vídeos podem esgotar o tempo de execução.
