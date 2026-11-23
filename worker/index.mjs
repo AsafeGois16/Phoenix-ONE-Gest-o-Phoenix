@@ -40,7 +40,7 @@ const pathUrl=p=>p.split('/').map(encodeURIComponent).join('/')
 async function claimJob(){
  return pg.begin(async tx=>{
   const rows=await tx.unsafe(
-   "select id,owner_id,storage_path,bytes,language,attempts from phoenix_one.large_media_jobs where status='uploaded' and expires_at>now() order by created_at asc limit 1 for update skip locked"
+   "select id,owner_id,storage_path,bytes,language,attempts from phoenix_one.large_media_jobs where (status='uploaded' or (status in ('extracting','chunking','transcribing','assembling') and lease_until<now())) and attempts<3 and expires_at>now() order by created_at asc limit 1 for update skip locked"
   )
   if(!rows.length)return null
   const job=rows[0]
@@ -141,6 +141,9 @@ async function work(job){
  }
 }
 async function expireJobs(){
+ // Stop indefinitely abandoned workers after three leases and process cancelled stale leases.
+ await pg.unsafe("update phoenix_one.large_media_jobs set status='failed',error_code='worker_retries_exhausted',lease_token=null,lease_until=null,updated_at=now() where status in ('extracting','chunking','transcribing','assembling') and lease_until<now() and attempts>=3")
+ await pg.unsafe("update phoenix_one.large_media_jobs set status='cancelled',lease_token=null,lease_until=null,updated_at=now() where status='cancel_requested' and (lease_until<now() or lease_until is null)")
  const rows=await pg.unsafe(
   "select id,storage_path from phoenix_one.large_media_jobs where (expires_at<now() or status='cancelled') and status not in ('expired','extracting','chunking','transcribing','assembling','cancel_requested') limit 20"
  )
