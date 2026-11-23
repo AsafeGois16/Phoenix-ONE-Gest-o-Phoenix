@@ -5,6 +5,7 @@
 export const TRANSCRIBE_BUCKET='phoenix-hub-transcription-temp'
 export const TRANSCRIBE_MAX_BYTES=24000000
 export const TRANSCRIBE_MODEL='gpt-transcribe'
+export const TRANSCRIBE_MODELS=new Set(['gpt-transcribe','whisper-1'])
 const extensions=new Map([
  ['mp3','audio/mpeg'],['mpga','audio/mpeg'],['mpeg','audio/mpeg'],
  ['m4a','audio/mp4'],['mp4','video/mp4'],['wav','audio/wav'],
@@ -43,12 +44,13 @@ export async function validateMedia(blob,filename){
  if(!ok)throw new TranscriptionError('media_invalid_content')
  return {extension:ext,mime:mediaContentType(ext),bytes:blob.size}
 }
-export async function transcribeMedia(blob,{filename,apiKey,language='auto',fetcher=fetch}={}){
+export async function transcribeMedia(blob,{filename,apiKey,language='auto',model=TRANSCRIBE_MODEL,fetcher=fetch}={}){
+ if(!TRANSCRIBE_MODELS.has(model))throw new TranscriptionError('transcription_invalid_model',400)
  const meta=await validateMedia(blob,filename)
  if(typeof apiKey!=='string'||!apiKey)throw new TranscriptionError('transcription_not_configured',503)
  const data=new FormData()
  data.append('file',new Blob([blob],{type:meta.mime}),'recording.'+meta.extension)
- data.append('model',TRANSCRIBE_MODEL)
+ data.append('model',model)
  data.append('response_format','json')
  if(language==='pt')data.append('language','pt')
  data.append('prompt','Termos para preservar quando pronunciados: Phoenix Insurance, Bradesco Saúde, Amil, Hapvida, SulAmérica, Porto Seguro, corretora de seguros, apólice, sinistro, carência, coparticipação.')
@@ -71,5 +73,5 @@ export async function transcribeMedia(blob,{filename,apiKey,language='auto',fetc
  if(typeof json?.text!=='string'||json.text.trim().length<10)throw new TranscriptionError('transcription_empty',422)
  const text=json.text.replace(/\u0000/g,'').trim()
  if(text.length>145000)throw new TranscriptionError('transcription_too_long',413)
- return {text,model:TRANSCRIBE_MODEL,bytes:meta.bytes}
+ return {text,model,bytes:meta.bytes}
 }

@@ -13,7 +13,8 @@ export default async function handler(req,res){
  if(jwt.length<40||!URL||!KEY)return res.status(401).json({error:'unauthorized'})
  const path=req.body?.path
  const language=req.body?.language
- if(req.body?.consent!==true||!['auto','pt'].includes(language)||typeof path!=='string')return res.status(400).json({error:'invalid_transcription_request'})
+ const model=req.body?.model||'gpt-transcribe'
+ if(req.body?.consent!==true||!['auto','pt'].includes(language)||!['gpt-transcribe','whisper-1'].includes(model)||typeof path!=='string')return res.status(400).json({error:'invalid_transcription_request'})
  let storage=null,canCleanup=false
  try{
   const supa=createClient(URL,KEY,{
@@ -39,7 +40,8 @@ export default async function handler(req,res){
   const result=await transcribeMedia(media,{
    filename:'recording.'+extension,
    apiKey:process.env.OPENAI_API_KEY,
-   language
+   language,
+   model
   })
   // Text is returned for manual editing; it is NOT automatically saved or
   // published. The original media is removed in finally, success or failure.
