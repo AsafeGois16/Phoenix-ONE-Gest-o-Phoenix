@@ -1,5 +1,6 @@
 import React,{useMemo,useState} from 'react'
-import {CheckCircle2,ChevronLeft,ChevronRight,ExternalLink,FolderTree,Globe,Link2,RefreshCcw,ShieldCheck,X} from 'lucide-react'
+import KnowledgeProgress from './KnowledgeProgress.jsx'
+import {CheckCircle2,ChevronDown,ChevronLeft,ChevronRight,FolderTree,Globe,Link2,RefreshCcw,ShieldCheck,X} from 'lucide-react'
 const SELECT_LIMIT=12
 const TYPES=['clara','murilo','grazy_copy']
 const LABELS={clara:'Clara',murilo:'Murilo',grazy_copy:'Grazy Copy'}
@@ -31,31 +32,38 @@ export default function KnowledgeSiteMap({session,call,refresh,onClose}){
  const [url,setUrl]=useState('https://phoenixseg.com.br/')
  const [map,setMap]=useState(null),[selected,setSelected]=useState([])
  const [phase,setPhase]=useState('map'),[drafts,setDrafts]=useState([]),[focus,setFocus]=useState(0)
- const [busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState('')
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[progress,setProgress]=useState(''),[taskProgress,setTaskProgress]=useState(null)
+ const [mapQuery,setMapQuery]=useState(''),[expandedGroups,setExpandedGroups]=useState([])
  const [failures,setFailures]=useState([]),[category,setCategory]=useState('Produtos')
  const [sensitivity,setSensitivity]=useState('internal'),[agents,setAgents]=useState(['clara'])
  const grouped=useMemo(()=>{
   const result={}
   for(const p of (map?.pages||[])){
    const key=p.host+' · '+p.section
+   const query=mapQuery.trim().toLocaleLowerCase('pt-BR')
+   if(query&&!(p.title+' '+p.url+' '+key).toLocaleLowerCase('pt-BR').includes(query))continue
    if(!result[key])result[key]=[]
    result[key].push(p)
   }
   return result
- },[map])
+ },[map,mapQuery])
  const mapIt=async e=>{
   e.preventDefault();if(busy)return
-  setBusy(true);setError('');setMap(null);setDrafts([]);setSelected([]);setFailures([]);setPhase('map')
+  setBusy(true);setError('');setMap(null);setDrafts([]);setSelected([]);setFailures([]);setPhase('map');setMapQuery('');setExpandedGroups([])
+  setTaskProgress({label:'Localizando páginas e sitemaps públicos...',active:true,note:'A duração depende do servidor consultado. A porcentagem será exibida quando houver uma contagem conhecida.'})
   try{
    const result=await post('/api/phoenix-map-site',session.access_token,{url:url.trim()})
    if(!result.reviewRequired||!Array.isArray(result.pages))throw Error('site_map_unavailable')
    setMap(result);setProgress(result.pages.length+' páginas públicas identificadas. Escolha até '+SELECT_LIMIT+' por lote.')
-  }catch(e){setError(message(e.message))}finally{setBusy(false)}
+   setExpandedGroups([...new Set(result.pages.map(p=>p.host+' · '+p.section))].slice(0,4))
+   setTaskProgress({label:'Mapeamento concluído: '+result.pages.length+' páginas identificadas',done:1,total:1,active:false})
+  }catch(e){setError(message(e.message));setTaskProgress({label:'Não foi possível concluir o mapeamento',error:true,active:false})}finally{setBusy(false)}
  }
  const toggle=link=>setSelected(previous=>previous.includes(link)?previous.filter(x=>x!==link):previous.length<SELECT_LIMIT?[...previous,link]:previous)
  const prepare=async()=>{
   if(busy||!selected.length)return
   setBusy(true);setError('');setFailures([]);setProgress('Preparando conteúdo selecionado...')
+  setTaskProgress({label:'Extraindo páginas selecionadas',done:0,total:selected.length,active:true,note:'Esta barra acompanha o número de páginas processadas, não os bytes transferidos.'})
   const chosen=(map?.pages||[]).filter(p=>selected.includes(p.url))
   const gathered=[],errs=[]
   for(let i=0;i<chosen.length;i++){
@@ -66,11 +74,13 @@ export default function KnowledgeSiteMap({session,call,refresh,onClose}){
     if(!x.reviewRequired||typeof x.content!=='string'||x.content.length<30)throw Error('source_import_unavailable')
     gathered.push({url:p.url,title:String(x.title||p.title).slice(0,180),content:x.content,selected:true,saved:false})
    }catch(e){errs.push({url:p.url,reason:message(e.message)})}
+   setTaskProgress({label:'Extraindo páginas selecionadas',done:i+1,total:chosen.length,active:true,note:'Páginas com falha também entram na contagem de processadas.'})
   }
   setDrafts(gathered);setFailures(errs);setFocus(0)
   if(gathered.length)setPhase('review')
   else setError('Nenhuma página pôde ser extraída. Tente outra seção ou links individuais.')
   setProgress(gathered.length+' página(s) preparadas para revisão. Nada foi salvo.')
+  setTaskProgress({label:gathered.length+' páginas preparadas para revisão',done:chosen.length,total:chosen.length,active:false,note:'Nenhum conteúdo foi salvo ou publicado.'})
   setBusy(false)
  }
  const updateDraft=change=>setDrafts(prev=>prev.map((d,i)=>i===focus?{...d,...change}:d))
@@ -79,6 +89,8 @@ export default function KnowledgeSiteMap({session,call,refresh,onClose}){
   if(busy||!pending.length||!agents.length&&sensitivity!=='restricted')return
   if(!window.confirm('Cadastrar '+pending.length+' documento(s) no Supabase com status EM REVISÃO? Isso não publicará o conteúdo para os agentes.'))return
   setBusy(true);setError('');const next=[...drafts],errors=[]
+  setTaskProgress({label:'Cadastrando documentos em revisão',done:0,total:pending.length,active:true})
+  let processed=0
   for(let i=0;i<next.length;i++){
    const d=next[i];if(!d.selected||d.saved)continue
    setProgress('Cadastrando '+d.title+' em revisão...')
@@ -88,7 +100,10 @@ export default function KnowledgeSiteMap({session,call,refresh,onClose}){
     next[i]={...d,saved:true}
     setDrafts([...next])
    }catch(e){errors.push({url:d.url,reason:message(e.message)})}
+   processed++
+   setTaskProgress({label:'Cadastrando documentos em revisão',done:processed,total:pending.length,active:true})
   }
+  setTaskProgress({label:errors.length?'Cadastro concluído com pendências':'Documentos cadastrados em revisão',done:pending.length,total:pending.length,active:false,note:'Os agentes ainda não têm acesso: falta a aprovação humana.'})
   setFailures(prev=>[...prev,...errors]);setBusy(false)
   setProgress(next.filter(d=>d.saved).length+' de '+next.length+' documentos cadastrados em revisão.')
   if(errors.length)setError(errors.length+' documento(s) não foram cadastrados. Revise e tente novamente.')
@@ -96,10 +111,13 @@ export default function KnowledgeSiteMap({session,call,refresh,onClose}){
  }
  const remaining=drafts.filter(d=>d.selected&&!d.saved).length
  const done=drafts.filter(d=>d.saved).length
+ const visiblePages=Object.values(grouped).reduce((n,p)=>n+p.length,0)
+ const toggleGroup=key=>setExpandedGroups(old=>old.includes(key)?old.filter(x=>x!==key):[...old,key])
  return <div className="ops-modal-back">
-  <div className="ops-modal" role="dialog" aria-modal="true" aria-label="Mapear site completo" style={{maxWidth:'1020px',width:'min(1020px,96vw)'}}>
+  <div className="ops-modal ops-site-map-modal" role="dialog" aria-modal="true" aria-label="Mapear site completo" style={{maxWidth:'1020px',width:'min(1020px,96vw)'}}>
    <div className="ops-modal-title"><h3><FolderTree size={19}/> Mapear site completo</h3><button type="button" onClick={onClose} disabled={busy} aria-label="Fechar"><X size={18}/></button></div>
-   <div className="ops-scroll" style={{maxHeight:'65vh'}}>
+   {taskProgress&&<div className="ops-map-status-bar"><KnowledgeProgress value={taskProgress} compact/></div>}
+   <div className="ops-scroll">
     <p className="ops-muted">Descoberta pontual por links e sitemaps públicos, incluindo subdomínios vinculados ao mesmo domínio-base. Sem monitoramento, login ou publicação automática.</p>
     <form onSubmit={mapIt} className="ops-form-cols">
      <label>Endereço público HTTPS<input type="url" required value={url} onChange={e=>setUrl(e.target.value)} maxLength={2048} disabled={busy} placeholder="https://phoenixseg.com.br/"/></label>
@@ -119,14 +137,32 @@ export default function KnowledgeSiteMap({session,call,refresh,onClose}){
       <Btn onClick={()=>setSelected(map.pages.slice(0,SELECT_LIMIT).map(p=>p.url))}>Selecionar primeiras {Math.min(map.pages.length,SELECT_LIMIT)}</Btn>
       <Btn onClick={()=>setSelected([])}>Limpar seleção</Btn>
      </div>
-     <div style={{maxHeight:'350px',overflow:'auto',border:'1px solid var(--border, #dbe3ed)',borderRadius:'10px',padding:'10px'}}>
-      {Object.entries(grouped).map(([section,pages])=><section key={section} style={{marginBottom:'14px'}}>
-       <strong style={{display:'block',marginBottom:'6px'}}><FolderTree size={14} style={{verticalAlign:'middle',marginRight:6}}/>{section} ({pages.length})</strong>
-       {pages.map(p=><label key={p.url} style={{display:'flex',alignItems:'start',gap:10,padding:'6px',cursor:'pointer',overflowWrap:'anywhere'}}>
-        <input type="checkbox" checked={selected.includes(p.url)} disabled={!selected.includes(p.url)&&selected.length>=SELECT_LIMIT} onChange={()=>toggle(p.url)}/>
-        <span><span style={{display:'block'}}>{p.title}</span><small style={{display:'block',opacity:0.75}}>{p.url} · {p.source}</small></span>
-       </label>)}
-      </section>)}
+     <div className="ops-map-filter">
+      <label>Buscar por título, URL, área ou subdomínio
+       <input type="search" value={mapQuery} onChange={e=>setMapQuery(e.target.value)} placeholder="Ex.: saúde, seguro auto, lp.phoenixseg.com.br"/>
+      </label>
+      <span className="ops-muted" style={{flexShrink:0,alignSelf:'flex-end',marginBottom:12}}>{visiblePages} de {map.pages.length}</span>
+     </div>
+     <div className="ops-actions" style={{margin:'8px 0 12px'}}>
+      <Btn onClick={()=>setExpandedGroups(Object.keys(grouped))}>Expandir todas as seções</Btn>
+      <Btn onClick={()=>setExpandedGroups([])}>Recolher seções</Btn>
+     </div>
+     <div className="ops-map-groups" aria-label="Páginas do site agrupadas por área">
+      {Object.entries(grouped).map(([section,pages])=>{
+       const open=Boolean(mapQuery.trim())||expandedGroups.includes(section)
+       return <section key={section} className="ops-map-group">
+        <button type="button" className="ops-map-group-toggle" aria-expanded={open} onClick={()=>toggleGroup(section)}>
+         <FolderTree size={16}/><span>{section} ({pages.length})</span><ChevronDown size={16} style={{transform:open?'rotate(180deg)':'none'}}/>
+        </button>
+        {open&&<div>
+         {pages.map(p=><label key={p.url} className="ops-map-page">
+          <input type="checkbox" checked={selected.includes(p.url)} disabled={!selected.includes(p.url)&&selected.length>=SELECT_LIMIT} onChange={()=>toggle(p.url)}/>
+          <span><strong style={{display:'block'}}>{p.title}</strong><small>{p.url} · {p.source}</small></span>
+         </label>)}
+        </div>}
+       </section>
+      })}
+      {visiblePages===0&&<p className="ops-map-empty">Nenhuma página corresponde à busca. Tente outro termo.</p>}
      </div>
      <div className="ops-info"><ShieldCheck size={17}/> As páginas selecionadas serão extraídas para prévia. Nenhum documento será salvo até você confirmar o cadastro.</div>
     </>}
