@@ -43,7 +43,7 @@ export function assembleTranscript(parts){
  }
  // Preserve all words. Any overlap deduplication requires explicit alignment,
  // not simplistic string removal that might erase naturally repeated speech.
- return ordered.map(p=>`[\${formatMs(p.startMs)} – \${formatMs(p.endMs)}] \${p.text.trim()}`).join('\n\n')
+ return ordered.map(p=>`[${formatMs(p.startMs)} – ${formatMs(p.endMs)}] ${p.text.trim()}`).join('\n\n')
 }
 function formatMs(ms){
  const sec=Math.floor(ms/1000)
