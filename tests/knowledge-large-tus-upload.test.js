@@ -9,6 +9,9 @@ const location=endpoint+'/upload-fixture'
 const file={name:'treinamento.mp4',size:14*1024*1024,lastModified:15,slice:(from,to)=>new Blob([new Uint8Array(to-from)])}
 const store=()=>{const m=new Map();return {getItem:key=>m.get(key)||null,setItem:(key,val)=>m.set(key,val),removeItem:key=>m.delete(key),_map:m}}
 test('validate path, size and storage origin',()=>{
+ assert.equal(uid.length,36)
+ assert.match(uid,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+ assert.ok('token'&&'key')
  assert.equal(TUS_CHUNK_BYTES,6*1024*1024)
  assert.equal(validateUpload({file,userId:uid,storageUrl:origin,accessToken:'token',apikey:'key'}).origin,origin)
  assert.throws(()=>validateUpload({file:{...file,size:501000000},userId:uid,storageUrl:origin,accessToken:'token',apikey:'key'}),/invalid_large_media/)
