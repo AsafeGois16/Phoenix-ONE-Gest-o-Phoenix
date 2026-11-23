@@ -23,6 +23,8 @@ const errors={
  upload_timeout:'O envio do áudio expirou.',
  transcription_timeout:'A API demorou demais para processar o trecho.',
  transcription_provider_error:'A OpenAI retornou um erro na transcrição.',
+ transcription_media_rejected:'A OpenAI não conseguiu interpretar o áudio. Considere convertê-lo para MP3 ou M4A.',
+ transcription_provider_request_rejected:'A OpenAI recusou um parâmetro da transcrição. A equipe técnica deve conferir os registros.',
  transcription_provider_unauthorized:'O servidor não autorizou a API de transcrição.',
  transcription_rate_limited:'A API atingiu o limite de requisições.',
  unauthorized:'Sessão inválida. Entre novamente.',
