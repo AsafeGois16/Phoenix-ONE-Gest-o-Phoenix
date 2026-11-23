@@ -14,6 +14,15 @@ Status: **arquitetura preparada para implementação, não habilitada em produç
 - Testes de plano de segmentos, argumentos do FFmpeg, ordenação, progresso e limpeza em caso de falha foram adicionados em `tests/knowledge-large-worker.test.js` e aprovados no build de preview `cf04f8b`. Os testes simulam o FFmpeg/OpenAI: **ainda não são um teste real de vídeo grande ou da API**.
 - **Ainda não verificados:** limite global do Storage, upload real de 100/500 MB, implantação do worker em ambiente com FFmpeg, fila autenticada, limpeza de uploads abandonados, tratamento de cancelamento durante chamadas OpenAI e integração de revisão. Nenhuma transcrição de 500 MB liberada no frontend.
 
+## Integração da fila e preparação para hospedagem — 23/11/2026
+
+- Migração privada `phoenix_one_large_media_jobs_private_v2` aplicada no Supabase e versionada em `supabase/migrations/20261123_phoenix_one_large_media_jobs_private_v2.sql`. Sem `GRANT` aos papéis `anon` ou `authenticated`; RLS habilitada sem políticas de acesso direto por design.
+- Edge Function `phoenix-hub-large-queue` publicada com `verify_jwt=true`, autenticação por token real, checagem de papel Phoenix, verificação de propriedade e metadados do objeto, quotas de trabalhos e operações `enqueue/status/list/cancel`.
+- Serviço separado `worker/index.mjs` e `worker/Dockerfile`: varredura de fila, reserva via `FOR UPDATE SKIP LOCKED`, heartbeat, transferência privada de mídia para disco com limite de bytes, FFmpeg/IA, progresso na fila, limpeza da origem e tratamento de cancelamento.
+- Componentes `src/LargeMediaTranscription.jsx` e `src/large-media-queue-client.js` preparam o envio, acompanhamento e revisão; habilitados **somente** pela flag `VITE_KNOWLEDGE_LARGE_WORKER_ENABLED=true`, que não está configurada em nenhum ambiente Vercel. Fluxo de 24 MB permanece intacto.
+- **NÃO operacional:** não há serviço de worker hospedado, nem validação end-to-end 100/500 MB. Credenciais de produção devem ser inseridas apenas no cofre do futuro host. O acesso ao frontend permanece fechado.
+- **Importante:** sem worker em execução, os arquivos de jobs não serão limpos por varredura. A flag continua desabilitada até implantação de worker estável e monitorado.
+
 ## Objetivo
 Aceitar gravações MP4/WebM de até 500 MB por usuário autorizado, com upload retomável, extração de áudio em worker isolado, segmentação por tempo com sobreposição, transcrição de partes, reconstituição ordenada e revisão humana antes de qualquer inserção no RAG.
 
