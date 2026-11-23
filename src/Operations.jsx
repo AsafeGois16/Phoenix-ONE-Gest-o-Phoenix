@@ -85,7 +85,7 @@ function KnowledgePanel({data,call,refresh,session}){
  }catch(err){setLinkError(errorText(err.message))}}
  const prepareTranscription=({title,content,category})=>{
   setForm({title,content,category:category||'Aprendizado supervisionado',sensitivity:'internal',agents:['clara']})
-  setTranscribeOpen(false);setBrowserTranscribeOpen(false);setNewOpen(true)
+  setTranscribeOpen(false);setNewOpen(true);setBrowserTranscribeOpen(false)
   setHubProgress({label:'Transcrição pronta para revisão',done:1,total:1,active:false,note:'Nenhum conhecimento foi publicado ou registrado automaticamente.'})
   setMsg('Transcrição obtida. Confira o conteúdo, as informações pessoais e os agentes antes de cadastrar.')
  }
