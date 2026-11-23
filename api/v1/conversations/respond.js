@@ -22,6 +22,7 @@ import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/v
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
+import {enrichClaraHandoff} from '../../../server/junior-handoff-contract.js'
 import {resolvePilotMode,orchestrationErrorCode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
@@ -179,6 +180,8 @@ export async function respondValidated(body,res,pin=null){
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
   payload=alignAutoReHandoff(payload,body.messages)
+  // Junior v1.1: optional fields on already-approved Clara handoffs only.
+  payload=enrichClaraHandoff(payload,activeMessages,{claraOnly})
   if(payload.humanHandoff)console.info('phoenix_handoff_proposed',JSON.stringify({agent:payload.agent,department:payload.handoff?.department||null}))
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
