@@ -23,3 +23,9 @@ O painel Phoenix ONE ganha o botão **Transcrever áudio ou vídeo**:
 
 ## Verificações
 Validar schema e políticas de armazenamento em transação, testes de serviço e regressão da interface no preview da Vercel. Realizar teste manual autenticado com gravação autorizada após publicação oficial.
+
+## Verificações realizadas (23/11/2026)
+- Bucket criado privado com 24.000.000 bytes, três políticas restritas a authenticated + papel Phoenix ONE + diretório auth.uid(). Rejeição de acesso sem sessão e sem autorização validada.
+- Teste de regressão: 554 testes automatizados aprovados, sem falhas.
+- Teste real de conexão com o modelo gpt-transcribe na API OpenAI: HTTP 200, objeto de transcrição JSON retornado a partir de áudio sintético. Não foi usada nenhuma gravação de clientes e nenhum conteúdo foi salvo.
+- O script temporário de prova de conexão foi excluído da versão final.
