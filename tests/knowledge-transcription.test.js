@@ -40,7 +40,6 @@ test('Transcrição: usa endpoint oficial com modelo atual, sem expor prompt ou 
   assert.equal(opts.body.get('model'),'gpt-transcribe')
   assert.equal(opts.body.get('languages[]'),'pt')
   assert.equal(opts.body.has('language'),false)
-  assert.equal(opts.body.has('languages[]'),false)
   assert.equal(opts.body.get('response_format'),'json')
   const media=opts.body.get('file')
   assert.equal(media.name,'recording.mp3');assert.equal(media.type,'audio/mpeg')
@@ -53,6 +52,7 @@ test('Transcrição: usa endpoint oficial com modelo atual, sem expor prompt ou 
 test('Transcrição: omite indicação de idioma quando automática',async()=>{
  const r=await transcribeMedia(data(),{filename:'audio.mp3',apiKey:'fixture',fetcher:async(url,opts)=>{
   assert.equal(opts.body.has('language'),false)
+  assert.equal(opts.body.has('languages[]'),false)
   return {ok:true,json:async()=>({text:'The Phoenix Insurance company offers professional insurance brokerage services to customers.'})}
  }})
  assert.ok(r.text.includes('Phoenix'))
