@@ -12,7 +12,7 @@ const extensions=new Map([
  ['ogg','audio/ogg'],['webm','audio/webm'],['flac','audio/flac']
 ])
 export class TranscriptionError extends Error{
- constructor(code,status=422){super(code);this.name='TranscriptionError';this.status=status}
+ constructor(code,status=422,details=null){super(code);this.name='TranscriptionError';this.status=status;this.details=details}
 }
 export const mediaExtension=name=>{
  const ext=String(name||'').split('.').pop()?.toLowerCase()
@@ -52,7 +52,8 @@ export async function transcribeMedia(blob,{filename,apiKey,language='auto',mode
  data.append('file',new Blob([blob],{type:meta.mime}),'recording.'+meta.extension)
  data.append('model',model)
  data.append('response_format','json')
- if(language==='pt')data.append('language','pt')
+ // GPT-Transcribe accepts languages[]; the legacy Whisper model accepts language.
+ if(language==='pt')data.append(model==='gpt-transcribe'?'languages[]':'language','pt')
  data.append('prompt','Termos para preservar quando pronunciados: Phoenix Insurance, Bradesco Saúde, Amil, Hapvida, SulAmérica, Porto Seguro, corretora de seguros, apólice, sinistro, carência, coparticipação.')
  let response
  try{response=await fetcher('https://api.openai.com/v1/audio/transcriptions',{
@@ -63,10 +64,28 @@ export async function transcribeMedia(blob,{filename,apiKey,language='auto',mode
   })}
  catch(e){if(['AbortError','TimeoutError'].includes(e?.name))throw new TranscriptionError('transcription_timeout',504);throw new TranscriptionError('transcription_service_unavailable',503)}
  if(!response.ok){
-  if(response.status===429)throw new TranscriptionError('transcription_rate_limited',429)
-  if(response.status===401||response.status===403)throw new TranscriptionError('transcription_provider_unauthorized',503)
-  if(response.status===413)throw new TranscriptionError('media_too_large',413)
-  throw new TranscriptionError('transcription_provider_error',503)
+  // Expose only non-sensitive diagnostic identifiers. Never log upstream
+  // messages, audio, headers containing credentials, or transcript content.
+  const body=await response.json?.().catch(()=>null)
+  const clean=v=>typeof v==='string'?v.slice(0,80).replace(/[^a-zA-Z0-9_-]/g,''):null
+  const upstream=body?.error&&typeof body.error==='object'?body.error:{}
+  const details={
+   providerStatus:response.status,
+   providerType:clean(upstream.type),
+   providerCode:clean(upstream.code),
+   providerParam:clean(upstream.param),
+   providerRequestId:clean(response.headers?.get?.('x-request-id')),
+   extension:meta.extension,
+   model
+  }
+  if(response.status===429)throw new TranscriptionError('transcription_rate_limited',429,details)
+  if(response.status===401||response.status===403)throw new TranscriptionError('transcription_provider_unauthorized',503,details)
+  if(response.status===413)throw new TranscriptionError('media_too_large',413,details)
+  if(response.status===400||response.status===422){
+   const code=details.providerParam==='file'?'transcription_media_rejected':'transcription_provider_request_rejected'
+   throw new TranscriptionError(code,422,details)
+  }
+  throw new TranscriptionError('transcription_provider_error',503,details)
  }
  let json
  try{json=await response.json()}catch{throw new TranscriptionError('transcription_invalid_response',502)}
