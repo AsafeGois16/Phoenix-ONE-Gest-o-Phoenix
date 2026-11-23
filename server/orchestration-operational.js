@@ -5,6 +5,7 @@
  * O adaptador de produção permanece desabilitado até homologação Junior.
  */
 import {MODES,TARGETS,identifyOrchestrationProducts} from './orchestration-preview.js'
+import {juniorProductForLabel,JUNIOR_PRODUCT_LINES} from './junior-handoff-contract.js'
 import {classifyConversationIntent} from './agent-routing.js'
 import {activeMovementHistory,assessBackofficeIntake,detectBackofficeStatusRequest,isStandaloneNewRequest} from './backoffice-routing.js'
 import {incidentContext} from './incident-routing.js'
@@ -20,8 +21,16 @@ const direct=/^(?:por favor[, ]+)?(?:quero falar com|preciso falar com|gostaria 
 const urgent=/\b(?:nao respira|inconsciente|dor no peito|falta de ar|ha feridos|tem feridos|pegou fogo|esta pegando fogo|preciso de socorro|socorro agora|sofri (?:um |uma )?acidente|meu carro foi roubado|houve (?:um principio de )?incendio)\b/
 // Mapa acordado com Junior (proposta somente; execução permanece bloqueada).
 export const LEGACY_COMMERCIAL_ROUTES=Object.freeze(Object.fromEntries(
- ['Auto','Moto','Frota','Residencial','Empresarial','Saúde','Odonto','Vida','Viagem','Pet','Bike','Cyber','Equipamentos','Responsabilidade Civil','Garantia','Fiança Locatícia','Previdência','Rural'].map(product=>[product,Object.freeze({verified:true,department:['Auto','Moto','Frota','Residencial','Empresarial'].includes(product)?'patrimonio':'comercial'})])
+ ['Auto','Moto','Frota','Residencial','Empresarial','Saúde','Odonto','Vida','Viagem','Pet','Bike','Cyber','Equipamentos','Responsabilidade Civil','Garantia','Fiança Locatícia','Previdência','Crédito']
+  .map(product=>[product,Object.freeze({verified:true,department:JUNIOR_PRODUCT_LINES[juniorProductForLabel(product)]==='patrimonio'?'patrimonio':'comercial'})])
 ))
+function identifyContractProducts(text){
+ const products=identifyContractProducts(text)
+ const t=fold(text)
+ if(/\b(?:seguro (?:de )?credito)\b/.test(t)&&!products.some(p=>p[0]==='Crédito'))products.push(['Crédito','auto_re'])
+ if(/\bseguro fianca\b/.test(t)&&!products.some(p=>p[0]==='Fiança Locatícia'))products.push(['Fiança Locatícia','auto_re'])
+ return products
+}
 const quoteWords=t=>/\b(?:cotacao|cotar|orcamento|simular|simulacao|contratar|quanto custa|preco de|novo seguro)\b/.test(fold(t))
 const clarify='Qual produto de seguro ou benefício você deseja avaliar?'
 const offer=(product,target)=>'Posso encaminhar sua solicitação de '+product+' à equipe de '+TARGETS[target]+' para continuar o atendimento?'
@@ -48,7 +57,7 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
  // A apresentação única do handler pode anteceder a oferta canônica.
  const offerText=delivered.replace(/^Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance\. 💙\s*/u,'')
  const offeredProduct=offerText.match(/^Posso encaminhar sua solicitação de (.+?) à equipe de /u)?.[1]||''
- const prior=identifyOrchestrationProducts('seguro '+offeredProduct)
+ const prior=identifyContractProducts('seguro '+offeredProduct)
  // Só uma oferta canônica realmente entregue no turno imediatamente anterior
  // pode ser usada para confirmar. Nunca confiar em texto do cliente como oferta.
  const offered=prior.length===1&&offeredProduct===prior[0][0]&&fold(offerText)===fold(offer(prior[0][0],prior[0][1]))?prior[0]:null
@@ -72,11 +81,14 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
   const precedingClarification=m=>m?.direction==='outbound'&&m.author==='agent'&&fold(String(m.text||'').replace(/^Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance\. 💙\s*/u,''))===fold(clarify)
   const isQuote=quoteWords(text)||((offered||asked)&&contactQuote(messages.at(-3)))||
    (Boolean(offered)&&messages.at(-3)?.direction==='inbound'&&messages.at(-3)?.author==='contact'&&precedingClarification(messages.at(-4))&&contactQuote(messages.at(-5)))
-  const intentField=target==='auto_re'&&route?.department==='patrimonio'&&isQuote?{intent:'nova_cotacao'}:{}
-  if(!route||route.verified!==true||!['patrimonio','comercial'].includes(route.department))
+  const code=juniorProductForLabel(product,messages.filter(m=>m?.direction==='inbound'&&m.author==='contact').map(m=>m.text||'').join(' '))
+  const expectedDepartment=code&&JUNIOR_PRODUCT_LINES[code]==='patrimonio'?'patrimonio':'comercial'
+  const intentField=isQuote?{intent:'nova_cotacao'}:{}
+  const productField=code?{product:code}:{}
+  if(!route||route.verified!==true||!code||route.department!==expectedDepartment)
    return reply('Obrigada pela confirmação. O destino comercial ainda precisa ser validado pela nossa equipe.',{action:'mapping_required',product,logicalTarget:target})
   return {action:'propose_handoff',agent:'clara',reply:'Obrigada pela confirmação. Vou solicitar seu encaminhamento à equipe comercial responsável.',
-   product,logicalTarget:target,humanHandoff:true,handoff:{department:route.department,...intentField,
+   product,logicalTarget:target,humanHandoff:true,handoff:{department:route.department,...intentField,...productField,
    reason:'Solicitação comercial autorizada pelo cliente',summary:'Interesse em '+product+'. Encaminhamento comercial direto; nenhuma cotação ou transferência executada pelo Phoenix ONE.'}}
  }
  if(offered&&products.length===0&&yes.test(t))return propose(offered)
