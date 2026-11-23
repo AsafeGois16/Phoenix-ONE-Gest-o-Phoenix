@@ -24,7 +24,7 @@ export function mayAdvance(from,to){
  return typeof from==='string'&&typeof to==='string'&&!!edges[from]?.includes(to)
 }
 export function validateLargeMedia({size,name,userId,path}){
- const validUid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+ const validUid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  if(!validUid.test(userId||''))throw Error('invalid_user_id')
  if(!Number.isSafeInteger(size)||size<=0||size>MAX_LARGE_MEDIA_BYTES)throw Error('media_size_invalid')
  if(typeof name!=='string'||name.length>180||!/^.{1,175}\.(mp4|webm|mov|m4a|mp3|wav)$/i.test(name))throw Error('media_type_invalid')
