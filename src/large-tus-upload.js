@@ -7,7 +7,7 @@ export const LARGE_BUCKET='phoenix-hub-large-media-temp'
 export const TUS_CHUNK_BYTES=6*1024*1024
 export const LARGE_MAX_BYTES=500_000_000
 const VALID_EXT=/\.(mp4|webm|mov|m4a|mp3|wav)$/i
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MIME={mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime',m4a:'audio/mp4',mp3:'audio/mpeg',wav:'audio/wav'}
 const b64=text=>btoa(String.fromCharCode(...new TextEncoder().encode(text)))
 const keyFor=(uid,file)=>'phoenix-v2-tus:'+uid+':'+file.name+':'+file.size+':'+file.lastModified
