@@ -49,7 +49,7 @@ export default async function handler(req,res){
  }catch(e){
   const code=e instanceof TranscriptionError?e.message:'transcription_unavailable'
   const status=e instanceof TranscriptionError?e.status:503
-  console.warn('phoenix_transcription_error',JSON.stringify({reason:code}))
+  console.warn('phoenix_transcription_error',JSON.stringify({reason:code,...(e instanceof TranscriptionError&&e.details?e.details:{})}))
   return res.status(status).json({error:code})
  }finally{
   if(canCleanup&&storage){
