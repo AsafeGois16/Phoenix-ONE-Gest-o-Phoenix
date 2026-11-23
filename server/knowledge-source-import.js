@@ -52,7 +52,10 @@ async function httpsRead(url,{resolver=dnsLookup,request=https.request,maxBytes=
   const fail=err=>{if(!settled){settled=true;reject(err instanceof SourceImportError?err:new SourceImportError('source_unavailable'))}}
   const req=request(url,{
    method:'GET',headers:{'User-Agent':'PhoenixONE-KnowledgeHub/1.0','Accept':'text/html,text/plain,application/xml,text/xml;q=0.9,*/*;q=0.1','Accept-Encoding':'identity'},
-   lookup:(name,opts,cb)=>cb(null,address,4),
+   // Node 24 may request a lookup result in {all:true} array form.
+   // Use only the already validated public address, never resolve again.
+   lookup:(name,opts,cb)=>opts?.all?cb(null,[{address,family:4}]):cb(null,address,4),
+   family:4,autoSelectFamily:false,
    timeout:12000,maxHeaderSize:16000
   },res=>{
    if(settled){res.destroy();return}

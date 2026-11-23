@@ -92,3 +92,33 @@ test('Importação vídeo jamais usa captions externos indicados por uma página
  const r=importPublicSource('https://www.youtube.com/watch?v=AbCdEfGhI12',{fetcher:async()=>({body:'ytInitialPlayerResponse = '+JSON.stringify({captions:{playerCaptionsTracklistRenderer:{captionTracks:[{languageCode:'pt',baseUrl:'https://private.other.com/script'}]}}})+';'})})
  await assert.rejects(r,/video_captions_unavailable/)
 })
+
+test('Node.js 24: lookup HTTPS aceita forma all:true sem ERR_INVALID_IP_ADDRESS',async()=>{
+ const resolver=async()=>[{address:'8.8.8.8',family:4}]
+ let calls=0
+ const request=(url,opts,onResponse)=>{
+  calls++
+  assert.equal(opts.autoSelectFamily,false)
+  assert.equal(opts.family,4)
+  opts.lookup(url.hostname,{all:true},(err,entries)=>{
+   assert.equal(err,null)
+   assert.deepEqual(entries,[{address:'8.8.8.8',family:4}])
+  })
+  opts.lookup(url.hostname,{all:false},(err,address,family)=>{
+   assert.equal(err,null);assert.equal(address,'8.8.8.8');assert.equal(family,4)
+  })
+  const req=new EventEmitter()
+  req.end=()=>queueMicrotask(()=>{
+   const stream=new PassThrough()
+   stream.statusCode=200
+   stream.headers={'content-type':'text/html; charset=utf-8'}
+   onResponse(stream)
+   stream.end('<html><title>Teste</title><body><main><h1>Conteúdo público</h1><p>Artigo sobre procedimentos comerciais e informações institucionais oferecidas publicamente.</p></main></body></html>')
+  })
+  req.destroy=()=>{}
+  return req
+ }
+ const r=await safeFetchSource('https://www.gov.br/ans',{resolver,request})
+ assert.equal(r.status,200);assert.equal(calls,1)
+ assert.match(r.body,/Conteúdo público/)
+})
