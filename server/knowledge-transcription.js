@@ -66,7 +66,7 @@ export async function transcribeMedia(blob,{filename,apiKey,language='auto',mode
  if(!response.ok){
   // Expose only non-sensitive diagnostic identifiers. Never log upstream
   // messages, audio, headers containing credentials, or transcript content.
-  const body=await response.json?.().catch(()=>null)
+  const body=typeof response.json==='function'?await response.json().catch(()=>null):null
   const clean=v=>typeof v==='string'?v.slice(0,80).replace(/[^a-zA-Z0-9_-]/g,''):null
   const upstream=body?.error&&typeof body.error==='object'?body.error:{}
   const details={
