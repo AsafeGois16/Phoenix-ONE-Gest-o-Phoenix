@@ -10,7 +10,9 @@ Status: **arquitetura preparada para implementação, não habilitada em produç
 - Cliente TUS retomável em `src/large-tus-upload.js` com blocos de 6 MiB, upload autenticado, retomada via `HEAD Upload-Offset`, URL confinada ao host Storage do projeto e progresso baseado em bytes confirmados.
 - Testes unitários de validação, envio e retomada integrados ao `npm run build`; build de preview com esses testes concluído com sucesso no commit `c5bb3a1`.
 - Componente `src/LargeMediaUploadProbe.jsx` disponível apenas com a flag explícita `VITE_KNOWLEDGE_LARGE_UPLOAD_PREVIEW=true`; **não configurar em produção**. Esse laboratório testa apenas o armazenamento e tenta excluir o arquivo após upload. Não transcreve.
-- **Ainda não verificados:** limite global do Storage, upload real de 100/500 MB, processamento via worker, limpeza de uploads abandonados e integração de revisão. Nenhuma transcrição de 500 MB liberada no frontend.
+- Biblioteca do processador FFmpeg criada em `server/large-media-worker.mjs`: valida extensão/tamanho/duração, extrai áudio mono MP3 48 kbps, 16 kHz, divide em segmentos de 12 minutos com 3 segundos de sobreposição, transcreve partes sequencialmente pelo módulo já existente, reúne texto com marcações temporais e remove os arquivos locais no `finally`.
+- Testes de plano de segmentos, argumentos do FFmpeg, ordenação, progresso e limpeza em caso de falha foram adicionados em `tests/knowledge-large-worker.test.js` e aprovados no build de preview `cf04f8b`. Os testes simulam o FFmpeg/OpenAI: **ainda não são um teste real de vídeo grande ou da API**.
+- **Ainda não verificados:** limite global do Storage, upload real de 100/500 MB, implantação do worker em ambiente com FFmpeg, fila autenticada, limpeza de uploads abandonados, tratamento de cancelamento durante chamadas OpenAI e integração de revisão. Nenhuma transcrição de 500 MB liberada no frontend.
 
 ## Objetivo
 Aceitar gravações MP4/WebM de até 500 MB por usuário autorizado, com upload retomável, extração de áudio em worker isolado, segmentação por tempo com sobreposição, transcrição de partes, reconstituição ordenada e revisão humana antes de qualquer inserção no RAG.
