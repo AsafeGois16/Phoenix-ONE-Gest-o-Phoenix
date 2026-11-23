@@ -14,7 +14,7 @@ const keyFor=(uid,file)=>'phoenix-v2-tus:'+uid+':'+file.name+':'+file.size+':'+f
 const error=(code)=>Object.assign(new Error(code),{code})
 export function validateUpload({file,userId,storageUrl,accessToken,apikey}){
  if(!file||!VALID_EXT.test(file.name)||!Number.isSafeInteger(file.size)||file.size<1000||file.size>LARGE_MAX_BYTES)throw error('invalid_large_media')
- if(!UUID.test(userId||'')||!accessToken||!apikey)throw error('unauthorized_'+[UUID.test(userId||''),!!accessToken,!!apikey].join('_'))
+ if(!UUID.test(userId||'')||!accessToken||!apikey)throw error('unauthorized_'+[typeof userId,String(userId||'').length,JSON.stringify(String(userId||'').split('-').map(x=>x.length)),!!accessToken,!!apikey].join('_'))
  const parsed=new URL(storageUrl)
  if(parsed.protocol!=='https:'||!/^https:\/\/[a-z0-9-]+\.storage\.supabase\.co$/.test(parsed.origin))throw error('invalid_storage_origin')
  return {origin:parsed.origin,extension:file.name.split('.').pop().toLowerCase()}
