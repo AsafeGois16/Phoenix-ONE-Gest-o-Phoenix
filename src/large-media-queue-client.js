@@ -1,6 +1,6 @@
 const ACTIONS=new Set(['enqueue','status','cancel','list'])
 export const TERMINAL_STATES=new Set(['review_ready','failed','cancelled','expired'])
-const UID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const LARGE_QUEUE_STATES={
  uploaded:'Aguardando processamento',
  extracting:'Extraindo o áudio',
