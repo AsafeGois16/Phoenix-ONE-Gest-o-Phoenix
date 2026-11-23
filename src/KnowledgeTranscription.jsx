@@ -16,6 +16,8 @@ const names={
  transcription_provider_unauthorized:'A credencial da OpenAI não autorizou a transcrição. Verifique as configurações.',
  transcription_rate_limited:'A API atingiu o limite de requisições. Tente outro momento.',
  transcription_provider_error:'O serviço de transcrição retornou um erro. Tente novamente.',
+ transcription_media_rejected:'A OpenAI não conseguiu interpretar este áudio. O arquivo é aceito pelo Phoenix ONE, mas pode precisar ser convertido para MP3 ou M4A.',
+ transcription_provider_request_rejected:'A OpenAI recusou um parâmetro da transcrição. A equipe técnica deve conferir os registros do servidor.',
  transcription_timeout:'A transcrição demorou demais. Tente um arquivo mais curto.',
  transcription_service_unavailable:'Não foi possível conectar ao serviço de transcrição.',
  transcription_invalid_response:'A API retornou uma resposta inválida.',
