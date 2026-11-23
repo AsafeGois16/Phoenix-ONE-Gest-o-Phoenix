@@ -7,7 +7,10 @@ Status: **arquitetura preparada para implementação, não habilitada em produç
 - Bucket privado `phoenix-hub-large-media-temp` criado no projeto Supabase `cxyxrhmpjehrqhwihxul` com `file_size_limit=500000000` bytes; tipos de vídeo/áudio explicitamente permitidos.
 - Políticas `phoenix_hub_large_media_upload`, `phoenix_hub_large_media_read` e `phoenix_hub_large_media_delete` aplicadas a `storage.objects` para usuários autenticados que passem na função existente de autorização Phoenix, limitados a caminhos sob seu próprio UID.
 - Bucket legado de 24 MB não modificado.
-- **Ainda não verificados:** limite global do Storage, TUS com 500 MB, processamento via worker, política efetiva de limpeza e integração de revisão; nenhuma funcionalidade de 500 MB liberada no frontend.
+- Cliente TUS retomável em `src/large-tus-upload.js` com blocos de 6 MiB, upload autenticado, retomada via `HEAD Upload-Offset`, URL confinada ao host Storage do projeto e progresso baseado em bytes confirmados.
+- Testes unitários de validação, envio e retomada integrados ao `npm run build`; build de preview com esses testes concluído com sucesso no commit `c5bb3a1`.
+- Componente `src/LargeMediaUploadProbe.jsx` disponível apenas com a flag explícita `VITE_KNOWLEDGE_LARGE_UPLOAD_PREVIEW=true`; **não configurar em produção**. Esse laboratório testa apenas o armazenamento e tenta excluir o arquivo após upload. Não transcreve.
+- **Ainda não verificados:** limite global do Storage, upload real de 100/500 MB, processamento via worker, limpeza de uploads abandonados e integração de revisão. Nenhuma transcrição de 500 MB liberada no frontend.
 
 ## Objetivo
 Aceitar gravações MP4/WebM de até 500 MB por usuário autorizado, com upload retomável, extração de áudio em worker isolado, segmentação por tempo com sobreposição, transcrição de partes, reconstituição ordenada e revisão humana antes de qualquer inserção no RAG.
