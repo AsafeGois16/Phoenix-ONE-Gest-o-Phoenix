@@ -82,6 +82,7 @@ async function httpsRead(url,{resolver=dnsLookup,request=https.request,maxBytes=
 export async function safeFetchSource(input,opts={}){
  let url=validateSourceUrl(input)
  for(let i=0;i<=3;i++){
+  if(opts.allowRedirect&&!opts.allowRedirect(url))denied('source_out_of_scope')
   const response=await httpsRead(url,opts)
   if(response.status===200)return response
   if(i===3)denied('source_redirect_limit')
