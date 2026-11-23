@@ -25,7 +25,7 @@ export const LEGACY_COMMERCIAL_ROUTES=Object.freeze(Object.fromEntries(
   .map(product=>[product,Object.freeze({verified:true,department:JUNIOR_PRODUCT_LINES[juniorProductForLabel(product)]==='patrimonio'?'patrimonio':'comercial'})])
 ))
 function identifyContractProducts(text){
- const products=identifyContractProducts(text)
+ const products=identifyOrchestrationProducts(text)
  const t=fold(text)
  if(/\b(?:seguro (?:de )?credito)\b/.test(t)&&!products.some(p=>p[0]==='Crédito'))products.push(['Crédito','auto_re'])
  if(/\bseguro fianca\b/.test(t)&&!products.some(p=>p[0]==='Fiança Locatícia'))products.push(['Fiança Locatícia','auto_re'])
@@ -66,7 +66,7 @@ export function operationalRouting({pin,body,verifiedRoutes={}}){
   if(offered||asked)return reply('Tudo bem, não farei o encaminhamento. Em que mais posso ajudar?')
   return delegate('clara','no_commercial_consent')
  }
- const products=identifyOrchestrationProducts(text)
+ const products=identifyContractProducts(text)
  const explicitSales=intent==='sales'||direct.test(t)||/\b(?:quero|gostaria|tenho interesse)\b.{0,50}\b(?:plano de saude|seguro|odonto)\b/.test(t)
  const commercial=explicitSales||asked||Boolean(offered)
  if(!commercial)return delegate('clara','no_explicit_commercial_intent')
