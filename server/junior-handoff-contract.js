@@ -51,7 +51,7 @@ export function juniorProductFromMessages(messages){
  if(/\b(?:seguro (?:de )?credito|seguro de credito)\b/.test(fold(text)))recognized.push(['Crédito','auto_re'])
  if(/\b(?:seguro fianca|fianca locaticia)\b/.test(fold(text))&&!recognized.some(p=>p[0]==='Fiança Locatícia'))recognized.push(['Fiança Locatícia','auto_re'])
  // A word like 'vida' is not proof that the client requests life insurance.
- const filtered=recognized.filter(([label])=>label!=='Vida'||/\b(?:seguro (?:de )?vida|vida em grupo|vida individual)\b/.test(fold(text)))
+ const filtered=recognized.filter(([label])=>label!=='Vida'||quoteHint(text)||/\b(?:seguro (?:de )?vida|vida em grupo|vida individual)\b/.test(fold(text)))
  const codes=[...new Set(filtered.map(([label])=>juniorProductForLabel(label,text)).filter(Boolean))]
  return codes.length===1?codes[0]:null
 }
