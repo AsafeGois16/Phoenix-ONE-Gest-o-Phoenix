@@ -2,6 +2,13 @@
 
 Status: **arquitetura preparada para implementação, não habilitada em produção**.
 
+## Progresso de infraestrutura — 23/11/2026
+
+- Bucket privado `phoenix-hub-large-media-temp` criado no projeto Supabase `cxyxrhmpjehrqhwihxul` com `file_size_limit=500000000` bytes; tipos de vídeo/áudio explicitamente permitidos.
+- Políticas `phoenix_hub_large_media_upload`, `phoenix_hub_large_media_read` e `phoenix_hub_large_media_delete` aplicadas a `storage.objects` para usuários autenticados que passem na função existente de autorização Phoenix, limitados a caminhos sob seu próprio UID.
+- Bucket legado de 24 MB não modificado.
+- **Ainda não verificados:** limite global do Storage, TUS com 500 MB, processamento via worker, política efetiva de limpeza e integração de revisão; nenhuma funcionalidade de 500 MB liberada no frontend.
+
 ## Objetivo
 Aceitar gravações MP4/WebM de até 500 MB por usuário autorizado, com upload retomável, extração de áudio em worker isolado, segmentação por tempo com sobreposição, transcrição de partes, reconstituição ordenada e revisão humana antes de qualquer inserção no RAG.
 
