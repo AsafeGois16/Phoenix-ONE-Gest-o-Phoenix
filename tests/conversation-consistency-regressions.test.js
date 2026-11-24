@@ -5,6 +5,7 @@ import {nextMuriloSdrDecision} from '../server/murilo-sdr-flow.js'
 import {classifyConversationIntent,selectConversationAgent} from '../server/agent-routing.js'
 import {validJuniorProtocol,hasOutboundProtocolMismatch} from '../server/protocol-contract.js'
 import {respondValidated} from '../api/v1/conversations/respond.js'
+import {confirmedOfferHandoff,routeConfirmedMuriloQuote} from '../server/consent-routing.js'
 const incoming=text=>({direction:'inbound',author:'contact',type:'texto',text})
 const agent=text=>({direction:'outbound',author:'agent',type:'texto',text})
 const ages='Quais são as idades das pessoas que entrarão no plano?'
@@ -156,4 +157,28 @@ test('QA20: uma confirmação de conflito de vidas não reabre fluxo de urgênci
  assert.equal(d.handoff,null)
  assert.equal(d.humanHandoff,false)
  assert.doesNotMatch(d.reply,/samu|urgencia medica|apolice cadastrada/i)
+})
+
+test('QA21: pendência de idades é enviada à fila Benefícios após aceite, sem expor idades',()=>{
+ const question='Para confirmar as vidas e idades: você informou 12 vidas e 4 idades. As outras 8 idades ainda serão enviadas ou devemos ajustar a quantidade de vidas?'
+ const history=[
+  incoming('Quero cotar plano de saúde empresarial para 12 vidas.'),
+  agent(ages),incoming('12,23,24 e 56'),
+  agent(question),incoming('São 12 vidas, mas as outras idades envio depois.'),
+  agent('Com as informações disponíveis, um consultor pode concluir a avaliação. Posso encaminhar sua solicitação à equipe de Benefícios da Phoenix?'),
+  incoming('Sim')
+ ]
+ const raw=confirmedOfferHandoff(history,'murilo')
+ assert.ok(raw)
+ const routed=routeConfirmedMuriloQuote(raw,history)
+ assert.equal(routed.handoff.department,'beneficios')
+ assert.match(routed.handoff.summary,/PENDÊNCIA DE CONFERÊNCIA: 12 vidas declaradas e 4 idades informadas/)
+ assert.doesNotMatch(routed.handoff.summary,/12,23,24 e 56/)
+})
+test('QA22: cotação de renovação com cancelamento explícito fica operacional',()=>{
+ for(const txt of ['Quero renovar, mas preciso cancelar minha apólice atual.',
+ 'Preciso abrir um sinistro antes de renovar.',
+ 'Quero renovar mas antes solicito cancelamento da apólice anterior.']){
+  assert.equal(classifyConversationIntent(txt),'service',txt)
+ }
 })
