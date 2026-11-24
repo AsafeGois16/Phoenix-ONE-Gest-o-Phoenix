@@ -269,3 +269,14 @@ test('H19 preferência e solicitação operacional na mesma frase mantêm preced
  assert.equal(classifyConversationIntent(input),'service')
  assert.equal(selectConversationAgent(context([...quoteHistory,inbound(input)])),'clara')
 })
+
+test('H20 inclusão de dependente não é escondida pela preferência de hospital',()=>{
+ const message='Quero incluir minha esposa como dependente no plano de Saúde e prefiro o Hospital Nipo Brasileiro.'
+ assert.equal(classifyConversationIntent(message),'service')
+ assert.equal(selectConversationAgent(context([...quoteHistory,inbound(message)])),'clara')
+ const entry=operationalRouting({pin:{mode:'clara_only',revision:8},
+  body:{mode:'sugestao',messages:[inbound(message)]},
+  verifiedRoutes:LEGACY_COMMERCIAL_ROUTES})
+ assert.equal(entry.action,'delegate')
+ assert.equal(entry.agent,'clara')
+})
