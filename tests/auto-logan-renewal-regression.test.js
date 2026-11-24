@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {isAutoInsuranceFromVehicleDescription} from '../server/auto-insurance-product-signal.js'
+import {isAutoInsuranceFromVehicleDescription,hasVehicleModelAndYear} from '../server/auto-insurance-product-signal.js'
 import {detectSdrQuoteProduct,nextMuriloSdrDecision} from '../server/murilo-sdr-flow.js'
 import {muriloTransferInvitation} from '../server/murilo-transfer-invitation.js'
 import {confirmedOfferHandoff,routeConfirmedMuriloQuote} from '../server/consent-routing.js'
@@ -110,4 +110,11 @@ test('LOG10: continua identificando renovações com marca + modelo e ano',()=>{
   'Quero renovar o seguro do meu Hyundai Creta 2023.',
   'Quero renovar o seguro do meu Renault Sandero 2022.'
  ])assert.equal(detectSdrQuoteProduct([inc(sample)]),'auto',sample)
+})
+
+test('LOG11: pergunta de marca/modelo/ano permanece quando cliente só diz carro',()=>{
+ assert.equal(isAutoInsuranceFromVehicleDescription('Quero cotar seguro para meu carro.'),true)
+ assert.equal(hasVehicleModelAndYear('Quero cotar seguro para meu carro.'),false)
+ assert.equal(hasVehicleModelAndYear(initial),true)
+ assert.equal(hasVehicleModelAndYear('Quero renovar o seguro do meu Dolphin Mini 2025.'),true)
 })
