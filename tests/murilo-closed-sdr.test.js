@@ -177,3 +177,35 @@ test('SDR: API em laboratório retorna pergunta aprovada sem chamar a OpenAI',as
   else process.env.PHX_MURILO_CLOSED_QUESTIONS=old
  }
 })
+
+
+test('SDR: API aceita fotografia confirmada sem texto e prossegue sem OCR ou OpenAI',async()=>{
+ const old=process.env.PHX_MURILO_CLOSED_QUESTIONS
+ process.env.PHX_MURILO_CLOSED_QUESTIONS='true'
+ const oldFetch=globalThis.fetch
+ globalThis.fetch=async()=>{throw Error('photo_must_not_be_fetched_or_read')}
+ try{
+  const messages=[
+   inc('Quero cotar renovação de seguro Auto. Me chamo Marina de Teste.'),
+   out('Sou o Murilo, do time comercial da Phoenix Insurance.'),
+   out('Pode me encaminhar a apólice atual, por favor?'),
+   inc('',{media_received:true,media_kind:'image'})
+  ]
+  const body={
+   conversation_id:'11111111-1111-4111-8111-111111111111',
+   protocolo:'20990101-9877',mode:'sugestao',contact:{kind:'lead'},
+   agent_hint:'murilo',messages
+  }
+  const res={statusCode:200,setHeader(){},status(v){this.statusCode=v;return this},json(v){this.data=v;return v}}
+  await respondValidated(body,res,{mode:'clara_murilo',revision:7,intro:{blocked:false,clara_apresentada:true,murilo_apresentado:true}})
+  assert.equal(res.statusCode,200)
+  assert.equal(res.data.agent,'murilo')
+  assert.equal(res.data.humanHandoff,false)
+  assert.match(res.data.reply,/Recebi o anexo indicado pelo sistema/)
+  assert.doesNotMatch(res.data.reply,/analisei a imagem|identifiquei a placa|seguradora é/i)
+ }finally{
+  globalThis.fetch=oldFetch
+  if(old===undefined)delete process.env.PHX_MURILO_CLOSED_QUESTIONS
+  else process.env.PHX_MURILO_CLOSED_QUESTIONS=old
+ }
+})
