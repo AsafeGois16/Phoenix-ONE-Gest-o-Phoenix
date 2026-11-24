@@ -11,7 +11,7 @@ const QUESTIONNAIRES=Object.freeze({
   principal:[
    'O plano seria somente para você ou para mais vidas?',
    'Seria pelo CPF ou CNPJ?',
-   'Você possui plano atualmente? Se sim, qual?'
+   'Qual é seu plano atual, caso possua um?'
   ],
   cpf:[
    'Pode me informar as idades das pessoas que entrarão no plano?',
@@ -32,7 +32,7 @@ const QUESTIONNAIRES=Object.freeze({
   principal:[
    'O plano seria somente para você ou para mais vidas?',
    'Seria pelo CPF ou CNPJ?',
-   'Você possui plano odontológico atualmente? Se sim, qual?'
+   'Qual é seu plano odontológico atual, caso possua um?'
   ],
   cpf:['Você gostaria do odonto básico ou de coberturas como clareamento, aparelho ou prótese?'],
   cnpj:[
@@ -46,14 +46,14 @@ const QUESTIONNAIRES=Object.freeze({
   principal:[
    'O seguro seria somente para você ou para mais vidas?',
    'Seria pelo CPF ou CNPJ?',
-   'Você possui seguro de vida atualmente? Se sim, qual?'
+   'Qual é seu seguro de vida atual, caso possua um?'
   ],
   cpf:[
    'Qual é a sua data de nascimento?',
    'Qual é a sua profissão?',
    'Você é tabagista?',
-   'Pratica algum esporte radical? Se sim, qual?',
-   'Tem alguma doença grave ou preexistente? Se sim, qual?'
+   'Qual esporte radical pratica, caso pratique algum?',
+   'Tem alguma doença grave ou preexistente?'
   ],
   cnpj:[
    'Pode me informar o CNPJ da empresa?',
@@ -93,7 +93,7 @@ const QUESTIONNAIRES=Object.freeze({
    'Qual é a sua data de nascimento?',
    'Com qual idade pretende começar a utilizar o recurso acumulado?',
    'Qual valor pretende investir mensalmente?',
-   'Pretende realizar algum aporte inicial? Se sim, qual valor?',
+   'Qual valor pretende aportar inicialmente, caso queira fazer um aporte?',
    'Qual renda mensal gostaria de receber no futuro?'
   ],
   com_plano:[
@@ -225,7 +225,7 @@ const QUESTIONNAIRES=Object.freeze({
   ],
   novo:[
    'A bicicleta é convencional ou elétrica?',
-   'Possui nota fiscal ou comprovante de aquisição da bicicleta? Se sim, pode me enviar?'
+   'Pode me encaminhar a nota fiscal ou comprovante de aquisição da bicicleta, caso tenha?'
   ],
   renovacao:[
    'Qual é a seguradora atual?',
@@ -305,7 +305,8 @@ const QUESTIONNAIRES=Object.freeze({
  }),
  cyber:freeze({
   principal:[
-   'Pode me informar o CNPJ e o ramo de atividade da empresa?',
+   'Pode me informar o CNPJ da empresa?',
+   'Qual é o ramo de atividade da empresa?',
    'Qual é o faturamento anual aproximado da empresa?',
    'Seria um seguro novo ou renovação?'
   ],
@@ -326,7 +327,8 @@ const QUESTIONNAIRES=Object.freeze({
  }),
  garantia:freeze({
   principal:[
-   'Pode me informar o CNPJ e o ramo de atividade da empresa?',
+   'Pode me informar o CNPJ da empresa?',
+   'Qual é o ramo de atividade da empresa?',
    'Qual modalidade de Seguro Garantia necessita: licitação, execução, judicial ou adiantamento?',
    'Seria um seguro novo ou renovação?'
   ],
@@ -348,7 +350,8 @@ const QUESTIONNAIRES=Object.freeze({
  }),
  credito:freeze({
   principal:[
-   'Pode me informar o CNPJ e o ramo de atividade da empresa?',
+   'Pode me informar o CNPJ da empresa?',
+   'Qual é o ramo de atividade da empresa?',
    'Qual é o faturamento anual aproximado da empresa?',
    'Seria um seguro novo ou renovação?'
   ],
