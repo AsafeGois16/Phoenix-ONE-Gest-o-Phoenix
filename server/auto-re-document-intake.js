@@ -55,7 +55,7 @@ function typeInHistory(list){
 const safe=reply=>({agent:'murilo',reply,humanHandoff:false,handoff:null})
 const requestText=type=>{
  const id=type==='cnpj'?'CNPJ':'CPF'
- return 'Para consultar se já existe um seguro cadastrado e evitar perguntas repetidas, você autoriza a consulta e pode me informar o número do '+id+' do titular? Se preferir não informar, seguimos sem a consulta.'
+ return 'Para ajudar a equipe a localizar seu cadastro e evitar perguntas repetidas, pode me informar o número do '+id+' do titular? Se preferir não informar, seguimos com a cotação normalmente.'
 }
 /**
  * Chamado antes da próxima pergunta do catálogo, mas DEPOIS de segurança,
