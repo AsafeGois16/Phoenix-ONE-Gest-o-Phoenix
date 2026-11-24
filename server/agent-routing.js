@@ -1,4 +1,5 @@
 import {isAdministrativeMovementRequest} from './backoffice-routing.js'
+import {isHealthNetworkPreference} from './health-network-preference.js'
 /**
  * Identidade pública dos agentes Phoenix ONE.
  * Clara é a porta de entrada universal; Murilo só assume demanda comercial explícita.
@@ -14,7 +15,9 @@ const SERVICE_PATTERNS=[
   /\b(?:boleto|fatura|vencimento|parcela|pagamento|cobranca|debito|nota fiscal|quitacao|inadimplencia|segunda via|2a via|2 via)\b/,
   /\b(?:carteirinha|reembolso|sinistro|emergencia|autorizacao|cirurgia|guia|beneficiario|dependente|exclusao|excluir|inclusao|incluir|movimentacao|cancelamento|cancelar|alteracao|atualizar dados|atualizacao cadastral)\b/,
   /\b(?:minha apolice|meu contrato|minha cobertura|meu plano|minha seguradora|meu seguro|seguro que tenho|sou cliente|ja sou cliente|sou segurado|tenho um plano|quais seguros|meus seguros|minhas apolices|quais apolices)\b/,
-  /\b(?:nao recebi|nao consigo acessar|preciso de ajuda com|problema no atendimento|acompanhar meu pedido|quero falar com atendente)\b/
+  /\b(?:nao recebi|nao consigo acessar|preciso de ajuda com|problema no atendimento|acompanhar meu pedido|quero falar com atendente)\b/,
+  /\b(?:dor no peito|falta de ar|nao respira|inconsciente|convulsao|sangramento intenso|risco de vida|internacao urgente|preciso de pronto.socorro)\b/,
+  /\b(?:nao consigo (?:marcar|agendar|fazer) (?:uma?\s+|a\s+)?(?:consulta|exame)|(?:consulta|exame) (?:negad[oa]|recusad[oa]))\b/
 ]
 const SALES_PATTERNS=[
   /\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|proposta de seguro)\b/,
@@ -40,6 +43,7 @@ function intent(text){
  if(/\b(?:assistencia|indenizacao|cobertura)\b/.test(value)&&
     /\b(?:funeral|falecimento|invalidez|24 horas|24h|na cotacao|na proposta)\b/.test(value))
    return 'neutral'
+ if(isHealthNetworkPreference(text))return 'neutral'
  if(SERVICE_PATTERNS.some(p=>p.test(value)))return 'service'
  return 'neutral'
 }
@@ -51,6 +55,19 @@ export function selectConversationAgent(body) {
  const current=intent(last)
  if(current==='service')return 'clara'
  if(current==='sales')return 'murilo'
+ // Resposta neutra à ÚLTIMA pergunta comercial do Murilo tem precedência
+ // sobre demandas operacionais antigas no mesmo histórico. A pergunta deve
+ // ser realmente de qualificação, e não uma proposta de passagem entre agentes.
+ const messages=Array.isArray(body?.messages)?body.messages:[]
+ const lastAgentMessage=[...messages].reverse().find(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string')
+ const lastAgentText=fold(lastAgentMessage?.text)
+ const offeredTransfer=/\b(?:posso|podemos|pode)\b.{0,55}\b(?:encaminhar|transferir|passar)\b.{0,55}\b(?:murilo|assistente comercial|equipe|atendente|humano)\b/.test(lastAgentText)
+ const qualificationQuestion=/\?/.test(lastAgentText)&&/\b(?:cotacao|orcamento|simulacao|rede credenciada|hospital|hospitais|regioes?|franquia|cobertura|protecao|veiculo|imovel|empresa|vidas)\b/.test(lastAgentText)
+ const recentSalesAgent=messages.slice(-14).some(m=>m?.direction==='outbound'&&m.author==='agent'&&/\b(?:sou (?:o )?murilo|aqui e (?:o )?murilo|me chamo murilo|murilo, do time comercial)\b/.test(fold(m.text)))
+ const genuineQualification=qualificationQuestion&&!offeredTransfer&&
+  (recentSalesAgent||body?.agent_hint==='murilo'||/\b(?:cotacao|orcamento|simulacao)\b/.test(lastAgentText))
+ const newTopic=/^(?:outro assunto|tenho outra duvida|quero falar de outro assunto|quero retomar outro assunto)\b/.test(fold(last))
+ if(genuineQualification&&!newTopic)return 'murilo'
  // Somente respostas curtas de acompanhamento mantêm a intenção já identificada
  // no MESMO protocolo. Nunca transformar "Oi" inicial em Murilo por causa do hint.
  const stripped=fold(last)
