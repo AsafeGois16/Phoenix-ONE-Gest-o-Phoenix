@@ -1,4 +1,5 @@
 import {isAdministrativeMovementRequest} from './backoffice-routing.js'
+import {isHealthNetworkPreference} from './health-network-preference.js'
 
 /**
  * Triagem por produto em sinistros e assistências. Contrato Junior v1.2:
@@ -103,6 +104,8 @@ function classifyOther(text){
 function classifyBenefitsService(text){
  const t=fold(text)
  if(!t||hypothetical(t)||isAdministrativeMovementRequest(text))return null
+ // Preferências comerciais por hospitais não são problemas com o plano atual.
+ if(isHealthNetworkPreference(text))return null
  if(/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|contratar um novo plano|quanto custa)\b/.test(t))return null
  if(/\b(?:boleto|fatura|segunda via|parcela|nota fiscal|vencimento|pagamento)\b/.test(t)&&
     !/\b(?:negativa|problema com atendimento|autorizacao)\b/.test(t))return null
