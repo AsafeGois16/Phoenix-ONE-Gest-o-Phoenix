@@ -39,6 +39,18 @@ BEGIN
  JOIN phoenix_one.knowledge_documents d ON d.id=c.document_id
  WHERE d.title='Murilo 09 — Roteiro aprovado de perguntas por produto (24-11-2026)';
  IF existing<>8 THEN RAISE EXCEPTION 'unexpected RAG09 chunk count: %',existing; END IF;
+ -- Publicar uma referência aprovada, sem deixar aviso antigo de "em revisão".
+ UPDATE phoenix_one.knowledge_chunks c SET content=
+   replace(replace(
+     c.content,
+     'RAG COMPLEMENTAR PARA REVISÃO',
+     'ROTEIRO OFICIAL DE PERGUNTAS DO MURILO'),
+     'Esta RAG permanece EM REVISÃO até a homologação, sem instruir o agente ativo.',
+     'Roteiro autorizado pela Phoenix para qualificação no Phoenix ONE oficial; uma pergunta aprovada por vez.'),
+   embedding=null
+ FROM phoenix_one.knowledge_documents d
+ WHERE d.id=c.document_id AND d.title='Murilo 09 — Roteiro aprovado de perguntas por produto (24-11-2026)'
+   AND d.status='review' AND c.chunk_index=0;
  UPDATE phoenix_one.knowledge_documents
  SET status='published',reviewed_at=now(),updated_at=now()
  WHERE title='Murilo 09 — Roteiro aprovado de perguntas por produto (24-11-2026)' AND status='review';
