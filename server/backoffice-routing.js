@@ -1,3 +1,4 @@
+import {isHealthNetworkPreference} from './health-network-preference.js'
 /**
  * Fase 2: encaminhamento para a fila do Junior, jamais execução de
  * inclusões, exclusões ou alterações cadastrais pelo Phoenix ONE.
@@ -27,6 +28,8 @@ export function detectBackofficeStatusRequest(message){
 const movementKind=text=>{
  const t=fold(text)
  if(!t||t.length>4000)return null
+ // Incluir hospitais na REDE desejada não é inclusão de beneficiário.
+ if(isHealthNetworkPreference(text))return null
  // Incluir COBERTURA na cotação é assunto comercial, não movimentação
  // de beneficiário. Vale para todos os ramos (Vida, Saúde, Auto etc.).
  const isQuote=/\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta|contratar|contratacao|novo seguro)\b/.test(t)
