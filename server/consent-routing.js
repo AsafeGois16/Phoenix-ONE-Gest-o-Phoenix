@@ -32,7 +32,20 @@ export function humanDepartmentFromOffer(messages){
 }
 export function confirmedOfferHandoff(messages,selectedAgent='clara'){
  if(!isHumanHandoffConfirmed(messages)||!offerHuman(recentOutbound(messages))||offerMurilo(recentOutbound(messages)))return null
- const department=humanDepartmentFromOffer(messages)
+ let department=humanDepartmentFromOffer(messages)
+ // Compatibilidade com convites antigos: Murilo podia oferecer um consultor
+ // "para confirmar o produto" sem citar a fila. Se há produto de cotação
+ // inequívoco no histórico DO CLIENTE, o aceite vai para a fila real.
+ // Sem produto inequívoco, não inventar setor nem forçar handoff.
+ const offered=fold(recentOutbound(messages))
+ const legacyConsultantQuote=selectedAgent==='murilo'&&
+  /\bposso encaminhar\b/.test(offered)&&/\bconsultor\b/.test(offered)&&
+  /\bconfirmar o produto\b/.test(offered)
+ if(!department&&legacyConsultantQuote){
+  const product=detectSdrQuoteProduct(messages)
+  const patrimonial=['auto','frota','residencial','fianca','viagem','bike','empresarial','equipamentos','rc','cyber','garantia','credito'].includes(product)
+  if(product)department=patrimonial?'patrimonio':'beneficios'
+ }
  return department?{agent:selectedAgent==='murilo'?'murilo':'clara',reply:'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe responsável.',humanHandoff:true,handoff:{
   department,reason:'Cliente confirmou encaminhamento humano',summary:'Solicitação de atendimento humano confirmada pelo cliente. Conferir detalhes do protocolo no sistema de gestão.'}}:null
 }
@@ -46,8 +59,9 @@ export function confirmedOfferHandoff(messages,selectedAgent='clara'){
 export function routeConfirmedMuriloQuote(payload,messages){
  if(payload?.agent!=='murilo'||payload.humanHandoff!==true||!payload.handoff)return payload
  const offered=fold(recentOutbound(messages))
- const quoteOffer=/\bposso encaminhar\b/.test(offered)&&
-  /\bequipe de (?:beneficios(?: da phoenix)?|vendas da phoenix|auto\/re)\b/.test(offered)
+ const quoteOffer=/\bposso encaminhar\b/.test(offered)&&(
+  /\bequipe de (?:beneficios(?: da phoenix)?|vendas da phoenix|auto\/re)\b/.test(offered)||
+  /\bconsultor\b/.test(offered)&&/\bconfirmar o produto\b/.test(offered))
  if(!quoteOffer||!isHumanHandoffConfirmed(messages))return payload
  const product=detectSdrQuoteProduct(messages)
  if(!product)return payload
@@ -64,8 +78,9 @@ export function routeConfirmedMuriloQuote(payload,messages){
   ' idades informadas. Confirmar dados com o cliente antes da cotação.':''
  const summary=(baseSummary+qualityNote).slice(0,650)
  const next={...payload.handoff,department,product,intent:'nova_cotacao',summary}
- const reply=department==='beneficios'&&/equipe responsavel/.test(fold(payload.reply))?
-  'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe de Benefícios para continuar a cotação.':payload.reply
+ const reply=/equipe responsavel/.test(fold(payload.reply))?
+  'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe de '+
+  (department==='patrimonio'?'Auto/RE':'Benefícios')+' para continuar a cotação.':payload.reply
  return {...payload,reply,handoff:next}
 }
 
