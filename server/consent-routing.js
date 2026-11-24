@@ -1,3 +1,4 @@
+import {detectSdrQuoteProduct} from './murilo-sdr-flow.js'
 /**
  * Confirmações de encaminhamento e troca de agente.
  * Histórico é confirmado pelo Junior (inbound/outbound), nunca por proposta
@@ -32,6 +33,31 @@ export function confirmedOfferHandoff(messages,selectedAgent='clara'){
  return department?{agent:selectedAgent==='murilo'?'murilo':'clara',reply:'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe responsável.',humanHandoff:true,handoff:{
   department,reason:'Cliente confirmou encaminhamento humano',summary:'Solicitação de atendimento humano confirmada pelo cliente. Conferir detalhes do protocolo no sistema de gestão.'}}:null
 }
+/**
+ * Compatibilidade com Gestão Phoenix: benefícios é uma fila REAL, enquanto
+ * "comercial" é apenas departamento lógico legado. Para ofertas de cotação
+ * do Murilo já confirmadas, enviar diretamente a fila do produto, inclusive
+ * quando a oferta de "Vendas da Phoenix" foi feita antes desta correção.
+ * Nunca redireciona operações, dúvidas, protocolos sem aceite nem a Clara.
+ */
+export function routeConfirmedMuriloQuote(payload,messages){
+ if(payload?.agent!=='murilo'||payload.humanHandoff!==true||!payload.handoff)return payload
+ const offered=fold(recentOutbound(messages))
+ const quoteOffer=/\bposso encaminhar\b/.test(offered)&&
+  /\bequipe de (?:beneficios(?: da phoenix)?|vendas da phoenix|auto\/re)\b/.test(offered)
+ if(!quoteOffer||!isHumanHandoffConfirmed(messages))return payload
+ const product=detectSdrQuoteProduct(messages)
+ if(!product)return payload
+ if(!['comercial','beneficios','patrimonio'].includes(payload.handoff.department))return payload
+ const patrimonial=['auto','frota','residencial','fianca','viagem','bike','empresarial','equipamentos','rc','cyber','garantia','credito'].includes(product)
+ const department=patrimonial?'patrimonio':'beneficios'
+ const summary=payload.handoff.summary||'Solicitação de cotação confirmada pelo cliente.'
+ const next={...payload.handoff,department,product,intent:'nova_cotacao',summary}
+ const reply=department==='beneficios'&&/equipe responsavel/.test(fold(payload.reply))?
+  'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe de Benefícios para continuar a cotação.':payload.reply
+ return {...payload,reply,handoff:next}
+}
+
 export function enforceHumanHandoffConsent(payload,messages){
  if(payload?.humanHandoff!==true||!payload?.handoff)return payload
  if(isHumanHandoffConfirmed(messages))return payload
