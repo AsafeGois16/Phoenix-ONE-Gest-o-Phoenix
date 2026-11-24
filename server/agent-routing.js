@@ -1,4 +1,5 @@
 import {isAdministrativeMovementRequest} from './backoffice-routing.js'
+import {isHealthNetworkPreference} from './health-network-preference.js'
 /**
  * Identidade pública dos agentes Phoenix ONE.
  * Clara é a porta de entrada universal; Murilo só assume demanda comercial explícita.
@@ -40,6 +41,7 @@ function intent(text){
  if(/\b(?:assistencia|indenizacao|cobertura)\b/.test(value)&&
     /\b(?:funeral|falecimento|invalidez|24 horas|24h|na cotacao|na proposta)\b/.test(value))
    return 'neutral'
+ if(isHealthNetworkPreference(text))return 'neutral'
  if(SERVICE_PATTERNS.some(p=>p.test(value)))return 'service'
  return 'neutral'
 }
