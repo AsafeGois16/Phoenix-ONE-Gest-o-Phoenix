@@ -1,4 +1,5 @@
 import {detectSdrQuoteProduct} from './murilo-sdr-flow.js'
+import {healthLivesCheck} from './murilo-conversation-quality.js'
 /**
  * Confirmações de encaminhamento e troca de agente.
  * Histórico é confirmado pelo Junior (inbound/outbound), nunca por proposta
@@ -51,7 +52,15 @@ export function routeConfirmedMuriloQuote(payload,messages){
  if(!['comercial','beneficios','patrimonio'].includes(payload.handoff.department))return payload
  const patrimonial=['auto','frota','residencial','fianca','viagem','bike','empresarial','equipamentos','rc','cyber','garantia','credito'].includes(product)
  const department=patrimonial?'patrimonio':'beneficios'
- const summary=payload.handoff.summary||'Solicitação de cotação confirmada pelo cliente.'
+ const baseSummary=payload.handoff.summary||'Solicitação de cotação confirmada pelo cliente.'
+ // Caso o cliente não tenha informado todas as idades, não prolongar a
+ // entrevista nem ocultar a pendência da equipe humana.
+ const pending=['saude','saude_empresarial','odonto','odonto_empresarial'].includes(product)?
+  healthLivesCheck(messages):null
+ const qualityNote=pending?.type==='pending'?
+  ' PENDÊNCIA DE CONFERÊNCIA: '+pending.declared+' vidas declaradas e '+pending.received+
+  ' idades informadas. Confirmar dados com o cliente antes da cotação.':''
+ const summary=(baseSummary+qualityNote).slice(0,650)
  const next={...payload.handoff,department,product,intent:'nova_cotacao',summary}
  const reply=department==='beneficios'&&/equipe responsavel/.test(fold(payload.reply))?
   'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe de Benefícios para continuar a cotação.':payload.reply

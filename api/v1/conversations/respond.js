@@ -1,5 +1,5 @@
 import {authenticateJunior,bridge,juniorIdentityContext,redact,uuidValid,validAgent,safeText,jsonResponse} from '../../../server/junior-v1.js'
-import {validJuniorProtocol} from '../../../server/protocol-contract.js'
+import {validJuniorProtocol,hasOutboundProtocolMismatch} from '../../../server/protocol-contract.js'
 import {isAudioOnlyNotice,audioHandoffDecision} from '../../../server/audio-handoff.js'
 import {shadowObserveMegaBrain} from '../../../server/megabrain-observation.js'
 import {readMegaBrainHint} from '../../../server/megabrain-agent-context.js'
@@ -118,6 +118,10 @@ export default async function handler(req,res){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'invalid_contract_payload'}))
   return jsonResponse(res,400,{error:'invalid_contract_payload'})
  }
+ // A gestão Junior determina qual protocolo é exibido. Apenas diagnosticar
+ // referências antigas conflitantes, sem expor números nem bloquear o cliente.
+ if(hasOutboundProtocolMismatch(body.messages,body.protocolo))
+  console.warn('phoenix_external_protocol_reference_mismatch',JSON.stringify({detected:true}))
  let pin=null
  try{pin=await resolvePilotMode(body,process.env,bridge,observedAgentIntroductions(body.messages))}catch(e){
   const reason=orchestrationErrorCode(e)
