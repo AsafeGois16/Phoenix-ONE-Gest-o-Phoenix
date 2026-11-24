@@ -150,7 +150,7 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
  const list=Array.isArray(messages)?messages:[]
  const last=list.at(-1)
  if(!inbound(last))return null
- const lastCustomer=fold(last.text)
+ const lastCustomer=fold(last.text).replace(/[,.!]+/g,' ').replace(/\s+/g,' ').trim()
  const priorAgent=fold([...list].reverse().find(outbound)?.text)
  // Não insistir em convite já recusado: sem lead e sem novo encaminhamento.
  if(/^(?:nao|nao obrigado|nao obrigada|agora nao|prefiro nao)[.! ]*$/.test(lastCustomer)&&
