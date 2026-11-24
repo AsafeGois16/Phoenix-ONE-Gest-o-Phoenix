@@ -163,7 +163,7 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
 
  const product=detectSdrQuoteProduct(list)
  if(!product||!SDR_PRODUCT_CODES.includes(product))
-  return safe('Quero evitar perguntas fora do seu contexto. Posso encaminhar sua solicitação a um consultor para confirmar o produto e continuar?')
+  return safe('Para direcionar sua cotação à equipe correta, qual tipo de seguro você deseja cotar?')
  // Uma única pergunta de CONFERÊNCIA quando as respostas são contraditórias.
  // Não amplia o formulário nem insiste quando o cliente não sabe responder.
  // Deve ocorrer antes do limite de sete perguntas e antes do aceite humano.
