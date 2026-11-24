@@ -69,8 +69,16 @@ function classifyCritical(text){
   /\b(?:incendio|fogo|explosao|alagamento|inundacao|vazamento|roubo|furto|sinistro|danos|desabamento)\b/.test(t))return 'empresarial'
  if(/\b(?:casa|residencia|residencial|imovel|apartamento)\b/.test(t)&&
   /\b(?:incendio|fogo|explosao|fumaca|chamas|sinistro|desabamento)\b/.test(t))return 'residencial'
- if(/\b(?:plano de saude|seguro saude|saude|urgencia medica|emergencia medica|hospital|internacao|pronto.socorro)\b/.test(t)&&
-  /\b(?:urgente|urgencia|emergencia|internacao|hospital|pronto.socorro|cirurgia urgente|socorro imediato|risco de vida|atendimento emergencial)\b/.test(t))return 'saude'
+ // O nome de hospital e a preferência por rede credenciada nunca são,
+ // isoladamente, urgência. A regra anterior tinha "hospital" nos dois lados
+ // do AND, confundindo cotações com risco clínico.
+ const clinicalUrgency=
+  /\b(?:dor no peito|nao respira|inconsciente|convulsao|sangramento intenso|falta de ar|risco (?:imediato (?:a |de )?vida|de vida)|socorro imediato)\b/.test(t)||
+  /\b(?:preciso|necessito|precisamos|necessitamos)\s+(?:de\s+)?(?:uma?\s+)?(?:internacao|cirurgia|pronto.socorro|atendimento (?:medico |hospitalar )?(?:urgente|de urgencia|emergencial))\b/.test(t)||
+  /\b(?:estou|esta|estamos|estao|ficou|foi)\s+(?:internad[oa]s?|no pronto.socorro|passando mal)\b/.test(t)||
+  /\b(?:tenho|estou com|estamos com)\s+(?:uma?\s+)?(?:urgencia|emergencia) medica\b/.test(t)||
+  /\b(?:internacao|cirurgia)\s+(?:urgente|imediata)\b/.test(t)
+ if(clinicalUrgency&&/\b(?:plano de saude|seguro saude|saude|urgencia medica|emergencia medica|hospital|internacao|pronto.socorro|atendimento medico|atendimento hospitalar)\b/.test(t))return 'saude'
  return null
 }
 function classifyOther(text){
