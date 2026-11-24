@@ -120,7 +120,7 @@ test('SDR: pergunta de saúde preexistente e CPF do tutor são reservados à equ
 })
 test('SDR: máximo de sete perguntas, depois oferece consultor sem abrir lead antes do aceite',()=>{
  const qs=approvedQuestionsFor('previdencia',{hasPlan:false}).slice(0,7)
- const msgs=[...base('Quero contratar Previdência privada'),...qs.flatMap(q=>[out(q.text),inc('Resposta fictícia')])]
+ const msgs=[...base('Quero contratar Previdência privada, não tenho previdência atualmente.'),...qs.flatMap(q=>[out(q.text),inc('Resposta fictícia')])]
  const d=nextMuriloSdrDecision(msgs)
  assert.match(d.reply,/Posso encaminhar/i)
  assert.equal(d.humanHandoff,false)
