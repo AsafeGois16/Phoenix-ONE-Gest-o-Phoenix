@@ -7,6 +7,7 @@
 import {approvedQuestionsFor,SDR_PRODUCT_CODES} from './murilo-approved-questions.js'
 import {healthLivesCheck,healthCityCheck,volunteeredNetworkPriority} from './murilo-conversation-quality.js'
 import {isAutoInsuranceFromVehicleDescription} from './auto-insurance-product-signal.js'
+import {autoReDocumentIntake} from './auto-re-document-intake.js'
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const inbound=m=>m?.direction==='inbound'&&m.author==='contact'
 const outbound=m=>m?.direction==='outbound'&&m.author==='agent'
@@ -111,6 +112,9 @@ function volunteered(question,messages){
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
  if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
+ // A data de vencimento já veio na mensagem inicial: não perguntar de novo.
+ if(/\\bdata de vencimento da apolice\\b/.test(q)&&
+  /\\b(?:apolice|seguro|vence|vencimento)\\b.{0,100}\\b\\d{2}\/\\d{2}\/\\d{4}\\b/.test(text))return true
  if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&
    (/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text)||/\b(?:so para mim|somente para mim|apenas para mim|so eu|eu e minha esposa|eu e meu marido)\b/.test(text)))return true
  if(/\b(?:idades? das pessoas|as idades|idade das pessoas)\b/.test(q)&&
@@ -150,7 +154,7 @@ function offer(product){
  * If the question is about sensitive health/identity data, do not collect in
  * this chat. Leave it to authorized human processing.
  */
-export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
+export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=false}={}){
  const list=Array.isArray(messages)?messages:[]
  const last=list.at(-1)
  if(!inbound(last))return null
@@ -174,6 +178,13 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
   if(locality?.type==='question')return safe(locality.reply)
  }
  const questions=questionsFor(list,product)
+ // Coleta opcional e uma única vez do número CPF/CNPJ do titular, em todos
+ // os 12 produtos Auto/RE. Documento NÃO autentica titular nem libera
+ // leitura de apólices; a consulta verificada é atribuição do Gestão Phoenix.
+ if(documentIntake){
+  const identity=autoReDocumentIntake(list,product,questions)
+  if(identity)return identity
+ }
  const asked=recentQuestionCount(list,questions)
  const currentQuestionCount=asked.size
  const prefix=isImageMetadata(last)&&photoWasRequested(list)?'Recebi o anexo indicado pelo sistema. ':''
