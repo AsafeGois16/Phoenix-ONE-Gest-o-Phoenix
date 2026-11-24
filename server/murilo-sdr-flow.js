@@ -32,14 +32,15 @@ const names={
 }
 const patLine=new Set(['auto','frota','residencial','fianca','viagem','bike','empresarial','equipamentos','rc','cyber','garantia','credito'])
 export function detectSdrQuoteProduct(messages){
- const history=(Array.isArray(messages)?messages:[]).filter(inbound).slice(-20).map(m=>fold(m.text)).filter(Boolean)
+ const rawHistory=(Array.isArray(messages)?messages:[]).filter(inbound).slice(-20).map(m=>String(m.text||'')).filter(Boolean)
+ const history=rawHistory.map(fold)
  // An earlier product is retained for short, neutral replies; a new quote
  // request supersedes it only when unambiguous. Never infer a mixed product.
  let active=null
- for(const line of history){
+ for(const [index,line] of history.entries()){
   if(/\b(?:quero falar de outro assunto|outro assunto)\b/.test(line)){active=null;continue}
   const matches=Object.entries(names).filter(([,re])=>re.test(line)).map(([k])=>k)
-  if(!matches.includes('auto')&&isAutoInsuranceFromVehicleDescription(line))matches.push('auto')
+  if(!matches.includes('auto')&&isAutoInsuranceFromVehicleDescription(rawHistory[index]))matches.push('auto')
   // "Plano de saúde para pet" belongs only to Pet, not Health.
   if(matches.includes('pet'))matches.splice(matches.indexOf('saude'),matches.includes('saude')?1:0)
   if(matches.includes('frota'))matches.splice(matches.indexOf('auto'),matches.includes('auto')?1:0)
@@ -109,7 +110,7 @@ function volunteered(question,messages){
  const text=messages.filter(inbound).map(x=>fold(x.text)).join(' ')
  const q=fold(question)
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
- if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
+ if(/\bmarca, modelo e ano\b/.test(q)&&messages.filter(inbound).some(m=>isAutoInsuranceFromVehicleDescription(m.text)))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
  if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&
    (/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text)||/\b(?:so para mim|somente para mim|apenas para mim|so eu|eu e minha esposa|eu e meu marido)\b/.test(text)))return true
