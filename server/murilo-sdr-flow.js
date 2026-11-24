@@ -111,6 +111,9 @@ function volunteered(question,messages){
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
  if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
+ if(/\bdata de vencimento da apolice\b/.test(q)&&/\b(?:vence|vencimento|vigencia (?:ate|termina)|apolice vence)\b.{0,55}\b(?:0?[1-9]|[12]\d|3[01])[\/.-](?:0?[1-9]|1[0-2])[\/.-](?:20)?\d{2}\b/.test(text))return true
+ if(/\bnumero do cpf ou cnpj\b/.test(q)&&/\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/.test(text))return true
+ if(/\bplaca do veiculo\b/.test(q)&&(/\b[A-Z]{3}[- ]?\d[A-Z0-9]\d{2}\b/i.test(messages.filter(inbound).map(m=>m.text).join(' '))||/\b(?:sem placa|ainda nao tem placa|zero quilometro sem placa)\b/.test(text)))return true
  if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&
    (/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text)||/\b(?:so para mim|somente para mim|apenas para mim|so eu|eu e minha esposa|eu e meu marido)\b/.test(text)))return true
  if(/\b(?:idades? das pessoas|as idades|idade das pessoas)\b/.test(q)&&
