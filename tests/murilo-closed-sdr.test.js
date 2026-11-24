@@ -225,7 +225,7 @@ test('SDR: novo lead de Benefícios segue Comercial após aceite, não vira pass
 })
 test('SDR: cotação de Auto autorizada vai a Patrimônio sem fila fictícia',()=>{
  const q=approvedQuestionsFor('auto',{renewal:false})
- const history=[...base('Quero cotar Seguro Auto novo'),...q.slice(0,7).map(q=>out(q.text)),inc('Não tenho mais informações')]
+ const history=[...base('Quero cotar Seguro Auto, é seguro novo.'),...q.slice(0,7).map(q=>out(q.text)),inc('Não tenho mais informações')]
  const offer=nextMuriloSdrDecision(history)
  assert.match(offer.reply,/Auto\/RE/)
  assert.equal(offer.humanHandoff,false)
