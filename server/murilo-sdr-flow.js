@@ -6,6 +6,7 @@
  */
 import {approvedQuestionsFor,SDR_PRODUCT_CODES} from './murilo-approved-questions.js'
 import {healthLivesCheck,healthCityCheck,volunteeredNetworkPriority} from './murilo-conversation-quality.js'
+import {isAutoInsuranceFromVehicleDescription} from './auto-insurance-product-signal.js'
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const inbound=m=>m?.direction==='inbound'&&m.author==='contact'
 const outbound=m=>m?.direction==='outbound'&&m.author==='agent'
@@ -38,6 +39,7 @@ export function detectSdrQuoteProduct(messages){
  for(const line of history){
   if(/\b(?:quero falar de outro assunto|outro assunto)\b/.test(line)){active=null;continue}
   const matches=Object.entries(names).filter(([,re])=>re.test(line)).map(([k])=>k)
+  if(!matches.includes('auto')&&isAutoInsuranceFromVehicleDescription(line))matches.push('auto')
   // "Plano de saúde para pet" belongs only to Pet, not Health.
   if(matches.includes('pet'))matches.splice(matches.indexOf('saude'),matches.includes('saude')?1:0)
   if(matches.includes('frota'))matches.splice(matches.indexOf('auto'),matches.includes('auto')?1:0)
@@ -161,7 +163,7 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
 
  const product=detectSdrQuoteProduct(list)
  if(!product||!SDR_PRODUCT_CODES.includes(product))
-  return safe('Quero evitar perguntas fora do seu contexto. Posso encaminhar sua solicitação a um consultor para confirmar o produto e continuar?')
+  return safe('Para direcionar sua cotação à equipe correta, qual tipo de seguro você deseja cotar?')
  // Uma única pergunta de CONFERÊNCIA quando as respostas são contraditórias.
  // Não amplia o formulário nem insiste quando o cliente não sabe responder.
  // Deve ocorrer antes do limite de sete perguntas e antes do aceite humano.
