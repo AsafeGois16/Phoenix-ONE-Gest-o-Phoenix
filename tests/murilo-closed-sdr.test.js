@@ -131,7 +131,7 @@ test('SDR: dois produtos não causam qualificação inventada',()=>{
  const msgs=base('Quero cotar plano de Saúde e seguro de Vida.')
  assert.equal(detectSdrQuoteProduct(msgs),null)
  const d=nextMuriloSdrDecision([...msgs,inc('Para a família')])
- assert.match(d.reply,/confirmar o produto/i)
+ assert.match(d.reply,/qual tipo de seguro você deseja cotar/i)
 })
 test('SDR: o novo mecanismo é opt-in, mantendo Clara e fluxos antigos quando desativado',async()=>{
  const old=process.env.PHX_MURILO_CLOSED_QUESTIONS
