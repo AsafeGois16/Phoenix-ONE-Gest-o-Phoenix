@@ -32,18 +32,24 @@ function explicitVehicleRenewal(text){
  return false
 }
 
+// Para pular a pergunta de marca/modelo/ano, exigir evidências desses
+// dados, nunca somente "seguro do carro". Usa o texto original para nomes
+// próprios de modelos ainda não cadastrados na lista.
+export function hasVehicleModelAndYear(text){
+ const s=fold(text)
+ const years=[...s.matchAll(/\b(?:19[7-9]\d|20[0-4]\d)\b/g)]
+ if(years.length===0)return false
+ if([vehicleMakers,familiarModels].some(re=>{
+  const matches=[...s.matchAll(new RegExp(re.source,'g'))]
+  return matches.some(m=>years.some(y=>y.index>=m.index&&y.index-m.index<55))
+ }))return true
+ return explicitVehicleRenewal(text)
+}
 export function isAutoInsuranceFromVehicleDescription(text){
  const s=fold(text)
  const sales=/\b(?:seguro|apolice|cotacao|cotar|orcamento|renovacao|renovar|renovando|contratar|contratacao)\b/.test(s)
  if(!sales)return false
  const vehicle=/\b(?:veiculo|carro|automovel|moto|motocicleta)\b/.test(s)
  if(vehicle)return true
- const years=[...s.matchAll(/\b(?:19[7-9]\d|20[0-4]\d)\b/g)]
- if(years.length===0)return false
- // Marca/modelo + ano devem estar próximos dentro do mesmo texto.
- if([vehicleMakers,familiarModels].some(re=>{
-  const matches=[...s.matchAll(new RegExp(re.source,'g'))]
-  return matches.some(m=>years.some(y=>y.index>=m.index&&y.index-m.index<55))
- }))return true
- return explicitVehicleRenewal(text)
+ return hasVehicleModelAndYear(text)
 }
