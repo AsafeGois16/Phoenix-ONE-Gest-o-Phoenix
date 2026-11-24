@@ -6,6 +6,9 @@ import {spawnSync} from 'node:child_process'
 const env={...process.env}
 delete env.VERCEL_ENV
 delete env.VERCEL_GIT_COMMIT_REF
+// Lab-only feature flags must be opt-in in their own tests. Otherwise a
+// preview build would invalidate baseline legacy regression assertions.
+delete env.PHX_MURILO_CLOSED_QUESTIONS
 const files=readdirSync('tests').filter(f=>f.endsWith('.test.js')).sort().map(f=>'tests/'+f)
 if(!files.length)throw Error('no tests')
 const result=spawnSync(process.execPath,['--test',...files],{env,stdio:'inherit'})
