@@ -41,10 +41,15 @@ export function confirmedOfferHandoff(messages,selectedAgent='clara'){
  const legacyConsultantQuote=selectedAgent==='murilo'&&
   /\bposso encaminhar\b/.test(offered)&&/\bconsultor\b/.test(offered)&&
   /\bconfirmar o produto\b/.test(offered)
- if(!department&&legacyConsultantQuote){
+ if(legacyConsultantQuote){
   const product=detectSdrQuoteProduct(messages)
-  const patrimonial=['auto','frota','residencial','fianca','viagem','bike','empresarial','equipamentos','rc','cyber','garantia','credito'].includes(product)
-  if(product)department=patrimonial?'patrimonio':'beneficios'
+  // "Sou o Murilo, do time comercial" não é um destino de fila. O texto
+  // pode estar no MESMO balão da oferta antiga; não classificá-lo como fila.
+  if(!product)return null // esclarecer o produto, nunca enviar à fila fictícia
+  if(!department||department==='comercial'){
+   const patrimonial=['auto','frota','residencial','fianca','viagem','bike','empresarial','equipamentos','rc','cyber','garantia','credito'].includes(product)
+   department=patrimonial?'patrimonio':'beneficios'
+  }
  }
  return department?{agent:selectedAgent==='murilo'?'murilo':'clara',reply:'Perfeito, obrigado pela confirmação. Vou solicitar seu encaminhamento à equipe responsável.',humanHandoff:true,handoff:{
   department,reason:'Cliente confirmou encaminhamento humano',summary:'Solicitação de atendimento humano confirmada pelo cliente. Conferir detalhes do protocolo no sistema de gestão.'}}:null
