@@ -113,8 +113,8 @@ function volunteered(question,messages){
  if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
  // A data de vencimento já veio na mensagem inicial: não perguntar de novo.
- if(/\\bdata de vencimento da apolice\\b/.test(q)&&
-  /\\b(?:apolice|seguro|vence|vencimento)\\b.{0,100}\\b\\d{2}\/\\d{2}\/\\d{4}\\b/.test(text))return true
+ if(/\bdata de vencimento da apolice\b/.test(q)&&
+  /\b(?:apolice|seguro|vence|vencimento)\b.{0,100}\b\d{2}\/\d{2}\/\d{4}\b/.test(text))return true
  if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&
    (/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text)||/\b(?:so para mim|somente para mim|apenas para mim|so eu|eu e minha esposa|eu e meu marido)\b/.test(text)))return true
  if(/\b(?:idades? das pessoas|as idades|idade das pessoas)\b/.test(q)&&
