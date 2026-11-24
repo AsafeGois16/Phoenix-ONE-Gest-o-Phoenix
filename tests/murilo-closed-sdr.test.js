@@ -216,7 +216,7 @@ test('SDR: novo lead de Benefícios segue Comercial após aceite, não vira pass
  const known=approvedQuestionsFor('previdencia').slice(0,7)
  const history=[...base('Quero contratar Previdência privada'),...known.map(q=>out(q.text)),inc('Já informei o que sabia')]
  const offer=nextMuriloSdrDecision(history)
- assert.match(offer.reply,/equipe de Vendas da Phoenix/)
+ assert.match(offer.reply,/equipe de Benefícios da Phoenix/)
  assert.equal(offer.humanHandoff,false)
  const yes=confirmedOfferHandoff([...history,out(offer.reply),inc('Sim')],'murilo')
  assert.ok(yes)
