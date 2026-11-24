@@ -22,7 +22,7 @@ export function isAutoInsuranceFromVehicleDescription(text){
  // Em pedidos de seguro com posse explícita ("seguro do meu Logan 2021"),
  // qualquer modelo informado junto ao ano é válido, sem catálogo fechado.
  // Evita inferir Auto a partir de um ano solto ou de uma contratação não relacionada.
- const describedOwnVehicle=/\b(?:seguro|apolice)\s+(?:do|da|para o|para a)\s+(?:meu|minha)\s+[a-z][a-z0-9-]{1,28}\s+(?:19[7-9]\\d|20[0-4]\\d)\\b/.test(s)
+ const describedOwnVehicle=/\b(?:seguro|apolice)\s+(?:do|da|para o|para a)\s+(?:meu|minha)\s+[a-z][a-z0-9-]{1,28}\s+(?:19[7-9]\d|20[0-4]\d)\b/.test(s)
  if(describedOwnVehicle)return true
  // Marca/modelo + ano devem estar próximos dentro do mesmo texto.
  return [vehicleMakers,familiarModels].some(re=>{
