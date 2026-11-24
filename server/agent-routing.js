@@ -37,6 +37,10 @@ function intent(text){
    /\b(?:acionar|acione|preciso acionar|solicitar acionamento|abrir sinistro|sofri|faleceu|veio a falecer|preciso de guincho)\b.{0,90}\b(?:assistencia|sinistro|seguro|funeral|guincho|falecimento)\b/.test(value)||
    /\b(?:preciso de assistencia|assistencia urgente|socorro agora)\b/.test(value)
  if(operational)return 'service'
+ // Renovação comercial não pode encobrir novo sinistro nem pedido de cancelamento.
+ if(/\b(?:abrir|registrar|comunicar|acionar)\s+(?:um\s+|o\s+)?sinistro\b/.test(value)||
+   /\b(?:quero|preciso|desejo|solicito)\s+(?:o\s+|a\s+)?(?:cancelar|cancelamento|excluir|exclusao)\b/.test(value))
+  return 'service'
  // Uma cobertura mencionada em cotação continua sendo assunto do comercial.
  // Serve para todos os produtos: Vida, Auto, Saúde, Residencial, Viagem etc.
  if(SALES_PATTERNS.some(p=>p.test(value)))return 'sales'
