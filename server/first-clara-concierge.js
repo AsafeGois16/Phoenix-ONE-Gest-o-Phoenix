@@ -1,4 +1,5 @@
 import {clientDeclaredName} from './commercial-intake.js'
+import {muriloTransferInvitation} from './murilo-transfer-invitation.js'
 import {observedAgentIntroductions} from './conversation-policy.js'
 
 /**
@@ -29,7 +30,7 @@ export function firstClaraForNewQuote({pin,introState,messages,selectedAgent}={}
  if(/\b(?:falar com|me transfira para|me encaminhe para|quero (?:um |uma )?atendente|quero (?:um |uma )?consultor|atendimento humano)\b/.test(text))return null
  const name=clientDeclaredName(history)
  const reply=name?
-  'Prazer, '+name+'! Posso passar seu atendimento ao Murilo, nosso assistente comercial, para continuar a cotação?':
+  muriloTransferInvitation(history,{name,verb:'passar'}):
   'Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance. 💙\n\nComo posso te chamar?'
  return {agent:'clara',reply,humanHandoff:false,handoff:null}
 }

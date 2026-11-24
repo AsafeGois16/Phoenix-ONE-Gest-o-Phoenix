@@ -1,4 +1,6 @@
 import {detectSdrQuoteProduct} from './murilo-sdr-flow.js'
+import {clientDeclaredName} from './commercial-intake.js'
+import {muriloTransferInvitation} from './murilo-transfer-invitation.js'
 import {healthLivesCheck} from './murilo-conversation-quality.js'
 /**
  * Confirmações de encaminhamento e troca de agente.
@@ -99,5 +101,9 @@ export function decideMuriloSwitch(messages,selectedAgent){
   if(no.test(fold(text)))return {agent:'clara',reply:'Sem problemas, continuamos por aqui. Posso esclarecer dúvidas gerais sobre seguros sem encaminhar você para outro agente.',humanHandoff:false,handoff:null}
   return {agent:'clara',reply:'Para sua confirmação: deseja que eu passe o atendimento ao Murilo, nosso assistente comercial, para ajudar com a cotação?',humanHandoff:false,handoff:null}
  }
- return {agent:'clara',reply:'Claro, podemos cotar o seguro do mesmo veículo em outras seguradoras. Posso encaminhar sua conversa ao Murilo, nosso assistente comercial, para continuar a cotação?',humanHandoff:false,handoff:null}
+ // A mesma oferta contextual é usada também pelo fluxo de coleta de
+ // nome. Nenhuma regra pode voltar à frase fixa "mesmo veículo".
+ return {agent:'clara',reply:muriloTransferInvitation(messages,{
+  name:clientDeclaredName(messages),verb:'encaminhar'
+ }),humanHandoff:false,handoff:null}
 }

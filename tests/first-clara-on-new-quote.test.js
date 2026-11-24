@@ -56,7 +56,7 @@ test('C04: mensagem inicial já contém nome — Clara pede passagem ao Murilo, 
  assert.equal(res.body.agent,'clara')
  assert.match(res.body.reply,/Sou a Clara/)
  assert.match(res.body.reply,/Rafael/)
- assert.match(res.body.reply,/Posso passar seu atendimento ao Murilo/)
+ assert.match(res.body.reply,/Posso passar sua cotação de plano de saúde empresarial para 12 vidas ao Murilo/)
  assert.doesNotMatch(res.body.reply,/Como posso te chamar/)
 })
 test('C05: histórico sem aviso mantém Clara pela coleta de nome existente',async()=>{
