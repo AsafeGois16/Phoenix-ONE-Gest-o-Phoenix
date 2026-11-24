@@ -22,6 +22,7 @@ import {movementDocumentPrompt,verifiedMovementDecision} from '../../../server/v
 import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReadonlyConsultation,isVerifiedReadonlyContext,portfolioFocus,formatVerifiedPortfolio,requestedPortfolioProduct,isCommercialRequest,ensureClaraIntro,dedupeClaraIntroductions,hideIdentifierPlaceholders,observedAgentIntroductions,omitRepeatedAgentIntroduction} from '../../../server/conversation-policy.js'
 
 import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
+import {nextMuriloSdrDecision,muriloMediaReceived} from '../../../server/murilo-sdr-flow.js'
 import {resolvePilotMode,orchestrationErrorCode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
@@ -92,7 +93,9 @@ function checkPayload(body){
  // customer chat field. Legacy callers remain unchanged while feature is OFF.
  if(process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'&&body.verification_ref!==undefined&&!validVerificationRef(body.verification_ref))return false
  if(!body.contact||!['cliente','lead','desconhecido'].includes(body.contact.kind))return false
- return !body.messages.some(m=>!m||!['inbound','outbound'].includes(m.direction)||!['contact','agent','staff'].includes(m.author)||!['texto','text'].includes(m.type)||typeof m.text!=='string'||m.text.length>4000)
+ return !body.messages.some(m=>!m||!['inbound','outbound'].includes(m.direction)||!['contact','agent','staff'].includes(m.author)||!['texto','text'].includes(m.type)||typeof m.text!=='string'||m.text.length>4000||
+  (m.media_received!==undefined&&typeof m.media_received!=='boolean')||
+  (m.media_kind!==undefined&&!['image','photo','document','pdf'].includes(m.media_kind)))
 }
 function needsAccountContext(text){
  return /ap[oó]lice|cobertura|seguradora|parcela|boleto|segunda via|2[ªa]?\s*via|vencimento|vig[eê]ncia|contrato|pagamento|fatura|plano|carteirinha|inadimpl[eê]ncia|quit[ae]ç[aã]o/i.test(text)
@@ -204,7 +207,10 @@ export async function respondValidated(body,res,pin=null){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'last_message_not_inbound',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
  }
- const normalized=normalizeMessages(activeMessages)
+ // Authenticated Junior attachment receipt metadata: no image bytes, no OCR.
+ const sdrMedia=process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'&&muriloMediaReceived(last)
+ const normalized=normalizeMessages(sdrMedia&&!last.text.trim()?
+  activeMessages.map((m,i)=>i===activeMessages.length-1?{...m,text:'[Anexo recebido pelo sistema do Junior]'}:m):activeMessages)
  if(!normalized.length||normalized.at(-1)?.role!=='user'){
   console.info('phoenix_response_skipped',JSON.stringify({reason:'no_inbound_text',agent}))
   return replyToJunior({agent,reply:'',humanHandoff:false,handoff:null})
@@ -331,6 +337,12 @@ export async function respondValidated(body,res,pin=null){
    const shouldTransfer=statusBackoffice?true:backoffice.humanHandoff===true
    console.info('phoenix_backoffice_intake',JSON.stringify({category:backoffice.type,stage:backoffice.stage||'status_handoff',handoff:shouldTransfer}))
    return replyToJunior({agent:'clara',reply:backoffice.reply,humanHandoff:shouldTransfer,handoff:shouldTransfer?{department:backoffice.department,reason:backoffice.reason,summary:backoffice.summary}:null})
+ }
+ // Closed SDR flow runs only after identity, safety, consent and service guards.
+ // Disabled by default to preserve production until Junior jointly homologates.
+ if(process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'){
+  const sdr=nextMuriloSdrDecision(activeMessages)
+  if(sdr)return replyToJunior(sdr)
  }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)
  const start=performance.now()
