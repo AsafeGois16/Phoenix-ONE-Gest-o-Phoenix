@@ -137,7 +137,7 @@ const isImageMetadata=m=>inbound(m)&&m.media_received===true&&
   (!m.media_kind||['image','photo','document','pdf'].includes(m.media_kind))
 const photoWasRequested=messages=>messages.filter(outbound).slice(-3).some(m=>/\b(?:encaminhar|enviar|envie|mandar)\b.{0,100}\b(?:apolice|foto|nota fiscal|comprovante|relacao|documento|edital)\b/i.test(fold(m.text)))
 function offer(product){
- const line=patLine.has(product)?'Auto/RE':'Benefícios'
+ const line=patLine.has(product)?'Auto/RE':'Vendas da Phoenix'
  return safe('Com as informações disponíveis, um consultor pode concluir a avaliação. Posso encaminhar sua solicitação à equipe de '+line+'?')
 }
 /**
@@ -150,6 +150,13 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
  const list=Array.isArray(messages)?messages:[]
  const last=list.at(-1)
  if(!inbound(last))return null
+ const lastCustomer=fold(last.text)
+ const priorAgent=fold([...list].reverse().find(outbound)?.text)
+ // Não insistir em convite já recusado: sem lead e sem novo encaminhamento.
+ if(/^(?:nao|nao obrigado|nao obrigada|agora nao|prefiro nao)[.! ]*$/.test(lastCustomer)&&
+    /\bposso encaminhar\b/.test(priorAgent))
+  return safe('Sem problemas, não farei o encaminhamento. Continuamos à disposição.')
+
  const product=detectSdrQuoteProduct(list)
  if(!product||!SDR_PRODUCT_CODES.includes(product))
   return safe('Quero evitar perguntas fora do seu contexto. Posso encaminhar sua solicitação a um consultor para confirmar o produto e continuar?')
