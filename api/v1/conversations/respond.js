@@ -6,6 +6,7 @@ import {readMegaBrainHint} from '../../../server/megabrain-agent-context.js'
 import {findInboundDocument,scrubDocuments,scrubVerificationProof,extractVerificationProof,requiresPersonalLookup,handoffDepartment} from '../../../server/document-identity.js'
 import {documentContinuationState,repeatsDocumentRequest,noRepeatAfterVerified} from '../../../server/document-continuity.js'
 import {selectConversationAgent,classifyConversationIntent,hasExplicitConversationIntent} from '../../../server/agent-routing.js'
+import {firstClaraForNewQuote} from '../../../server/first-clara-concierge.js'
 import {refineCommercialReply,refineUnverifiedIdentityClaim} from '../../../server/global-agent-safety.js'
 import {normalizeHandoffDecision} from '../../../server/handoff-policy.js'
 import {financialSecondCopyDecision,shouldReuseProtocolDocument,needsVerifiedFinancialLookup} from '../../../server/financial-routing.js'
@@ -258,6 +259,12 @@ export async function respondValidated(body,res,pin=null){
  const closedMurilo=process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'
  const intake=closedMurilo||introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
+ // Gestão Phoenix pode inserir um aviso automático de protocolo como outbound
+ // antes da primeira cotação. Isso não é apresentação da Clara. No modo
+ // Clara + Murilo, quando o Bridge confirma que nenhum agente se apresentou,
+ // a Clara acolhe o cliente ANTES das perguntas SDR.
+ const firstConcierge=firstClaraForNewQuote({pin,introState,messages:body.messages,selectedAgent:agent})
+ if(firstConcierge)return replyToJunior(firstConcierge)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
  // Não delegar essa decisão ao texto gerado pelo Murilo.
  const directHuman=directAutoReHumanHandoff(body.messages,agent)
