@@ -1,4 +1,5 @@
 import {isAdministrativeMovementRequest} from './backoffice-routing.js'
+import {muriloTransferInvitation} from './murilo-transfer-invitation.js'
 
 /**
  * Coleta de nome de tratamento e roteamento de oportunidades Auto/RE.
@@ -57,7 +58,7 @@ export function nameIntakeDecision(messages,selectedAgent){
  if(/\b(?:ferid|acidente|emergencia|socorro|incendio|sinistro urgente|guincho agora|hospital de urgencia)\b/.test(latest)||
     /\b(?:falar com|quero|preciso|transferir|encaminhar)\b.{0,65}\b(?:humano|atendente|consultor humano|pessoa do atendimento)\b/.test(latest))return null
  if(selectedAgent==='murilo'&&known&&(nameJustAnswered||nameJustDeclared)&&!muriloAlreadySpoke&&!muriloOfferAlreadySent){
-  return {agent:'clara',reply:'Obrigada, '+known+'! Posso passar seu atendimento ao Murilo, nosso assistente comercial, para continuar a cotação?',humanHandoff:false,handoff:null}
+  return {agent:'clara',reply:muriloTransferInvitation(list,{name:known,verb:'passar'}),humanHandoff:false,handoff:null}
  }
  if(!intro.length){
   // A coleta obrigatória aqui é só na abertura comercial ou saudação pura.
@@ -67,7 +68,7 @@ export function nameIntakeDecision(messages,selectedAgent){
   // O nome já informado não autoriza nova apresentação da Clara nem uma
   // segunda oferta se o cliente acabou de dizer "sim" à passagem anterior.
   if(known&&selectedAgent==='murilo'&&nameJustDeclared&&!muriloOfferAlreadySent){
-   return {agent:'clara',reply:'Obrigada, '+known+'! Posso passar seu atendimento ao Murilo, nosso assistente comercial, para continuar a cotação?',humanHandoff:false,handoff:null}
+   return {agent:'clara',reply:muriloTransferInvitation(list,{name:known,verb:'passar'}),humanHandoff:false,handoff:null}
   }
   return null
  }
