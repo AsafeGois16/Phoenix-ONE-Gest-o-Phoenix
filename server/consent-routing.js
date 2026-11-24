@@ -1,5 +1,6 @@
 import {detectSdrQuoteProduct} from './murilo-sdr-flow.js'
 import {clientDeclaredName} from './commercial-intake.js'
+import {muriloTransferInvitation} from './murilo-transfer-invitation.js'
 import {healthLivesCheck} from './murilo-conversation-quality.js'
 /**
  * Confirmações de encaminhamento e troca de agente.
@@ -100,24 +101,9 @@ export function decideMuriloSwitch(messages,selectedAgent){
   if(no.test(fold(text)))return {agent:'clara',reply:'Sem problemas, continuamos por aqui. Posso esclarecer dúvidas gerais sobre seguros sem encaminhar você para outro agente.',humanHandoff:false,handoff:null}
   return {agent:'clara',reply:'Para sua confirmação: deseja que eu passe o atendimento ao Murilo, nosso assistente comercial, para ajudar com a cotação?',humanHandoff:false,handoff:null}
  }
- // No modo Clara + Murilo, o produto vem da solicitação real do cliente.
- // A regra anterior sempre mencionava "o mesmo veículo", inclusive quando
- // a pessoa acabara de pedir Saúde empresarial e informar seu nome.
- // Produto misto/desconhecido -> texto neutro, nunca adivinhar ramo.
- const labels={
-  saude:'plano de saúde',saude_empresarial:'plano de saúde empresarial',
-  odonto:'plano odontológico',odonto_empresarial:'plano odontológico empresarial',
-  vida:'seguro de Vida',vida_grupo:'seguro de Vida em grupo',
-  pet:'seguro Pet',previdencia:'previdência privada',
-  auto:'seguro Auto',frota:'seguro Frota',residencial:'seguro Residencial',
-  fianca:'seguro Fiança',viagem:'seguro Viagem',bike:'seguro Bike',
-  empresarial:'seguro Empresarial',equipamentos:'seguro de Equipamentos',
-  rc:'seguro de Responsabilidade Civil',cyber:'seguro Cyber',
-  garantia:'Seguro Garantia',credito:'Seguro de Crédito'
- }
- const product=detectSdrQuoteProduct(messages)
- const need=labels[product]?'sua cotação de '+labels[product]:'sua solicitação de cotação'
- const customerName=clientDeclaredName(messages)
- const salutation=customerName?'Prazer, '+customerName+'! ':''
- return {agent:'clara',reply:salutation+'Posso encaminhar '+need+' ao Murilo, nosso assistente comercial, para continuar o atendimento?',humanHandoff:false,handoff:null}
+ // A mesma oferta contextual é usada também pelo fluxo de coleta de
+ // nome. Nenhuma regra pode voltar à frase fixa "mesmo veículo".
+ return {agent:'clara',reply:muriloTransferInvitation(messages,{
+  name:clientDeclaredName(messages),verb:'encaminhar'
+ }),humanHandoff:false,handoff:null}
 }
