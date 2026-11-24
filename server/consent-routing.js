@@ -2,6 +2,7 @@ import {detectSdrQuoteProduct} from './murilo-sdr-flow.js'
 import {clientDeclaredName} from './commercial-intake.js'
 import {muriloTransferInvitation} from './murilo-transfer-invitation.js'
 import {healthLivesCheck} from './murilo-conversation-quality.js'
+import {isAutoPortfolioOffer} from './auto-verified-portfolio-handoff.js'
 /**
  * Confirmações de encaminhamento e troca de agente.
  * Histórico é confirmado pelo Junior (inbound/outbound), nunca por proposta
@@ -31,6 +32,9 @@ export function humanDepartmentFromOffer(messages){
  return null // não assumir setor sem clareza suficiente
 }
 export function confirmedOfferHandoff(messages,selectedAgent='clara'){
+ // A confirmação de Seguro Auto cadastrado exige verificação atual no
+ // mesmo protocolo. Nunca produzir handoff por aceite genérico a este convite.
+ if(isAutoPortfolioOffer(recentOutbound(messages)))return null
  if(!isHumanHandoffConfirmed(messages)||!offerHuman(recentOutbound(messages))||offerMurilo(recentOutbound(messages)))return null
  let department=humanDepartmentFromOffer(messages)
  // Compatibilidade com convites antigos: Murilo podia oferecer um consultor
