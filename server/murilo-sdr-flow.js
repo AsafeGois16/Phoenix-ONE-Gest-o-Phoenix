@@ -108,7 +108,7 @@ function volunteered(question,messages){
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
  if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
- if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b/.test(q)&&/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text))return true
+ if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text))return true
  if(/\bprefere\b|\bpreferencia por algum hospital\b/.test(q)&&/\b(?:prefiro|gostaria|quero)\b.{0,50}\b(?:hospital|laboratorio)\b/.test(text))return true
  if(/\bqual (?:e |é )?o destino\b/.test(q)&&/\b(?:viajaremos|destino|vamos para|iremos para)\b/.test(text))return true
  return false
