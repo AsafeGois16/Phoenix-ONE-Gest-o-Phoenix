@@ -246,7 +246,10 @@ export async function respondValidated(body,res,pin=null){
    directCommercial=true
    return replyToJunior({agent:'clara',reply:plan.reply,humanHandoff:plan.humanHandoff===true,handoff:plan.handoff||null})
  }
- const intake=introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
+ // O SDR fechado não acrescenta a pergunta genérica de nome fora do roteiro.
+ // A Clara continua identificando o contato no acolhimento/fluxo operacional.
+ const closedMurilo=process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'
+ const intake=closedMurilo||introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Pedido explícito de atendimento humano é autorização direta para handoff.
  // Não delegar essa decisão ao texto gerado pelo Murilo.
