@@ -51,6 +51,19 @@ export function selectConversationAgent(body) {
  const current=intent(last)
  if(current==='service')return 'clara'
  if(current==='sales')return 'murilo'
+ // Resposta neutra à ÚLTIMA pergunta comercial do Murilo tem precedência
+ // sobre demandas operacionais antigas no mesmo histórico. A pergunta deve
+ // ser realmente de qualificação, e não uma proposta de passagem entre agentes.
+ const messages=Array.isArray(body?.messages)?body.messages:[]
+ const lastAgentMessage=[...messages].reverse().find(m=>m?.direction==='outbound'&&m.author==='agent'&&typeof m.text==='string')
+ const lastAgentText=fold(lastAgentMessage?.text)
+ const offeredTransfer=/\b(?:posso|podemos|pode)\b.{0,55}\b(?:encaminhar|transferir|passar)\b.{0,55}\b(?:murilo|assistente comercial|equipe|atendente|humano)\b/.test(lastAgentText)
+ const qualificationQuestion=/\?/.test(lastAgentText)&&/\b(?:cotacao|orcamento|simulacao|rede credenciada|hospitais?|regioes?|franquia|cobertura|protecao|veiculo|imovel|empresa|vidas)\b/.test(lastAgentText)
+ const recentSalesAgent=messages.slice(-14).some(m=>m?.direction==='outbound'&&m.author==='agent'&&/\b(?:sou (?:o )?murilo|aqui e (?:o )?murilo|me chamo murilo|murilo, do time comercial)\b/.test(fold(m.text)))
+ const genuineQualification=qualificationQuestion&&!offeredTransfer&&
+  (recentSalesAgent||body?.agent_hint==='murilo'||/\b(?:cotacao|orcamento|simulacao)\b/.test(lastAgentText))
+ const newTopic=/^(?:outro assunto|tenho outra duvida|quero falar de outro assunto|quero retomar outro assunto)\b/.test(fold(last))
+ if(genuineQualification&&!newTopic)return 'murilo'
  // Somente respostas curtas de acompanhamento mantêm a intenção já identificada
  // no MESMO protocolo. Nunca transformar "Oi" inicial em Murilo por causa do hint.
  const stripped=fold(last)
