@@ -54,7 +54,7 @@ export function nameIntakeDecision(messages,selectedAgent){
  const muriloAlreadySpoke=intro.some(m=>/\b(?:sou\s+(?:o\s+)?murilo|murilo,\s+do time comercial)\b/i.test(fold(m.text)))
  const muriloOfferAlreadySent=intro.some(m=>/\b(?:posso|deseja|quer)\b.{0,140}\b(?:encaminhar|passar|transferir)\b.{0,120}\bmurilo\b/i.test(fold(m.text)))
  // Urgências e solicitações explícitas de humano não podem ser bloqueadas pelo nome.
- if(/\b(?:ferid|acidente|emergencia|socorro|incendio|sinistro urgente|guincho agora|hospital)\b/.test(latest)||
+ if(/\b(?:ferid|acidente|emergencia|socorro|incendio|sinistro urgente|guincho agora|hospital de urgencia)\b/.test(latest)||
     /\b(?:falar com|quero|preciso|transferir|encaminhar)\b.{0,65}\b(?:humano|atendente|consultor humano|pessoa do atendimento)\b/.test(latest))return null
  if(selectedAgent==='murilo'&&known&&(nameJustAnswered||nameJustDeclared)&&!muriloAlreadySpoke&&!muriloOfferAlreadySent){
   return {agent:'clara',reply:'Obrigada, '+known+'! Posso passar seu atendimento ao Murilo, nosso assistente comercial, para continuar a cotação?',humanHandoff:false,handoff:null}
