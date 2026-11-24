@@ -16,6 +16,7 @@ const SERVICE_PATTERNS=[
   /\b(?:carteirinha|reembolso|sinistro|emergencia|autorizacao|cirurgia|guia|beneficiario|dependente|exclusao|excluir|inclusao|incluir|movimentacao|cancelamento|cancelar|alteracao|atualizar dados|atualizacao cadastral)\b/,
   /\b(?:minha apolice|meu contrato|minha cobertura|meu plano|minha seguradora|meu seguro|seguro que tenho|sou cliente|ja sou cliente|sou segurado|tenho um plano|quais seguros|meus seguros|minhas apolices|quais apolices)\b/,
   /\b(?:nao recebi|nao consigo acessar|preciso de ajuda com|problema no atendimento|acompanhar meu pedido|quero falar com atendente)\b/,
+  /\b(?:dor no peito|falta de ar|nao respira|inconsciente|convulsao|sangramento intenso|risco de vida|internacao urgente|preciso de pronto.socorro)\b/,
   /\b(?:nao consigo (?:marcar|agendar|fazer) (?:uma?\s+|a\s+)?(?:consulta|exame)|(?:consulta|exame) (?:negad[oa]|recusad[oa]))\b/
 ]
 const SALES_PATTERNS=[
