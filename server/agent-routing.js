@@ -20,7 +20,7 @@ const SERVICE_PATTERNS=[
   /\b(?:nao consigo (?:marcar|agendar|fazer) (?:uma?\s+|a\s+)?(?:consulta|exame)|(?:consulta|exame) (?:negad[oa]|recusad[oa]))\b/
 ]
 const SALES_PATTERNS=[
-  /\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|proposta de seguro)\b/,
+  /\b(?:cotacao|cotar|orcamento|simulacao|simular|proposta comercial|proposta de seguro|renovar|renovacao|renovando|renove|cotacao de renovacao)\b/,
   /\b(?:contratar|contratacao|comprar|adquirir|fechar um seguro|fazer um seguro|fazer seguro|quero um seguro|quero seguro)\b/,
   /\b(?:qual o preco|quanto custa|quanto ficaria|valores para contratar|preco de um seguro|valor de um seguro)\b/,
   /\b(?:tenho interesse em|estou interessado em|quero conhecer planos|quero uma proposta)\b/
