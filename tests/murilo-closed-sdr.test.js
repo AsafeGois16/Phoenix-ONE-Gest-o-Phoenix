@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {SDR_PRODUCT_CODES,SDR_QUESTIONNAIRES,approvedQuestionsFor} from '../server/murilo-approved-questions.js'
 import {detectSdrQuoteProduct,nextMuriloSdrDecision,muriloMediaReceived} from '../server/murilo-sdr-flow.js'
 import {respondValidated} from '../api/v1/conversations/respond.js'
+import {confirmedOfferHandoff} from '../server/consent-routing.js'
 const inc=(text,extra={})=>({direction:'inbound',author:'contact',type:'texto',text,...extra})
 const out=text=>({direction:'outbound',author:'agent',type:'texto',text})
 const base=product=>[inc(product),out('Sou o Murilo, do time comercial da Phoenix Insurance.')]
@@ -208,4 +209,34 @@ test('SDR: API aceita fotografia confirmada sem texto e prossegue sem OCR ou Ope
   if(old===undefined)delete process.env.PHX_MURILO_CLOSED_QUESTIONS
   else process.env.PHX_MURILO_CLOSED_QUESTIONS=old
  }
+})
+
+
+test('SDR: novo lead de Benefícios segue Comercial após aceite, não vira passagem ao Murilo',()=>{
+ const known=approvedQuestionsFor('previdencia').slice(0,7)
+ const history=[...base('Quero contratar Previdência privada'),...known.map(q=>out(q.text)),inc('Já informei o que sabia')]
+ const offer=nextMuriloSdrDecision(history)
+ assert.match(offer.reply,/equipe de Vendas da Phoenix/)
+ assert.equal(offer.humanHandoff,false)
+ const yes=confirmedOfferHandoff([...history,out(offer.reply),inc('Sim')],'murilo')
+ assert.ok(yes)
+ assert.equal(yes.humanHandoff,true)
+ assert.equal(yes.handoff.department,'comercial')
+})
+test('SDR: cotação de Auto autorizada vai a Patrimônio sem fila fictícia',()=>{
+ const q=approvedQuestionsFor('auto',{renewal:false})
+ const history=[...base('Quero cotar Seguro Auto novo'),...q.slice(0,7).map(q=>out(q.text)),inc('Não tenho mais informações')]
+ const offer=nextMuriloSdrDecision(history)
+ assert.match(offer.reply,/Auto\/RE/)
+ assert.equal(offer.humanHandoff,false)
+ const yes=confirmedOfferHandoff([...history,out(offer.reply),inc('Sim')],'murilo')
+ assert.equal(yes?.handoff?.department,'patrimonio')
+})
+test('SDR: recusa de encaminhamento não reabre a oferta nem gera lead',()=>{
+ const hist=[...base('Quero cotar Seguro Auto'),out('Posso encaminhar sua solicitação à equipe de Auto/RE?'),inc('Não, obrigado')]
+ const decision=nextMuriloSdrDecision(hist)
+ assert.equal(decision.humanHandoff,false)
+ assert.equal(decision.handoff,null)
+ assert.doesNotMatch(decision.reply,/\?/)
+ assert.doesNotMatch(decision.reply,/posso encaminhar/i)
 })
