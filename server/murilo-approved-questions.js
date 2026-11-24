@@ -59,7 +59,7 @@ const QUESTIONNAIRES=Object.freeze({
    'Pode me informar o CNPJ da empresa?',
    'Qual seria a quantidade de vidas seguradas?',
    'Você possui uma base de vidas para a cotação?',
-   'Na base de vidas, há alguma pessoa afastada? Se sim, quantas?',
+   'Quantas pessoas estão afastadas na base de vidas, caso haja alguma?',
    'A empresa segue alguma Convenção Coletiva de Trabalho (CCT)?'
   ],
   geral_cpf:[
