@@ -108,7 +108,15 @@ function volunteered(question,messages){
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
  if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
- if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text))return true
+ if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&
+   (/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text)||/\b(?:so para mim|somente para mim|apenas para mim|so eu|eu e minha esposa|eu e meu marido)\b/.test(text)))return true
+ if(/\b(?:idades? das pessoas|as idades|idade das pessoas)\b/.test(q)&&
+   /\b(?:idade\s*(?:de|:)?\s*\d{1,2}|\d{1,2}\s*anos|\d{1,2}\s*e\s*\d{1,2}\s*anos)\b/.test(text))return true
+ if(/\bem qual cidade\b/.test(q)&&
+   /\b(?:moro|resido|moramos|cidade de|moramos em|utilizar(?:ao|a) em)\s+(?:em\s+)?[a-z]{3,}/.test(text))return true
+ if(/\bcodigo cnpj|\bcnpj da empresa\b/.test(q)&&/\b(?:cnpj|\d{2}\.?\d{3}\.?\d{3}\/\d{4}-?\d{2})\b/.test(text))return true
+ if(/\bplano atual\b/.test(q)&&
+   (/\b(?:tenho|possuo|usamos|atualmente tenho|estou no|meu plano)\b.{0,45}\b(?:amil|unimed|bradesco|sulamerica|sul america|hapvida|gndi|notredame|porto)\b/.test(text)||/\b(?:nao tenho plano|sem plano atualmente)\b/.test(text)))return true
  if(/\bprefere\b|\bpreferencia por algum hospital\b/.test(q)&&/\b(?:prefiro|gostaria|quero)\b.{0,50}\b(?:hospital|laboratorio)\b/.test(text))return true
  if(/\bqual (?:e |é )?o destino\b/.test(q)&&/\b(?:viajaremos|destino|vamos para|iremos para)\b/.test(text))return true
  return false
