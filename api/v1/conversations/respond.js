@@ -24,6 +24,7 @@ import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReado
 
 import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
 import {nextMuriloSdrDecision,muriloMediaReceived} from '../../../server/murilo-sdr-flow.js'
+import {isAutoRenewalForVerification,isAutoPortfolioOffer,verifiedAutoPortfolioDecision} from '../../../server/auto-verified-portfolio-handoff.js'
 import {resolvePilotMode,orchestrationErrorCode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
@@ -277,6 +278,35 @@ export async function respondValidated(body,res,pin=null){
  // quando a conversa acabou de retornar do Backoffice.
  const financial=financialSecondCopyDecision(body.messages,agent)
  if(financial)return replyToJunior(financial)
+ // Renovação Auto: consultar APENAS a existência de algum seguro Auto,
+ // sem escolher/mostrar veículo ou apólice. Só após identity_context=verified
+ // para este mesmo protocolo (ponte autenticada do Junior, propósito quote).
+ // A resposta SIM só encaminha direto quando a verificação continua válida;
+ // NÃO pode cair no handoff genérico sem validação.
+ const autoIdentityFlow=process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'&&
+   process.env.PHX_AUTO_RE_VERIFIED_LOOKUP==='true'&&
+   process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'&&
+   agent==='murilo'&&isAutoRenewalForVerification(activeMessages)
+ if(autoIdentityFlow){
+  const earlier=activeMessages.slice(0,-1).reverse().find(m=>m?.direction==='outbound'&&m.author==='agent')
+  const autoOfferAwaiting=Boolean(earlier&&isAutoPortfolioOffer(earlier.text))
+  const document=findInboundDocument(activeMessages)
+  const trustedRef=validVerificationRef(body.verification_ref)?body.verification_ref:null
+  let verified={status:'unavailable'}
+  if(document.status==='valid'||trustedRef){
+   const proof=document.status==='valid'?extractVerificationProof(activeMessages,document.type):null
+   verified=await juniorIdentityContext(body.conversation_id,body.protocolo,document,proof,
+     AbortSignal.timeout(7000),{v4:true,verificationRef:trustedRef,purpose:'quote',productCode:'auto'})
+  }
+  // Sem documento/ref confirmado, não se admite aceite de transferência
+  // baseado apenas em "sim" a uma afirmação antiga do chat.
+  const portfolioDecision=verifiedAutoPortfolioDecision(activeMessages,verified)
+  if(portfolioDecision)return replyToJunior(portfolioDecision)
+  if(autoOfferAwaiting&&verified.status!=='verified')return replyToJunior({
+   agent:'murilo',reply:'A validação do cadastro não está disponível neste momento. Vamos continuar a qualificação da renovação para a equipe Auto/RE.',
+   humanHandoff:false,handoff:null
+  })
+ }
  // Aceite de transferência pendente em pergunta ANTERIOR já entregue
  // (não apenas um pedido de transferência proposto pela IA).
  const confirmed=confirmedOfferHandoff(body.messages,agent)
@@ -358,7 +388,7 @@ export async function respondValidated(body,res,pin=null){
  // Closed SDR flow runs only after identity, safety, consent and service guards.
  // Disabled by default to preserve production until Junior jointly homologates.
  if(process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'){
-  const sdr=nextMuriloSdrDecision(activeMessages)
+  const sdr=nextMuriloSdrDecision(activeMessages,{documentIntake:process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'})
   if(sdr)return replyToJunior(sdr)
  }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)
