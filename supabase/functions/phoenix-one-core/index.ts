@@ -59,10 +59,20 @@ Deno.serve(async req=>{
     if(!validAgent(agent)||prompt.length<80||prompt.length>65000||!stringUnder(body.name||'',150)||!stringUnder(body.role||'',200))return err(400,'invalid_agent_data')
     let version=0
     await pg.begin(async tx=>{
+      // Serialize concurrent editor saves before allocating the next version.
+      await tx.unsafe("select pg_advisory_xact_lock(hashtext($1))",['phoenix-one:agent-versions:'+agent])
       const prev=await tx.unsafe("select coalesce(max(version),0) as last from phoenix_one.agent_versions where agent_id=$1",[agent])
+      const current=await tx.unsafe("select policy,tone from phoenix_one.agent_versions where agent_id=$1 and active=true order by version desc limit 1",[agent])
+      if(!current.length)throw Error('agent_active_version_missing')
       version=Number(prev[0].last)+1
+      // The editor does not receive or edit policy flags. Carry them forward
+      // unchanged so prompt edits cannot silently remove safety/role policies.
+      const prior=current[0].policy
+      const policy=prior&&typeof prior==='object'&&!Array.isArray(prior)?prior:{}
+      const preservedPolicy={...policy,source:'user_editor',review:'manual'}
+      const nextTone=typeof body.tone==='string'?tone:current[0].tone||''
       await tx.unsafe("update phoenix_one.agent_versions set active=false where agent_id=$1",[agent])
-      await tx.unsafe("insert into phoenix_one.agent_versions(agent_id,version,system_prompt,tone,policy,active) values($1,$2,$3,$4,$5::jsonb,true)",[agent,version,prompt,tone,JSON.stringify({source:'user_editor',management:'junior_only',review:'manual'})])
+      await tx.unsafe("insert into phoenix_one.agent_versions(agent_id,version,system_prompt,tone,policy,active) values($1,$2,$3,$4,$5::jsonb,true)",[agent,version,prompt,nextTone,JSON.stringify(preservedPolicy)])
       await tx.unsafe('update phoenix_one.agents set name=$2,role=$3,status=$4,updated_at=now() where id=$1',[agent,clean(body.name)||agent,clean(body.role)||'', 'testing'])
       await tx.unsafe("insert into phoenix_one.audit_events(actor_id,action,entity_kind,entity_id,metadata) values($1::uuid,'prompt_version_published','agent',$2,$3::jsonb)",[user.id,agent,JSON.stringify({version})])
     })
