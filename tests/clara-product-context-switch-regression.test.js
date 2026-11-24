@@ -39,6 +39,7 @@ test('CTX02: API reproduz a sequência real e mantém agente, produto e aceite p
  assert.equal(res.body.handoff,null)
  assert.match(res.body.reply,/Rafael/)
  assert.match(res.body.reply,/plano de saúde empresarial/i)
+ assert.match(res.body.reply,/12 vidas/i)
  assert.doesNotMatch(res.body.reply,/mesmo veículo|seguro Auto|outras seguradoras/i)
 })
 
