@@ -6,7 +6,7 @@
  */
 import {approvedQuestionsFor,SDR_PRODUCT_CODES} from './murilo-approved-questions.js'
 import {healthLivesCheck,healthCityCheck,volunteeredNetworkPriority} from './murilo-conversation-quality.js'
-import {isAutoInsuranceFromVehicleDescription} from './auto-insurance-product-signal.js'
+import {isAutoInsuranceFromVehicleDescription,hasVehicleModelAndYear} from './auto-insurance-product-signal.js'
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const inbound=m=>m?.direction==='inbound'&&m.author==='contact'
 const outbound=m=>m?.direction==='outbound'&&m.author==='agent'
@@ -109,7 +109,7 @@ function volunteered(question,messages){
  const text=messages.filter(inbound).map(x=>fold(x.text)).join(' ')
  const q=fold(question)
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
- if(/\bmarca, modelo e ano\b/.test(q)&&(isAutoInsuranceFromVehicleDescription(messages.filter(inbound).map(m=>m.text).join(' '))||/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text)))return true
+ if(/\bmarca, modelo e ano\b/.test(q)&&messages.filter(inbound).some(m=>hasVehicleModelAndYear(m.text)))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
  if(/\bdata de vencimento da apolice\b/.test(q)&&/\b(?:vence|vencimento|vigencia (?:ate|termina)|apolice vence)\b.{0,55}\b(?:0?[1-9]|[12]\d|3[01])[\/.-](?:0?[1-9]|1[0-2])[\/.-](?:20)?\d{2}\b/.test(text))return true
  if(/\bnumero do cpf ou cnpj\b/.test(q)&&/\b(?:\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})\b/.test(text))return true
