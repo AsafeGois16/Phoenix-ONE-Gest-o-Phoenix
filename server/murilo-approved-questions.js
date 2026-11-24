@@ -125,10 +125,11 @@ const QUESTIONNAIRES=Object.freeze({
   principal:[
    'Qual é a marca, modelo e ano do veículo?',
    'Seria um seguro novo ou renovação?',
-   'O veículo está no nome de pessoa física (CPF) ou jurídica (CNPJ)?'
+   'O veículo está no nome de pessoa física (CPF) ou jurídica (CNPJ)?',
+   'Para localizar seu cadastro, pode informar o número do CPF ou CNPJ do titular, por favor?',
+   'Pode me informar a placa do veículo? Se for zero-quilômetro sem placa, basta informar.'
   ],
   novo:[
-   'Pode me informar a placa do veículo? Se for zero-quilômetro sem placa, basta informar.',
    'Qual é a data de nascimento do principal condutor?',
    'Qual é o CEP onde o veículo pernoita?'
   ],
