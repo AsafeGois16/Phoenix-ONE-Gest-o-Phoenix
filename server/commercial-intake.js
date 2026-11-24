@@ -1,5 +1,6 @@
 import {isAdministrativeMovementRequest} from './backoffice-routing.js'
 import {muriloTransferInvitation} from './murilo-transfer-invitation.js'
+import {isAutoInsuranceFromVehicleDescription} from './auto-insurance-product-signal.js'
 
 /**
  * Coleta de nome de tratamento e roteamento de oportunidades Auto/RE.
@@ -80,7 +81,7 @@ export function nameIntakeDecision(messages,selectedAgent){
 }
 function autoReQuote(messages){
  const text=(Array.isArray(messages)?messages:[]).filter(isContact).slice(-16).map(m=>fold(m.text)).join(' ')
- const product=/\b(?:auto|automovel|carro|veiculo|frota|residencial|patrimonial|imovel|fianca|bike|equipamento)\b/.test(text)
+ const product=/\b(?:auto|automovel|carro|veiculo|frota|residencial|patrimonial|imovel|fianca|bike|equipamento)\b/.test(text)||isAutoInsuranceFromVehicleDescription(text)
  const commercial=/\b(?:cotar|cotacao|orcamento|seguro novo|renovacao|renovar|contratar|proposta|comparar|cotacoes)\b/.test(text)
  return product&&commercial
 }
