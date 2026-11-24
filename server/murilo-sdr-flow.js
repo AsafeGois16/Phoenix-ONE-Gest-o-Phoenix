@@ -6,7 +6,7 @@
  */
 import {approvedQuestionsFor,SDR_PRODUCT_CODES} from './murilo-approved-questions.js'
 import {healthLivesCheck,healthCityCheck,volunteeredNetworkPriority} from './murilo-conversation-quality.js'
-import {isAutoInsuranceFromVehicleDescription} from './auto-insurance-product-signal.js'
+import {isAutoInsuranceFromVehicleDescription,hasVehicleModelAndYear} from './auto-insurance-product-signal.js'
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const inbound=m=>m?.direction==='inbound'&&m.author==='contact'
 const outbound=m=>m?.direction==='outbound'&&m.author==='agent'
@@ -110,7 +110,7 @@ function volunteered(question,messages){
  const text=messages.filter(inbound).map(x=>fold(x.text)).join(' ')
  const q=fold(question)
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
- if(/\bmarca, modelo e ano\b/.test(q)&&messages.filter(inbound).some(m=>isAutoInsuranceFromVehicleDescription(m.text)))return true
+ if(/\bmarca, modelo e ano\b/.test(q)&&messages.filter(inbound).some(m=>hasVehicleModelAndYear(m.text)))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
  if(/\bquantas (?:pessoas|vidas)\b|\bquantidade de vidas\b|\bsomente para voce ou para mais vidas\b/.test(q)&&
    (/\b\d{1,4}\s*(?:pessoas|vidas|funcionarios|colaboradores|viajantes)\b/.test(text)||/\b(?:so para mim|somente para mim|apenas para mim|so eu|eu e minha esposa|eu e meu marido)\b/.test(text)))return true
