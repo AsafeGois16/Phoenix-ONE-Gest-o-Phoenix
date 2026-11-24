@@ -13,7 +13,7 @@ import {incidentContext,incidentFirstSafetyDecision,incidentFollowupDecision,inc
 import {productIncidentContext,productIncidentFirstDecision,productIncidentFollowupDecision,productIncidentVerifiedDecision,enrichProductIncidentHandoff} from '../../../server/incident-product-routing.js'
 import {routeBenefitsToBackoffice} from '../../../server/benefits-handoff-routing.js'
 import {clientDeclaredName,nameIntakeDecision,alignAutoReHandoff,guardCommercialQuoteClosing,directAutoReHumanHandoff,offerReadyAutoReHandoff,resumeQuoteContext} from '../../../server/commercial-intake.js'
-import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch} from '../../../server/consent-routing.js'
+import {enforceHumanHandoffConsent,confirmedOfferHandoff,decideMuriloSwitch,routeConfirmedMuriloQuote} from '../../../server/consent-routing.js'
 import {isSameCarQuote,summarizeVerifiedAutoForQuote,sameCarQuoteReply} from '../../../server/auto-quote-continuity.js'
 import {detectV41QuoteProduct,summarizeV41VerifiedQuote,replyV41VerifiedQuote} from '../../../server/v4-universal-risk.js'
 import {validVerificationRef,verifiedGreeting} from '../../../server/v4-verified-context.js'
@@ -182,6 +182,9 @@ export async function respondValidated(body,res,pin=null){
   // Handoff humano de cotação Auto/RE pertence à fila patrimonio do Junior.
   // Inclui o nome declarado pelo cliente no resumo, nunca inferido do telefone.
   payload=alignAutoReHandoff(payload,body.messages)
+  // A fila Comercial não existe no Gestão Phoenix: cotações confirmadas do
+  // Murilo vão diretamente a beneficios ou patrimonio conforme o produto.
+  payload=routeConfirmedMuriloQuote(payload,body.messages)
   if(payload.humanHandoff)console.info('phoenix_handoff_proposed',JSON.stringify({agent:payload.agent,department:payload.handoff?.department||null}))
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)

@@ -212,16 +212,16 @@ test('SDR: API aceita fotografia confirmada sem texto e prossegue sem OCR ou Ope
 })
 
 
-test('SDR: novo lead de Benefícios segue Comercial após aceite, não vira passagem ao Murilo',()=>{
+test('SDR: novo lead de Benefícios segue a fila Benefícios após aceite',()=>{
  const known=approvedQuestionsFor('previdencia').slice(0,7)
  const history=[...base('Quero contratar Previdência privada'),...known.map(q=>out(q.text)),inc('Já informei o que sabia')]
  const offer=nextMuriloSdrDecision(history)
- assert.match(offer.reply,/equipe de Vendas da Phoenix/)
+ assert.match(offer.reply,/equipe de Benefícios da Phoenix/)
  assert.equal(offer.humanHandoff,false)
  const yes=confirmedOfferHandoff([...history,out(offer.reply),inc('Sim')],'murilo')
  assert.ok(yes)
  assert.equal(yes.humanHandoff,true)
- assert.equal(yes.handoff.department,'comercial')
+ assert.equal(yes.handoff.department,'beneficios')
 })
 test('SDR: cotação de Auto autorizada vai a Patrimônio sem fila fictícia',()=>{
  const q=approvedQuestionsFor('auto',{renewal:false})
