@@ -228,3 +228,44 @@ test('H15 resposta Phoenix ONE real de laboratório: Murilo permanece sem handof
   else process.env.OPENAI_API_KEY=oldKey
  }
 })
+
+
+test('H16 rede desejada no "meu plano" é preferência comercial, não reclamação',()=>{
+ const variants=[
+  'Gostaria do Hospital Nipo Brasileiro na rede credenciada do meu plano de Saúde.',
+  'Prefiro a rede credenciada do meu plano com hospitais na Zona Norte.',
+  'Quero ter acesso ao Hospital Santa Joana no meu plano de saúde.',
+  'Quero incluir o Hospital Nipo Brasileiro entre os hospitais da rede do meu plano.'
+ ]
+ for(const input of variants){
+  const messages=[...quoteHistory,inbound(input)]
+  assert.equal(classifyProductIncident(input),null,input)
+  assert.equal(classifyConversationIntent(input),'neutral',input)
+  assert.equal(productIncidentFirstDecision(messages),null,input)
+  assert.equal(selectConversationAgent(context(messages)),'murilo',input)
+ }
+})
+test('H17 reclamação operacional real sobre hospital NÃO é reclassificada como preferência',()=>{
+ for(const input of [
+  'Gostaria do Hospital Nipo, mas meu plano não cobre e preciso de ajuda.',
+  'Prefiro o Hospital Santa Joana, mas a operadora negou autorização no meu plano de saúde.',
+  'Meu plano não atende no Hospital Nipo Brasileiro e quero reclamar.',
+  'Gostaria da rede credenciada, mas não consigo fazer a consulta e preciso de ajuda.'
+ ]){
+  assert.equal(selectConversationAgent(context([...quoteHistory,inbound(input)])),'clara',input)
+ }
+})
+test('H18 preferência seguida de sintomas graves interrompe imediatamente o comercial',()=>{
+ const input='Gostaria do Hospital Nipo Brasileiro, mas estou com dor no peito e falta de ar no hospital.'
+ const messages=[...quoteHistory,inbound(input)]
+ assert.equal(selectConversationAgent(context(messages)),'clara')
+ assert.equal(classifyProductIncident(input),'saude')
+ const result=productIncidentFirstDecision(messages)
+ assert.equal(result.agent,'clara')
+ assert.match(result.reply,/SAMU|192|urgência|clínica/)
+})
+test('H19 preferência e solicitação operacional na mesma frase mantêm precedência do serviço',()=>{
+ const input='Quero ter acesso ao Hospital Nipo na rede credenciada, mas preciso de segunda via do boleto.'
+ assert.equal(classifyConversationIntent(input),'service')
+ assert.equal(selectConversationAgent(context([...quoteHistory,inbound(input)])),'clara')
+})
