@@ -119,3 +119,23 @@ test('AUTO12: generic unknown product receives no speculative real queue',()=>{
  assert.equal(detectSdrQuoteProduct(messages),null)
  assert.equal(confirmedOfferHandoff(messages,'murilo'),null)
 })
+
+test('AUTO13: API — after Clara asks name, renewal offer preserves Auto/RE context',async()=>{
+ const messages=[
+  inc(initial),
+  out('Olá! Sou a Clara, concierge de atendimento da Phoenix Insurance. Como posso te chamar?'),
+  inc('Asafe Gois')
+ ]
+ const res=result()
+ await respondValidated(body(messages),res,{
+  mode:'clara_murilo',revision:7,
+  intro:{blocked:false,clara_apresentada:true,murilo_apresentado:false}
+ })
+ assert.equal(res.code,200)
+ assert.equal(res.data.agent,'clara')
+ assert.equal(res.data.humanHandoff,false)
+ assert.equal(res.data.handoff,null)
+ assert.match(res.data.reply,/seguro Auto/i)
+ assert.match(res.data.reply,/Murilo/)
+ assert.doesNotMatch(res.data.reply,/plano de saúde|produto não identificado|mesmo veículo/i)
+})
