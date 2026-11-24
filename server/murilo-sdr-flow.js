@@ -5,6 +5,7 @@
  * consent, emergency instructions, identity checks, or Junior human ownership.
  */
 import {approvedQuestionsFor,SDR_PRODUCT_CODES} from './murilo-approved-questions.js'
+import {healthLivesCheck,healthCityCheck,volunteeredNetworkPriority} from './murilo-conversation-quality.js'
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const inbound=m=>m?.direction==='inbound'&&m.author==='contact'
 const outbound=m=>m?.direction==='outbound'&&m.author==='agent'
@@ -116,7 +117,8 @@ function volunteered(question,messages){
    /\b(?:moro|resido|moramos|cidade de|moramos em|utilizar(?:ao|a) em)\s+(?:em\s+)?[a-z]{3,}/.test(text))return true
  if(/\bcodigo cnpj|\bcnpj da empresa\b/.test(q)&&/\b(?:cnpj|\d{2}\.?\d{3}\.?\d{3}\/\d{4}-?\d{2})\b/.test(text))return true
  if(/\bplano atual\b/.test(q)&&
-   (/\b(?:tenho|possuo|usamos|atualmente tenho|estou no|meu plano)\b.{0,45}\b(?:amil|unimed|bradesco|sulamerica|sul america|hapvida|gndi|notredame|porto)\b/.test(text)||/\b(?:nao tenho plano|sem plano atualmente)\b/.test(text)))return true
+   (/\b(?:tenho|temos|possuo|possuimos|usamos|atualmente temos|atualmente tenho|estou no|estamos na|nosso plano|meu plano|plano atual|ja temos)\b.{0,65}\b(?:amil|unimed|bradesco|sulamerica|sul america|hapvida|gndi|notredame|porto)\b/.test(text)||/\b(?:nao tenho plano|sem plano atualmente)\b/.test(text)))return true
+ if(/\b(?:custo.beneficio|rede credenciada maior)\b/.test(q)&&volunteeredNetworkPriority(messages))return true
  if(/\bprefere\b|\bpreferencia por algum hospital\b/.test(q)&&/\b(?:prefiro|gostaria|quero)\b.{0,50}\b(?:hospital|laboratorio)\b/.test(text))return true
  if(/\bqual (?:e |é )?o destino\b/.test(q)&&/\b(?:viajaremos|destino|vamos para|iremos para)\b/.test(text))return true
  return false
@@ -160,6 +162,15 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7}={}){
  const product=detectSdrQuoteProduct(list)
  if(!product||!SDR_PRODUCT_CODES.includes(product))
   return safe('Quero evitar perguntas fora do seu contexto. Posso encaminhar sua solicitação a um consultor para confirmar o produto e continuar?')
+ // Uma única pergunta de CONFERÊNCIA quando as respostas são contraditórias.
+ // Não amplia o formulário nem insiste quando o cliente não sabe responder.
+ // Deve ocorrer antes do limite de sete perguntas e antes do aceite humano.
+ if(['saude','saude_empresarial','odonto','odonto_empresarial'].includes(product)){
+  const lives=healthLivesCheck(list)
+  if(lives?.type==='question')return safe(lives.reply)
+  const locality=healthCityCheck(list)
+  if(locality?.type==='question')return safe(locality.reply)
+ }
  const questions=questionsFor(list,product)
  const asked=recentQuestionCount(list,questions)
  const currentQuestionCount=asked.size
