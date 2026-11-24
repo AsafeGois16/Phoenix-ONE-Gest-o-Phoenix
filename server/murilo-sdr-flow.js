@@ -137,7 +137,7 @@ const isImageMetadata=m=>inbound(m)&&m.media_received===true&&
   (!m.media_kind||['image','photo','document','pdf'].includes(m.media_kind))
 const photoWasRequested=messages=>messages.filter(outbound).slice(-3).some(m=>/\b(?:encaminhar|enviar|envie|mandar)\b.{0,100}\b(?:apolice|foto|nota fiscal|comprovante|relacao|documento|edital)\b/i.test(fold(m.text)))
 function offer(product){
- const line=patLine.has(product)?'Auto/RE':'Vendas da Phoenix'
+ const line=patLine.has(product)?'Auto/RE':'Benefícios da Phoenix'
  return safe('Com as informações disponíveis, um consultor pode concluir a avaliação. Posso encaminhar sua solicitação à equipe de '+line+'?')
 }
 /**
