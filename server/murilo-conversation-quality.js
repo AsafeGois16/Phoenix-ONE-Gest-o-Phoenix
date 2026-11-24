@@ -92,6 +92,6 @@ export function healthCityCheck(messages){
 }
 export function volunteeredNetworkPriority(messages){
  const texts=(Array.isArray(messages)?messages:[]).filter(inbound).map(m=>fold(m.text))
- return texts.some(t=>/\b(?:rede credenciada (?:maior|melhor|mais ampla)|rede (?:maior|mais ampla|melhor)|melhorar (?:a|minha|nossa)?\s*rede|ampliar (?:a|minha|nossa)?\s*rede|mais (?:hospitais|opcoes de hospitais)|prioridade (?:e |eh )?(?:a )?rede|buscando uma rede credenciada maior|quero (?:uma )?rede maior)\b/.test(t)) ||
+ return texts.some(t=>/\b(?:rede credenciada (?:maior|melhor|mais ampla)|rede (?:maior|mais ampla|melhor)|melhorar (?:a|minha|nossa)?\s*rede|ampliar (?:a|minha|nossa)?\s*rede|mais (?:hospitais|opcoes de hospitais)|prioridade (?:e |eh )?(?:a )?rede|buscando uma rede credenciada maior|quero (?:uma )?rede maior)\b/.test(t) ||
   /\b(?:melhor custo.beneficio|menor mensalidade|reduzir (?:o )?custo|mais economico|mais barato)\b/.test(t))
 }
