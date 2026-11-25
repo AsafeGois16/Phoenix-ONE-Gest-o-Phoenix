@@ -179,6 +179,14 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=fa
  const product=detectSdrQuoteProduct(list)
  if(!product||!SDR_PRODUCT_CODES.includes(product))
   return safe('Para direcionar sua cotação à equipe correta, qual tipo de seguro você deseja cotar?')
+ // O Junior confirmou mais de uma apólice da categoria. Nunca selecionar a
+ // primeira: confirmar qual renovação e entregar a escolha ao consultor.
+ if(verifiedRenewal?.found===true&&verifiedRenewal.count>1){
+  const alreadyAsked=list.filter(outbound).some(m=>
+   /qual contrato voce deseja renovar|qual seguro voce deseja renovar/i.test(fold(m.text)))
+  if(!alreadyAsked)return safe('A consulta autorizada identificou mais de um seguro dessa categoria. Qual contrato você deseja renovar?')
+  return offer(product)
+ }
  // Uma única pergunta de CONFERÊNCIA quando as respostas são contraditórias.
  // Não amplia o formulário nem insiste quando o cliente não sabe responder.
  // Deve ocorrer antes do limite de sete perguntas e antes do aceite humano.
