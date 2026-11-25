@@ -73,7 +73,7 @@ test('PORT API2: cliente aceita, consulta novamente o mesmo protocolo e encaminh
   assert.equal(res.data.agent,'murilo')
   assert.equal(res.data.humanHandoff,true)
   assert.equal(res.data.handoff?.department,'patrimonio')
-  assert.equal(res.data.handoff?.intent,'nova_cotacao')
+  assert.equal(res.data.handoff?.intent,'renovacao')
   assert.equal(res.data.handoff?.product,'auto')
   assert.equal(calls.length,1)
   assert.doesNotMatch(res.data.reply,/Creta|SEGREDO|placa|modelo/i)

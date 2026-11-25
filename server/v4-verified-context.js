@@ -60,6 +60,20 @@ export function sanitizeV4AutoRisk(raw){
  }
  return Object.values(vehicle).some(x=>x!==null)?{vehicle}:null
 }
+/**
+ * O Junior é a fonte única do resultado da consulta de existência.
+ * A ausência/invalidade de coverage_check não pode ser inferida a partir da
+ * lista de apólices (que pode estar vazia por escopo ou paginação).
+ */
+export function validatedCoverageCheck(value,requestedProduct){
+ if(!validProductCode(requestedProduct)||!value||typeof value!=='object'||Array.isArray(value))return null
+ if(value.product_code!==requestedProduct)return null
+ if(!['found','not_found'].includes(value.result))return null
+ if(!Number.isInteger(value.count)||value.count<0||value.count>100000)return null
+ if((value.result==='found')!==(value.count>0))return null
+ return {product_code:requestedProduct,result:value.result,count:value.count}
+}
+
 export function v4VerifiedSummary(raw,purpose='service',productCode=null){
  if(!raw||raw.status!=='verified'||!validV4Purpose(purpose))return null
  const expires=raw.expires_at,verified=raw.verified_at
@@ -76,6 +90,7 @@ export function v4VerifiedSummary(raw,purpose='service',productCode=null){
  return {
   status:'verified',verified_profile:profile,verified_at:verified,expires_at:expires,
   field_scopes:scopes,data_freshness:dataFreshness,
+  ...(purpose==='quote'&&scopes.includes('policies.read')?{coverage_check:validatedCoverageCheck(raw.coverage_check,productCode)}:{}),
   // Reference is passed only in server-server transport, not copied into replies.
   verification_ref:validVerificationRef(raw.verification_ref)?raw.verification_ref:null
  }

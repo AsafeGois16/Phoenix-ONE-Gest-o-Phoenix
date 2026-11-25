@@ -25,6 +25,7 @@ import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReado
 import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
 import {nextMuriloSdrDecision,muriloMediaReceived} from '../../../server/murilo-sdr-flow.js'
 import {isAutoRenewalForVerification,isAutoPortfolioOffer,verifiedAutoPortfolioDecision} from '../../../server/auto-verified-portfolio-handoff.js'
+import {universalRenewalContext,universalRenewalClaraStage,universalRenewalSwitchMessage,verifiedRenewalSummary,isUniversalRenewalOffer,tagRenewalHandoff} from '../../../server/universal-renewal-flow.js'
 import {resolvePilotMode,orchestrationErrorCode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
@@ -191,6 +192,9 @@ export async function respondValidated(body,res,pin=null){
   // A fila Comercial não existe no Gestão Phoenix: cotações confirmadas do
   // Murilo vão diretamente a beneficios ou patrimonio conforme o produto.
   payload=routeConfirmedMuriloQuote(payload,body.messages)
+  // Contrato Junior 25/11: uma renovação nunca entra como lead de nova cotação.
+  // Aplicar APÓS as normalizações de rota e de aceite humano.
+  if(!isAudioOnlyNotice(last))payload=tagRenewalHandoff(payload,activeMessages)
   if(payload.humanHandoff)console.info('phoenix_handoff_proposed',JSON.stringify({agent:payload.agent,department:payload.handoff?.department||null}))
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
@@ -258,6 +262,43 @@ export async function respondValidated(body,res,pin=null){
  // O SDR fechado não acrescenta a pergunta genérica de nome fora do roteiro.
  // A Clara continua identificando o contato no acolhimento/fluxo operacional.
  const closedMurilo=process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'
+ const universalRenewalEnabled=!claraOnly&&process.env.PHX_UNIVERSAL_RENEWAL_LOOKUP==='true'&&
+  process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'
+ if(universalRenewalEnabled){
+  const stage=universalRenewalClaraStage(activeMessages)
+  if(stage?.stage==='offer'||stage?.stage==='clarify')
+   return replyToJunior({agent:'clara',reply:stage.reply,humanHandoff:false,handoff:null})
+  if(stage?.stage==='continue')
+   return replyToJunior({agent:'clara',reply:'Sem problemas, a confirmação de identidade não é obrigatória para continuar a cotação. Posso encaminhar sua renovação ao Murilo, nosso assistente comercial?',humanHandoff:false,handoff:null})
+  if(stage?.stage==='verify'){
+   const doc=findInboundDocument(activeMessages)
+   const trustedRef=validVerificationRef(body.verification_ref)?body.verification_ref:null
+   const documentPrompts=activeMessages.filter(m=>m?.direction==='outbound'&&m.author==='agent'&&
+    /(?:cpf ou cnpj do titular|somente o cpf ou cnpj do titular)/i.test(m.text||'')).length
+   if(!trustedRef&&doc.status!=='valid'&&documentPrompts>=2)
+    return replyToJunior({agent:'clara',reply:universalRenewalSwitchMessage(stage,null),humanHandoff:false,handoff:null})
+   if(!trustedRef&&doc.status==='missing')return replyToJunior({agent:'clara',
+    reply:'Para consultar seu cadastro com segurança, pode informar o CPF ou CNPJ do titular? O documento é apenas uma chave de busca; o Junior poderá solicitar confirmação adicional.',
+    humanHandoff:false,handoff:null})
+   if(!trustedRef&&(doc.status==='invalid'||doc.status==='multiple'))return replyToJunior({agent:'clara',
+    reply:'O documento informado não pôde ser validado. Pode conferir e informar somente o CPF ou CNPJ do titular, se desejar? Também podemos continuar sem a consulta.',
+    humanHandoff:false,handoff:null})
+   const proof=doc.status==='valid'?extractVerificationProof(activeMessages,doc.type):null
+   const verification=await juniorIdentityContext(body.conversation_id,body.protocolo,doc,proof,AbortSignal.timeout(7000),{
+    v4:true,verificationRef:trustedRef,purpose:'quote',productCode:stage.product
+   })
+   if(verification.status==='verification_required'&&['birth_date','cep'].includes(verification.method)&&
+      (verification.attemptsLeft===null||verification.attemptsLeft>0)){
+    const question=verification.method==='birth_date'?
+      'Para confirmar sua identidade, pode informar a data de nascimento do titular no formato DD/MM/AAAA?':
+      'Para confirmar a representação da empresa, pode informar o CEP cadastrado (8 números)?'
+    return replyToJunior({agent:'clara',reply:question,humanHandoff:false,handoff:null})
+   }
+   const summary=verifiedRenewalSummary(verification,stage.product)
+   return replyToJunior({agent:'clara',reply:universalRenewalSwitchMessage(stage,summary?summary.found:null),
+    humanHandoff:false,handoff:null})
+  }
+ }
  const intake=closedMurilo||introState?.murilo_apresentado||introState?.blocked||documentArrival?null:nameIntakeDecision(body.messages,agent)
  if(intake)return replyToJunior(intake)
  // Gestão Phoenix pode inserir um aviso automático de protocolo como outbound
@@ -283,7 +324,7 @@ export async function respondValidated(body,res,pin=null){
  // para este mesmo protocolo (ponte autenticada do Junior, propósito quote).
  // A resposta SIM só encaminha direto quando a verificação continua válida;
  // NÃO pode cair no handoff genérico sem validação.
- const autoIdentityFlow=process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'&&
+ const autoIdentityFlow=!universalRenewalEnabled&&process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'&&
    process.env.PHX_AUTO_RE_VERIFIED_LOOKUP==='true'&&
    process.env.PHOENIX_ONE_V4_VERIFIED_CONTEXT==='true'&&
    agent==='murilo'&&isAutoRenewalForVerification(activeMessages)
@@ -385,10 +426,30 @@ export async function respondValidated(body,res,pin=null){
    console.info('phoenix_backoffice_intake',JSON.stringify({category:backoffice.type,stage:backoffice.stage||'status_handoff',handoff:shouldTransfer}))
    return replyToJunior({agent:'clara',reply:backoffice.reply,humanHandoff:shouldTransfer,handoff:shouldTransfer?{department:backoffice.department,reason:backoffice.reason,summary:backoffice.summary}:null})
  }
+ // Renovação verificada: revalidar a consulta por protocolo e produto.
+ // Só dados autorizados servem para pular perguntas já respondidas no cadastro.
+ if(universalRenewalEnabled&&agent==='murilo'&&
+    activeMessages.some(m=>m?.direction==='outbound'&&m.author==='agent'&&isUniversalRenewalOffer(m.text))){
+  const info=universalRenewalContext(activeMessages)
+  if(info?.queryable){
+   const doc=findInboundDocument(activeMessages)
+   const trustedRef=validVerificationRef(body.verification_ref)?body.verification_ref:null
+   if(trustedRef||doc.status==='valid'){
+    const verification=await juniorIdentityContext(body.conversation_id,body.protocolo,doc,null,AbortSignal.timeout(7000),{
+     v4:true,verificationRef:trustedRef,purpose:'quote',productCode:info.product
+    })
+    const summary=verifiedRenewalSummary(verification,info.product)
+    if(summary){
+     const next=nextMuriloSdrDecision(activeMessages,{verifiedRenewal:summary,documentIntake:false})
+     if(next)return replyToJunior(next)
+    }
+   }
+  }
+ }
  // Closed SDR flow runs only after identity, safety, consent and service guards.
  // Disabled by default to preserve production until Junior jointly homologates.
  if(process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'){
-  const sdr=nextMuriloSdrDecision(activeMessages,{documentIntake:process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'})
+  const sdr=nextMuriloSdrDecision(activeMessages,{documentIntake:process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'&&!(universalRenewalEnabled&&universalRenewalContext(activeMessages)?.queryable)})
   if(sdr)return replyToJunior(sdr)
  }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)

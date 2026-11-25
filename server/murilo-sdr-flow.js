@@ -6,14 +6,14 @@
  */
 import {approvedQuestionsFor,SDR_PRODUCT_CODES} from './murilo-approved-questions.js'
 import {healthLivesCheck,healthCityCheck,volunteeredNetworkPriority} from './murilo-conversation-quality.js'
-import {isAutoInsuranceFromVehicleDescription} from './auto-insurance-product-signal.js'
+import {isAutoInsuranceFromVehicleDescription,hasVehicleModelAndYear} from './auto-insurance-product-signal.js'
 import {autoReDocumentIntake} from './auto-re-document-intake.js'
 const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim()
 const inbound=m=>m?.direction==='inbound'&&m.author==='contact'
 const outbound=m=>m?.direction==='outbound'&&m.author==='agent'
 const safe=msg=>({agent:'murilo',reply:msg,humanHandoff:false,handoff:null})
 const names={
- saude:/\b(?:plano (?:de )?saude|convenio medico|seguro saude)\b/,
+ saude:/\b(?:plano (?:de )?saude|convenio medico|seguro (?:de )?saude)\b/,
  odonto:/\b(?:odonto|odontologico|odontologia|plano dental)\b/,
  vida:/\b(?:seguro (?:de )?vida|vida em grupo)\b/,
  pet:/\b(?:seguro pet|plano pet|plano de saude (?:para )?(?:meu |um )?pet)\b/,
@@ -106,12 +106,23 @@ const normalizations={
  'Você possui plano atualmente? Se sim, qual?':/\b(?:ja tenho plano|tenho plano|nao tenho plano|meu plano atual|meu convenio atual)\b/,
  'Você possui seguro de vida atualmente? Se sim, qual?':/\b(?:ja tenho seguro de vida|nao tenho seguro de vida|meu seguro de vida atual)\b/
 }
+function verifiedRenewalAnswered(question,verified){
+ if(!verified||verified.found!==true)return false
+ const q=fold(question)
+ if(verified.insurer&&(
+   /\bqual e a seguradora atual\b/.test(q)||
+   /\b(?:qual e )?(?:seu |o seu )?(?:plano(?: de saude| odontologico| dental)?|seguro de vida|seguro odontologico) atual\b/.test(q)
+ ))return true
+ if(verified.expiry&&/\bdata de vencimento da apolice\b/.test(q))return true
+ return false
+}
 function volunteered(question,messages){
  const text=messages.filter(inbound).map(x=>fold(x.text)).join(' ')
  const q=fold(question)
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
- if(/\bmarca, modelo e ano\b/.test(q)&&/\b(?:onix|gol|corolla|hb20|civic|creta|argo|tracker|nivus|polo|uno|mobi|fit|strada|saveiro|moto|honda|toyota)\b.{0,40}\b20\d{2}\b/.test(text))return true
+ if(/\bmarca, modelo e ano\b/.test(q)&&messages.filter(inbound).some(m=>hasVehicleModelAndYear(m.text)))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
+ if(/\bplaca do veiculo\b/.test(q)&&(/\b[a-z]{3}[- ]?\d[a-z0-9]\d{2}\b/i.test(text)||/\b(?:sem placa|ainda nao tem placa|zero quilometro sem placa)\b/.test(text)))return true
  // A data de vencimento já veio na mensagem inicial: não perguntar de novo.
  if(/\bdata de vencimento da apolice\b/.test(q)&&
   /\b(?:apolice|seguro|vence|vencimento)\b.{0,100}\b\d{2}\/\d{2}\/\d{4}\b/.test(text))return true
@@ -154,7 +165,7 @@ function offer(product){
  * If the question is about sensitive health/identity data, do not collect in
  * this chat. Leave it to authorized human processing.
  */
-export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=false}={}){
+export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=false,verifiedRenewal=null}={}){
  const list=Array.isArray(messages)?messages:[]
  const last=list.at(-1)
  if(!inbound(last))return null
@@ -168,6 +179,14 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=fa
  const product=detectSdrQuoteProduct(list)
  if(!product||!SDR_PRODUCT_CODES.includes(product))
   return safe('Para direcionar sua cotação à equipe correta, qual tipo de seguro você deseja cotar?')
+ // O Junior confirmou mais de uma apólice da categoria. Nunca selecionar a
+ // primeira: confirmar qual renovação e entregar a escolha ao consultor.
+ if(verifiedRenewal?.found===true&&verifiedRenewal.count>1){
+  const alreadyAsked=list.filter(outbound).some(m=>
+   /qual contrato voce deseja renovar|qual seguro voce deseja renovar/i.test(fold(m.text)))
+  if(!alreadyAsked)return safe('A consulta autorizada identificou mais de um seguro dessa categoria. Qual contrato você deseja renovar?')
+  return offer(product)
+ }
  // Uma única pergunta de CONFERÊNCIA quando as respostas são contraditórias.
  // Não amplia o formulário nem insiste quando o cliente não sabe responder.
  // Deve ocorrer antes do limite de sete perguntas e antes do aceite humano.
@@ -192,7 +211,7 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=fa
  let next=null
  for(const q of questions){
   if(q.sensitive||privateDetails.test(q.text))continue
-  if(asked.has(q.id)||volunteered(q.text,list))continue
+  if(asked.has(q.id)||volunteered(q.text,list)||verifiedRenewalAnswered(q.text,verifiedRenewal))continue
   next=q
   break
  }

@@ -73,9 +73,15 @@ export async function juniorIdentityContext(conversationId,protocolo,document,pr
    const sanitizeCoverage=c=>c&&typeof c==='object'&&!Array.isArray(c)?{
     nome:safeString(c.nome,140),capital_segurado:safeMoney(c.capital_segurado),franquia:safeMoney(c.franquia)
    }:null
+   // Junior agrupa consultas de auto/moto/frota. A filtragem preserva
+   // somente essas três categorias, sem escolher automaticamente um veículo.
+   const autoGroup=['auto','moto','frota']
    const allowedForPurpose=policy=>purpose!=='quote'||
-    (numero?policy?.numero===numero:policy?.product_code===productCode||
-      (productCode==='auto'&&policy?.product_code==='frota'&&summary.field_scopes.includes('risk.frota.read')))
+    (numero?policy?.numero===numero:
+      autoGroup.includes(productCode)?(
+        autoGroup.includes(policy?.product_code)&&
+        (policy?.product_code!=='frota'||productCode==='frota'||summary.field_scopes.includes('risk.frota.read'))
+      ):policy?.product_code===productCode)
    const policies=summary.field_scopes.includes('policies.read')&&Array.isArray(data.policies)?
     data.policies.filter(allowedForPurpose).slice(0,12).map(policy=>{
      if(!policy||typeof policy!=='object'||Array.isArray(policy))return null
