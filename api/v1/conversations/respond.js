@@ -270,6 +270,10 @@ export async function respondValidated(body,res,pin=null){
   if(stage?.stage==='verify'){
    const doc=findInboundDocument(activeMessages)
    const trustedRef=validVerificationRef(body.verification_ref)?body.verification_ref:null
+   const documentPrompts=activeMessages.filter(m=>m?.direction==='outbound'&&m.author==='agent'&&
+    /(?:cpf ou cnpj do titular|somente o cpf ou cnpj do titular)/i.test(m.text||'')).length
+   if(!trustedRef&&doc.status!=='valid'&&documentPrompts>=2)
+    return replyToJunior({agent:'clara',reply:universalRenewalSwitchMessage(stage,null),humanHandoff:false,handoff:null})
    if(!trustedRef&&doc.status==='missing')return replyToJunior({agent:'clara',
     reply:'Para consultar seu cadastro com segurança, pode informar o CPF ou CNPJ do titular? O documento é apenas uma chave de busca; o Junior poderá solicitar confirmação adicional.',
     humanHandoff:false,handoff:null})
