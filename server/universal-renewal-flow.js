@@ -31,9 +31,13 @@ export function universalRenewalContext(messages){
  const list=(Array.isArray(messages)?messages:[]).filter(incoming).slice(-24)
  if(!list.length)return null
  const reset=list.findLastIndex(m=>/\b(?:outro assunto|quero falar de outro assunto|nova solicitacao)\b/.test(fold(m.text)))
- const text=list.slice(reset+1).map(m=>fold(m.text)).join(' ')
- if(!renewalRe.test(text)||unsafeRe.test(text))return null
- const declared=detectSdrQuoteProduct(list.slice(reset+1))
+ const scoped=list.slice(reset+1)
+ // Uma cotação NOVA posterior substitui a renovação anterior. Não reutilizar
+ // a palavra "renovação" de um assunto já encerrado em outro produto.
+ const requests=scoped.map(m=>fold(m.text)).filter(x=>/\b(?:renovar|renovacao|renovando|renove|renova|cotar|cotacao|orcamento|contratar|contratacao|seguro novo)\b/.test(x))
+ const current=requests.at(-1)||''
+ if(!renewalRe.test(current)||unsafeRe.test(current))return null
+ const declared=detectSdrQuoteProduct(scoped)
  if(!declared)return null // tema ainda indefinido/ambíguo: fluxo de esclarecimento
  const product=maps[declared]||declared
  return {product,label:names[product]||null,queryable:validProductCode(product)&&Boolean(names[product])}
