@@ -56,6 +56,7 @@ test('API consulta contexto verified de Vida e oferece Murilo sem citar a apóli
     status:'verified',verified_at:new Date(Date.now()-30000).toISOString(),
     expires_at:new Date(Date.now()+300000).toISOString(),
     field_scopes:['policies.read','profile.basic'],
+    coverage_check:{product_code:'vida',numero:null,result:'found',count:1},
     verified_profile:{nome_tratamento:'Mariana',tipo_pessoa:'pf',relacao_com_contrato:'titular'},
     policies:[{product_code:'vida',seguradora:'Porto',fim_vigencia:'2026-12-15'}]
    })}
