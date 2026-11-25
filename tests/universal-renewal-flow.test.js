@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
  universalRenewalContext,universalRenewalClaraStage,
- isUniversalRenewalOffer,universalRenewalSwitchMessage,verifiedRenewalSummary
+ isUniversalRenewalOffer,universalRenewalSwitchMessage,verifiedRenewalSummary,tagRenewalHandoff
 } from '../server/universal-renewal-flow.js'
 import {nextMuriloSdrDecision} from '../server/murilo-sdr-flow.js'
 import {readFileSync} from 'node:fs'
@@ -36,16 +36,22 @@ test('Documento é chave, nunca presumir que documento sozinho verificou o clien
 
 test('Consulta distingue apólice única, múltiplas, ausência verificada e falha de escopo',()=>{
  const one={status:'verified',field_scopes:['policies.read'],verified_profile:{tipo_pessoa:'pf'},
+  coverage_check:{product_code:'vida',result:'found',count:1},
   policies:[{product_code:'vida',seguradora:'Porto',fim_vigencia:'2026-12-15'}]}
  const found=verifiedRenewalSummary(one,'vida')
  assert.equal(found.found,true)
  assert.equal(found.insurer,'Porto')
  assert.equal(found.expiry,'2026-12-15')
- const multiple=verifiedRenewalSummary({...one,policies:[...one.policies,...one.policies]},'vida')
+ const multiple=verifiedRenewalSummary({...one,
+   coverage_check:{product_code:'vida',result:'found',count:2},
+   policies:[...one.policies,...one.policies]},'vida')
  assert.equal(multiple.found,true)
  assert.equal(multiple.insurer,null)
  assert.equal(multiple.expiry,null)
- assert.equal(verifiedRenewalSummary({...one,policies:[]},'vida')?.found,false)
+ assert.equal(verifiedRenewalSummary({...one,coverage_check:{product_code:'vida',result:'not_found',count:0},policies:[]},'vida')?.found,false)
+ assert.equal(verifiedRenewalSummary({...one,policies:[]},'vida')?.found,true)
+ assert.equal(verifiedRenewalSummary({...one,policies:[],coverage_check:null},'vida'),null)
+ assert.equal(verifiedRenewalSummary({...one,coverage_check:{product_code:'auto',result:'found',count:1}},'vida'),null)
  assert.equal(verifiedRenewalSummary({...one,field_scopes:[]},'vida'),null)
  assert.equal(verifiedRenewalSummary({...one,status:'verification_required'},'vida'),null)
  assert.doesNotMatch(universalRenewalSwitchMessage({label:'Vida'},null),/encontrei|confirmei que existe/i)
@@ -61,6 +67,34 @@ test('Não consulta produto não suportado nem converte outro serviço em renova
 test('Cotação nova posterior não herda oferta de autenticação da renovação anterior',()=>{
  const history=[c('Quero renovar meu Seguro Auto'),c('Quero cotar um Seguro de Vida novo')]
  assert.equal(universalRenewalContext(history),null)
+})
+
+test('Junior agrupa auto, moto e frota sem escolher uma apólice automaticamente',()=>{
+ const fixture={status:'verified',field_scopes:['policies.read'],
+  coverage_check:{product_code:'auto',result:'found',count:2},
+  policies:[{product_code:'frota',seguradora:'Porto'}, {product_code:'moto',seguradora:'Suhai'}]}
+ const summary=verifiedRenewalSummary(fixture,'auto')
+ assert.equal(summary.found,true)
+ assert.equal(summary.count,2)
+ assert.equal(summary.insurer,null)
+ const msgs=[c('Quero renovar Seguro Auto'),a('Sou o Murilo, do time comercial.'),c('Sim')]
+ const question=nextMuriloSdrDecision(msgs,{verifiedRenewal:summary})
+ assert.match(question.reply,/qual contrato você deseja renovar/i)
+ const after=nextMuriloSdrDecision([...msgs,a(question.reply),c('O da frota')],{verifiedRenewal:summary})
+ assert.match(after.reply,/posso encaminhar/i)
+})
+
+test('Renovação vai ao Junior com intent renovacao, sem criar lead',()=>{
+ const msgs=[c('Quero renovar Seguro de Vida'),a('Posso encaminhar sua solicitação à equipe de Benefícios?'),c('Sim')]
+ const p={agent:'murilo',reply:'Perfeito',humanHandoff:true,handoff:{department:'beneficios',intent:'nova_cotacao',product:'vida'}}
+ const result=tagRenewalHandoff(p,msgs)
+ assert.equal(result.handoff.intent,'renovacao')
+ assert.equal(result.handoff.product,'vida')
+ assert.equal(tagRenewalHandoff({...p,humanHandoff:false},msgs).humanHandoff,false)
+ const unrelated=tagRenewalHandoff(p,[c('Quero cotar Seguro de Vida novo')])
+ assert.equal(unrelated.handoff.intent,'nova_cotacao')
+ const incident=tagRenewalHandoff(p,[c('Quero renovar Seguro de Vida'),c('Agora preciso abrir sinistro')])
+ assert.equal(incident.handoff.intent,'nova_cotacao')
 })
 
 test('Murilo não repete seguradora ou vencimento quando foram verificados em uma única apólice',()=>{
