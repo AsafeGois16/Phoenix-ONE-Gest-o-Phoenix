@@ -133,6 +133,7 @@ const QUESTIONNAIRES=Object.freeze({
    'Qual é o CEP onde o veículo pernoita?'
   ],
   renovacao:[
+   'Pode me informar a placa do veículo? Se for zero-quilômetro sem placa, basta informar.',
    'Qual é a seguradora atual?',
    'Qual é a data de vencimento da apólice?',
    'Qual é a classe de bônus atual?',
