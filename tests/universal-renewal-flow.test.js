@@ -58,6 +58,11 @@ test('Não consulta produto não suportado nem converte outro serviço em renova
  assert.equal(universalRenewalContext([c('Quero renovar meu seguro Auto e meu seguro de Vida')]),null)
 })
 
+test('Cotação nova posterior não herda oferta de autenticação da renovação anterior',()=>{
+ const history=[c('Quero renovar meu Seguro Auto'),c('Quero cotar um Seguro de Vida novo')]
+ assert.equal(universalRenewalContext(history),null)
+})
+
 test('Murilo não repete seguradora ou vencimento quando foram verificados em uma única apólice',()=>{
  const msgs=[c('Quero renovar meu seguro Auto do Onix 2021, vence em 15/12/2026.'),
  a('O veículo está no nome de pessoa física (CPF) ou jurídica (CNPJ)?'),c('CPF')]
