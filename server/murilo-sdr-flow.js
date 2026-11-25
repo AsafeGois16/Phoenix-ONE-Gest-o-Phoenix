@@ -122,6 +122,7 @@ function volunteered(question,messages){
  for(const [label,re] of Object.entries(normalizations)){if(q===fold(label)&&re.test(text))return true}
  if(/\bmarca, modelo e ano\b/.test(q)&&messages.filter(inbound).some(m=>hasVehicleModelAndYear(m.text)))return true
  if(/\bseguro novo ou renovacao\b/.test(q)&&/\b(?:seguro novo|nova contratacao|novo seguro|renovacao|renovar|primeiro seguro)\b/.test(text))return true
+ if(/\bplaca do veiculo\b/.test(q)&&(/\b[a-z]{3}[- ]?\d[a-z0-9]\d{2}\b/i.test(text)||/\b(?:sem placa|ainda nao tem placa|zero quilometro sem placa)\b/.test(text)))return true
  // A data de vencimento já veio na mensagem inicial: não perguntar de novo.
  if(/\bdata de vencimento da apolice\b/.test(q)&&
   /\b(?:apolice|seguro|vence|vencimento)\b.{0,100}\b\d{2}\/\d{2}\/\d{4}\b/.test(text))return true
