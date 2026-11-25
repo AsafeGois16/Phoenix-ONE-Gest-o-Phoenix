@@ -110,7 +110,7 @@ export function verifiedRenewalSummary(verification,product){
  const single=found&&check.count===1&&policies.length===1?policies[0]:null
  return {found,product,identityType:verification.verified_profile?.tipo_pessoa||null,
   insurer:typeof single?.seguradora==='string'&&single.seguradora.trim()?single.seguradora.trim():null,
-  expiry:typeof single?.fim_vigencia==='string'&&/^(?:\d{4}-\d{2}-\d{2}|\d{2}\\/\d{2}\\/\d{4})$/.test(single.fim_vigencia.trim())?single.fim_vigencia.trim():null,
+  expiry:typeof single?.fim_vigencia==='string'&&/^(?:\d{4}-\d{2}-\d{2}|\d{2}[/]\d{2}[/]\d{4})$/.test(single.fim_vigencia.trim())?single.fim_vigencia.trim():null,
   count:check.count}
 }
 
