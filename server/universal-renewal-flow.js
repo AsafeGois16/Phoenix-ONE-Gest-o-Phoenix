@@ -107,7 +107,7 @@ export function verifiedRenewalSummary(verification,product){
    p&&typeof p==='object'&&(
      autoGroup.has(product)?autoGroup.has(p.product_code):p.product_code===product
    )):[]
- const single=found&&check.count===1&&policies.length===1?policies[0]:null
+ const single=found&&check.count===1&&policies.length===1&&policies[0]?.product_code===product?policies[0]:null
  return {found,product,identityType:verification.verified_profile?.tipo_pessoa||null,
   insurer:typeof single?.seguradora==='string'&&single.seguradora.trim()?single.seguradora.trim():null,
   expiry:typeof single?.fim_vigencia==='string'&&/^(?:\d{4}-\d{2}-\d{2}|\d{2}[/]\d{2}[/]\d{4})$/.test(single.fim_vigencia.trim())?single.fim_vigencia.trim():null,
@@ -125,6 +125,10 @@ export function tagRenewalHandoff(payload,messages){
     !['patrimonio','beneficios'].includes(payload.handoff.department))return payload
  const info=universalRenewalContext(messages)
  if(!info)return payload
+ // Não reutilizar o ramo de uma renovação antiga se o handoff real disser
+ // respeito a outro produto; isso também evita criar categoria errada no Junior.
+ const payloadProduct=maps[payload.handoff.product]||payload.handoff.product
+ if(payloadProduct&&payloadProduct!==info.product)return payload
  const last=String((Array.isArray(messages)?messages:[]).at(-1)?.text||'')
  if(/\b(?:sinistro|emergencia|urgencia|cancelamento|exclusao|inclusao|segunda via)\b/i.test(fold(last)))return payload
  if(payload.handoff.intent&& !['nova_cotacao','renovacao'].includes(payload.handoff.intent))return payload
