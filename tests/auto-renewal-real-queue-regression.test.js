@@ -74,7 +74,8 @@ test('AUTO06: API end-to-end reproduces WhatsApp screenshot, not Comercial/Sem f
  assert.equal(res.data.strategy,'clara_murilo')
  assert.equal(res.data.humanHandoff,true)
  assert.equal(res.data.handoff?.department,'patrimonio')
- assert.equal(res.data.handoff?.intent,'nova_cotacao')
+ // Contrato Junior 25/11: renovação não cria lead novo no funil.
+ assert.equal(res.data.handoff?.intent,'renovacao')
  assert.equal(res.data.handoff?.product,'auto')
  assert.match(res.data.reply,/equipe de Auto\/RE/)
 })
