@@ -77,6 +77,11 @@ test('Junior agrupa auto, moto e frota sem escolher uma apólice automaticamente
  assert.equal(summary.found,true)
  assert.equal(summary.count,2)
  assert.equal(summary.insurer,null)
+ const other=verifiedRenewalSummary({...fixture,
+  coverage_check:{product_code:'auto',result:'found',count:1},
+  policies:[{product_code:'moto',seguradora:'Suhai'}]},'auto')
+ assert.equal(other.found,true)
+ assert.equal(other.insurer,null) // grupo encontrado não implica Auto individual
  const msgs=[c('Quero renovar Seguro Auto'),a('Sou o Murilo, do time comercial.'),c('Sim')]
  const question=nextMuriloSdrDecision(msgs,{verifiedRenewal:summary})
  assert.match(question.reply,/qual contrato você deseja renovar/i)
@@ -95,6 +100,8 @@ test('Renovação vai ao Junior com intent renovacao, sem criar lead',()=>{
  assert.equal(unrelated.handoff.intent,'nova_cotacao')
  const incident=tagRenewalHandoff(p,[c('Quero renovar Seguro de Vida'),c('Agora preciso abrir sinistro')])
  assert.equal(incident.handoff.intent,'nova_cotacao')
+ const mismatched=tagRenewalHandoff({...p,handoff:{...p.handoff,product:'saude'}},msgs)
+ assert.equal(mismatched.handoff.intent,'nova_cotacao')
 })
 
 test('Murilo não repete seguradora ou vencimento quando foram verificados em uma única apólice',()=>{
