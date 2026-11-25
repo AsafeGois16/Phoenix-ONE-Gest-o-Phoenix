@@ -106,6 +106,16 @@ const normalizations={
  'Você possui plano atualmente? Se sim, qual?':/\b(?:ja tenho plano|tenho plano|nao tenho plano|meu plano atual|meu convenio atual)\b/,
  'Você possui seguro de vida atualmente? Se sim, qual?':/\b(?:ja tenho seguro de vida|nao tenho seguro de vida|meu seguro de vida atual)\b/
 }
+function verifiedRenewalAnswered(question,verified){
+ if(!verified||verified.found!==true)return false
+ const q=fold(question)
+ if(verified.insurer&&(
+   /\\bqual e a seguradora atual\\b/.test(q)||
+   /\\b(?:qual e )?(?:seu |o seu )?(?:plano|seguro de vida|seguro odontologico) atual\\b/.test(q)
+ ))return true
+ if(verified.expiry&&/\\bdata de vencimento da apolice\\b/.test(q))return true
+ return false
+}
 function volunteered(question,messages){
  const text=messages.filter(inbound).map(x=>fold(x.text)).join(' ')
  const q=fold(question)
@@ -154,7 +164,7 @@ function offer(product){
  * If the question is about sensitive health/identity data, do not collect in
  * this chat. Leave it to authorized human processing.
  */
-export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=false}={}){
+export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=false,verifiedRenewal=null}={}){
  const list=Array.isArray(messages)?messages:[]
  const last=list.at(-1)
  if(!inbound(last))return null
@@ -192,7 +202,7 @@ export function nextMuriloSdrDecision(messages,{maxQuestions=7,documentIntake=fa
  let next=null
  for(const q of questions){
   if(q.sensitive||privateDetails.test(q.text))continue
-  if(asked.has(q.id)||volunteered(q.text,list))continue
+  if(asked.has(q.id)||volunteered(q.text,list)||verifiedRenewalAnswered(q.text,verifiedRenewal))continue
   next=q
   break
  }
