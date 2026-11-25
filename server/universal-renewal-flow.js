@@ -95,6 +95,6 @@ export function verifiedRenewalSummary(verification,product){
  const single=policies.length===1?policies[0]:null
  return {found:policies.length>0,product,identityType:verification.verified_profile?.tipo_pessoa||null,
   insurer:typeof single?.seguradora==='string'&&single.seguradora.trim()?single.seguradora.trim():null,
-  expiry:typeof single?.fim_vigencia==='string'&&single.fim_vigencia.trim()?single.fim_vigencia.trim():null,
+  expiry:typeof single?.fim_vigencia==='string'&&/^(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})$/.test(single.fim_vigencia.trim())?single.fim_vigencia.trim():null,
   count:policies.length}
 }
