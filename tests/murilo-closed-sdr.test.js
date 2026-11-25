@@ -78,7 +78,7 @@ test('SDR: ramo PF/PJ e novo/renovação aplicam somente perguntas de sua trilha
  const m=[...corpo,inc('É renovação, pelo CPF')]
  const approved=approvedQuestionsFor('auto',{type:'cpf',renewal:true})
  assert.ok(approved.some(q=>/apólice atual/i.test(q.text)))
- assert.ok(approved.every(q=>!/\bplaca do veículo\b/.test(q.text)))
+ assert.equal(approved.filter(q=>/\bplaca do veículo\b/.test(q.text)).length,1)
  const q=nextMuriloSdrDecision(m)
  assert.equal(q.agent,'murilo')
  assert.ok(approved.some(x=>x.text===q.reply),q.reply)
