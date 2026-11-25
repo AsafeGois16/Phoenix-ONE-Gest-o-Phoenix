@@ -68,7 +68,7 @@ test('Murilo não repete seguradora ou vencimento quando foram verificados em um
  a('O veículo está no nome de pessoa física (CPF) ou jurídica (CNPJ)?'),c('CPF')]
  const verified={found:true,product:'auto',insurer:'Suhai',expiry:'2026-12-15',count:1}
  const decision=nextMuriloSdrDecision(msgs,{verifiedRenewal:verified,documentIntake:false})
- assert.match(decision.reply,/classe de bônus atual/i)
+ assert.match(decision.reply,/placa do veículo/i)
  assert.doesNotMatch(decision.reply,/seguradora atual|vencimento da apólice/i)
 })
 
