@@ -111,7 +111,7 @@ function verifiedRenewalAnswered(question,verified){
  const q=fold(question)
  if(verified.insurer&&(
    /\bqual e a seguradora atual\b/.test(q)||
-   /\b(?:qual e )?(?:seu |o seu )?(?:plano|seguro de vida|seguro odontologico) atual\b/.test(q)
+   /\b(?:qual e )?(?:seu |o seu )?(?:plano(?: de saude| odontologico| dental)?|seguro de vida|seguro odontologico) atual\b/.test(q)
  ))return true
  if(verified.expiry&&/\bdata de vencimento da apolice\b/.test(q))return true
  return false
