@@ -442,7 +442,7 @@ export async function respondValidated(body,res,pin=null){
  // Closed SDR flow runs only after identity, safety, consent and service guards.
  // Disabled by default to preserve production until Junior jointly homologates.
  if(process.env.PHX_MURILO_CLOSED_QUESTIONS==='true'&&agent==='murilo'){
-  const sdr=nextMuriloSdrDecision(activeMessages,{documentIntake:process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'})
+  const sdr=nextMuriloSdrDecision(activeMessages,{documentIntake:process.env.PHX_AUTO_RE_DOCUMENT_INTAKE==='true'&&!(universalRenewalEnabled&&universalRenewalContext(activeMessages)?.queryable)})
   if(sdr)return replyToJunior(sdr)
  }
  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),17800)
