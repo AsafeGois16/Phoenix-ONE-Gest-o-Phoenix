@@ -9,9 +9,9 @@ import {readFileSync} from 'node:fs'
 
 const c=text=>({direction:'inbound',author:'contact',text})
 const a=text=>({direction:'outbound',author:'agent',text})
-const opening=product=>[c('Olá, quero renovar meu seguro de '+product+'.'),
+const opening=product=>[c('Olá, quero renovar meu '+({saúde:'plano de saúde',residencial:'seguro residencial',auto:'seguro Auto'}[product]||'seguro de '+product)+'.'),
  a('Olá! Sou a Clara, concierge da Phoenix Insurance. Como posso te chamar?'),
- c('Mariana Teste')]
+ c('Mariana Silva')]
 
 test('Clara oferece identidade para renovação Vida, Saúde, Residencial e Auto',()=>{
  for(const product of ['vida','saúde','residencial','auto']){
