@@ -87,14 +87,46 @@ export function universalRenewalSwitchMessage(info,found){
   'Não consegui confirmar o cadastro com segurança neste momento. Podemos continuar com a cotação normalmente. '
  return prefix+'Posso encaminhar sua renovação ao Murilo, nosso assistente comercial, para continuar o atendimento?'
 }
+/**
+ * O contrato atualizado do Junior distingue resultado de cobertura
+ * explicitamente: nunca inferir "not_found" de policies=[].
+ * Com Auto/Moto/Frota, a contagem representa o grupo consultado.
+ */
+const autoGroup=new Set(['auto','moto','frota'])
 export function verifiedRenewalSummary(verification,product){
+ const check=verification?.coverage_check
  if(verification?.status!=='verified'||!Array.isArray(verification.field_scopes)||
-    !verification.field_scopes.includes('policies.read')||!Array.isArray(verification.policies))return null
- const policies=verification.policies.filter(p=>p?.product_code===product)
- // Sem seleção automática de contrato, inclusive se houver vários riscos.
- const single=policies.length===1?policies[0]:null
- return {found:policies.length>0,product,identityType:verification.verified_profile?.tipo_pessoa||null,
+    !verification.field_scopes.includes('policies.read')||
+    !check||check.product_code!==product||
+    !['found','not_found'].includes(check.result)||
+    !Number.isInteger(check.count)||check.count<0||check.count>100000||
+    (check.result==='found')!==(check.count>0))return null
+ // Resultado do Junior é a autoridade; a lista pode vir parcial ou truncada.
+ const found=check.result==='found'
+ const policies=Array.isArray(verification.policies)?verification.policies.filter(p=>
+   p&&typeof p==='object'&&(
+     autoGroup.has(product)?autoGroup.has(p.product_code):p.product_code===product
+   )):[]
+ const single=found&&check.count===1&&policies.length===1?policies[0]:null
+ return {found,product,identityType:verification.verified_profile?.tipo_pessoa||null,
   insurer:typeof single?.seguradora==='string'&&single.seguradora.trim()?single.seguradora.trim():null,
-  expiry:typeof single?.fim_vigencia==='string'&&/^(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})$/.test(single.fim_vigencia.trim())?single.fim_vigencia.trim():null,
-  count:policies.length}
+  expiry:typeof single?.fim_vigencia==='string'&&/^(?:\d{4}-\d{2}-\d{2}|\d{2}\\/\d{2}\\/\d{4})$/.test(single.fim_vigencia.trim())?single.fim_vigencia.trim():null,
+  count:check.count}
+}
+
+/**
+ * Só marcar como renovação um encaminhamento humano realmente autorizado
+ * e vinculado a um pedido atual de renovação, preservando outras operações.
+ * O Junior usa intent=renovacao para NÃO criar lead no funil de vendas.
+ */
+export function tagRenewalHandoff(payload,messages){
+ if(payload?.humanHandoff!==true||!payload.handoff||
+    !['murilo','clara'].includes(payload.agent)||
+    !['patrimonio','beneficios'].includes(payload.handoff.department))return payload
+ const info=universalRenewalContext(messages)
+ if(!info)return payload
+ const last=String((Array.isArray(messages)?messages:[]).at(-1)?.text||'')
+ if(/\b(?:sinistro|emergencia|urgencia|cancelamento|exclusao|inclusao|segunda via)\b/i.test(fold(last)))return payload
+ if(payload.handoff.intent&& !['nova_cotacao','renovacao'].includes(payload.handoff.intent))return payload
+ return {...payload,handoff:{...payload.handoff,intent:'renovacao',product:info.product}}
 }
