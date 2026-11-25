@@ -25,7 +25,7 @@ import {shouldLookupPersonalData,firstMuriloAppearance,ensureMuriloIntro,isReado
 import {operationalRouting,LEGACY_COMMERCIAL_ROUTES} from '../../../server/orchestration-operational.js'
 import {nextMuriloSdrDecision,muriloMediaReceived} from '../../../server/murilo-sdr-flow.js'
 import {isAutoRenewalForVerification,isAutoPortfolioOffer,verifiedAutoPortfolioDecision} from '../../../server/auto-verified-portfolio-handoff.js'
-import {universalRenewalContext,universalRenewalClaraStage,universalRenewalSwitchMessage,verifiedRenewalSummary,isUniversalRenewalOffer} from '../../../server/universal-renewal-flow.js'
+import {universalRenewalContext,universalRenewalClaraStage,universalRenewalSwitchMessage,verifiedRenewalSummary,isUniversalRenewalOffer,tagRenewalHandoff} from '../../../server/universal-renewal-flow.js'
 import {resolvePilotMode,orchestrationErrorCode} from '../../../server/orchestration-pilot.js'
 export const config={maxDuration:20}
 const DEPARTMENTS=['patrimonio','beneficios','comercial','backoffice',...(process.env.PHOENIX_ONE_JUNIOR_FINANCEIRO_ENABLED==='true'?['financeiro']:[])]
@@ -192,6 +192,9 @@ export async function respondValidated(body,res,pin=null){
   // A fila Comercial não existe no Gestão Phoenix: cotações confirmadas do
   // Murilo vão diretamente a beneficios ou patrimonio conforme o produto.
   payload=routeConfirmedMuriloQuote(payload,body.messages)
+  // Contrato Junior 25/11: uma renovação nunca entra como lead de nova cotação.
+  // Aplicar APÓS as normalizações de rota e de aceite humano.
+  if(!isAudioOnlyNotice(last))payload=tagRenewalHandoff(payload,activeMessages)
   if(payload.humanHandoff)console.info('phoenix_handoff_proposed',JSON.stringify({agent:payload.agent,department:payload.handoff?.department||null}))
   let reply=String(payload.reply||'')
   reply=omitRepeatedAgentIntroduction(reply,payload.agent,seen)
